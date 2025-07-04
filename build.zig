@@ -39,6 +39,7 @@ pub fn build(b: *std.Build) void {
         "-drive",
         "format=raw,file=fat:rw:zig-out",
         // "-serial", "stdio",
+        // "-nographic",
     });
 
     // run_cmd.step.dependOn(b.getInstallStep());
