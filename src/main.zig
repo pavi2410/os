@@ -53,7 +53,7 @@ fn displayMemoryMap() void {
         return;
     }
 
-    mmap_size += 512;
+    mmap_size += 2 * desc_size;
 
     var mmap_ptr: [*]align(8) u8 = undefined;
 
@@ -84,6 +84,8 @@ fn displayMemoryMap() void {
         mmap_size, desc_size, desc_count,
     });
 
+    printf("MemoryDescriptor size: {d} bytes\r\n", .{ @sizeOf(MemoryDescriptor) });
+
     var b: usize = 0;
     var i: usize = 0;
     while (i < desc_count) : (i += 1) {
@@ -91,12 +93,14 @@ fn displayMemoryMap() void {
         const desc_ptr = @as(*MemoryDescriptor, @ptrCast(@alignCast(mmap_ptr + desc_offset)));
 
         const typ = @tagName(desc_ptr.type);
-        const addr = desc_ptr.physical_start;
+        const start = desc_ptr.physical_start;
         const pages = desc_ptr.number_of_pages;
+
+        const end = start + pages * 4096;
 
         if (desc_ptr.type == MemoryType.conventional_memory) {
             b += 1;
-            printf("    Type:{s} Addr:{x} Pages:{d}\r\n", .{ typ, addr, pages });
+            printf("  Type:{s} - {x} => {x} Pages:{d}\r\n", .{ typ, start, end, pages });
         }
     }
 
