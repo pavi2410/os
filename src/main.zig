@@ -24,17 +24,20 @@ fn uefi_bootstrap() void {
     uefi.printMultine(banner);
     uefi.printf("UEFI kernel bootstrap starting...\r\n", .{});
 
-    const mem_map = uefi.getMemoryMap() orelse {
+    // Get initial memory map for informational purposes
+    const initial_mem_map = uefi.getMemoryMap() orelse {
         uefi.printf("Failed to get memory map.\r\n", .{});
         while (true) {}
     };
 
-    // Exit boot services
-    if (!uefi.exitBootServices(mem_map.map_key)) {
+    uefi.printMemoryMap(initial_mem_map);
+
+    // Exit boot services (this will get a fresh memory map internally)
+    const mem_map = uefi.exitBootServices() orelse {
         uefi.printf("Failed to exit boot services.\r\n", .{});
         while (true) {}
-    }
+    };
 
-    // Jump to kernel entry point
+    // Jump to kernel entry point with the final memory map
     kernel.kernel_entry(mem_map);
 }
