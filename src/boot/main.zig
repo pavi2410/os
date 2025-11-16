@@ -2,7 +2,7 @@ const std = @import("std");
 
 const uefi = @import("uefi.zig");
 const elf_loader = @import("elf_loader.zig");
-const boot_info = @import("boot_info");
+const shared = @import("shared");
 
 const W = std.unicode.utf8ToUtf16LeStringLiteral;
 
@@ -45,7 +45,7 @@ pub fn main() void {
     };
 
     // Prepare boot info structure
-    var boot_info_data = boot_info.BootInfo{
+    var boot_info_data = shared.BootInfo{
         .memory_map = .{
             .entries = final_mem_map.mmap_ptr,
             .size = final_mem_map.mmap_size,
@@ -57,6 +57,6 @@ pub fn main() void {
 
     // Jump to kernel entry point
     // Pass boot info pointer in RDI (System V ABI calling convention)
-    const kernel_entry: *const fn (*const boot_info.BootInfo) callconv(.{ .x86_64_sysv = .{} }) noreturn = @ptrFromInt(loaded_kernel.entry_point);
+    const kernel_entry: *const fn (*const shared.BootInfo) callconv(.{ .x86_64_sysv = .{} }) noreturn = @ptrFromInt(loaded_kernel.entry_point);
     kernel_entry(&boot_info_data);
 }

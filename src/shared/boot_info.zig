@@ -1,6 +1,5 @@
 /// Boot information structure passed from bootloader to kernel
 /// This structure is passed via RDI register on kernel entry
-
 pub const BootInfo = struct {
     /// Memory map from UEFI
     memory_map: MemoryMap,

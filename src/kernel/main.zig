@@ -1,9 +1,9 @@
 const serial = @import("serial.zig");
-const boot_info = @import("boot_info");
+const shared = @import("shared");
 
 /// Kernel entry point
 /// Called by bootloader with boot information in RDI register
-export fn _start(boot_info_ptr: *const boot_info.BootInfo) callconv(.{ .x86_64_sysv = .{} }) noreturn {
+export fn _start(boot_info_ptr: *const shared.BootInfo) callconv(.{ .x86_64_sysv = .{} }) noreturn {
     // Initialize serial port
     serial.init();
 

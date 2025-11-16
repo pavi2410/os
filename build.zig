@@ -6,8 +6,8 @@ pub fn build(b: *std.Build) void {
     });
 
     // Shared boot_info module
-    const boot_info_mod = b.createModule(.{
-        .root_source_file = b.path("src/boot_info.zig"),
+    const shared_mod = b.createModule(.{
+        .root_source_file = b.path("src/shared/boot_info.zig"),
     });
 
     // Bootloader target (UEFI)
@@ -23,7 +23,7 @@ pub fn build(b: *std.Build) void {
         .target = boot_target,
         .optimize = optimize,
     });
-    boot_mod.addImport("boot_info", boot_info_mod);
+    boot_mod.addImport("shared", shared_mod);
 
     const bootloader = b.addExecutable(.{
         .name = "bootx64",
@@ -52,7 +52,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .code_model = .kernel,
     });
-    kernel_mod.addImport("boot_info", boot_info_mod);
+    kernel_mod.addImport("shared", shared_mod);
 
     const kernel = b.addExecutable(.{
         .name = "kernel.elf",
