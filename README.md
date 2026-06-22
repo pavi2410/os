@@ -17,16 +17,42 @@
 
 ## 🛠 Toolchain
 
-* Zig (v0.14+ recommended)
-* QEMU - `qemu-system-x86_64`
-* OVMF (UEFI firmware for QEMU) - `/usr/share/ovmf/OVMF.fd`
-* WSL / Linux (build environment)
+* Zig (v0.16+ recommended)
+* QEMU — `qemu-system-x86_64`
+* OVMF (UEFI firmware for QEMU)
 
-Run the following command to install the required tools:
+### macOS
+
+Install [Homebrew](https://brew.sh) and [mise](https://mise.jdx.dev), then:
 
 ```bash
-sudo apt install qemu-system-x86
-mise activate
+brew install qemu
+mise install
+eval "$(mise activate zsh)"   # add to ~/.zshrc to persist
+```
+
+Copy UEFI firmware into the project (one-time):
+
+```bash
+mkdir -p ovmf
+cp "$(brew --prefix qemu)/share/qemu/edk2-x86_64-code.fd" ovmf/OVMF_CODE_4M.fd
+dd if=/dev/zero of=ovmf/OVMF_VARS_4M.fd bs=1m count=4
+```
+
+### Linux / WSL
+
+```bash
+sudo apt install qemu-system-x86 ovmf
+mise install
+eval "$(mise activate bash)"   # add to ~/.bashrc to persist
+```
+
+Copy UEFI firmware into the project (one-time):
+
+```bash
+mkdir -p ovmf
+cp /usr/share/OVMF/OVMF_CODE_4M.fd ovmf/
+cp /usr/share/OVMF/OVMF_VARS_4M.fd ovmf/
 ```
 
 ## 💻 Building & Running
