@@ -1,6 +1,6 @@
 # Phase 1 — Page tables and higher-half kernel
 
-**Goal:** Install kernel-owned page tables and link/run the kernel from a high canonical virtual address.
+**Goal:** Link and run the kernel from a high canonical virtual address with a working virtual memory model. Boot-time paging is handled by Limine (HHDM + higher-half load); this phase adds kernel link layout, address helpers, and eventually kernel-owned page table helpers for runtime mapping.
 
 **Depends on:** [Phase 0 — Foundation](00-foundation.md)
 
@@ -10,36 +10,45 @@
 
 ## Checklist
 
-- [ ] Choose higher-half base (e.g. `0xFFFF800000000000` + physical offset)
-- [ ] Update [`linker.ld`](../../linker.ld) for higher-half virtual addresses
-- [ ] Update [`build.zig`](../../build.zig) `image_base` / link settings if needed
+### Higher-half link and boot handoff
+
+- [x] Choose higher-half base — `0xFFFFFFFF80000000` (Limine top 2 GiB / kernel code model) in [`kernel/mm/address.zig`](../../kernel/mm/address.zig)
+- [x] Update [`linker.ld`](../../linker.ld) for higher-half virtual addresses (`.limine_requests`, page-aligned segments)
+- [x] Update [`build.zig`](../../build.zig) link settings — `.code_model = .kernel` + linker script (no `image_base`; VA comes from `linker.ld`)
+- [x] Boot paging and higher-half entry — Limine loads the kernel at its linked VA and sets up HHDM (replaces manual `CR3` / identity-map bootstrap)
+- [x] Request HHDM offset from Limine and store it in [`kernel/mm/address.zig`](../../kernel/mm/address.zig) (`physToVirt` / `virtToPhys`)
+- [x] Verify serial MMIO (`0x3F8`) works after Limine handoff
+- [x] Document VA ↔ PA layout in [`kernel/mm/address.zig`](../../kernel/mm/address.zig)
+- [x] `zig build run` succeeds with no triple-fault on boot
+
+### Kernel-owned paging (remaining)
+
 - [ ] Add [`arch/x86_64/paging.zig`](../../kernel/arch/x86_64/paging.zig)
   - [ ] 4-level page table types (PML4 → PDPT → PD → PT)
   - [ ] `mapPage` / `unmapPage` helpers
   - [ ] Page flag helpers (present, writable, no-exec, huge page optional)
-- [ ] Build initial page tables at boot
-  - [ ] Map kernel physical frames to higher-half virtual addresses
-  - [ ] Temporary identity map for low memory during transition (if needed)
-- [ ] Load `CR3` and jump to higher-half code (or enable mapping before `_start` continues)
-- [ ] Verify serial MMIO (`0x3F8`) remains mapped after transition
-- [ ] Tear down unnecessary identity mappings once higher-half is stable
-- [ ] Document final VA ↔ PA layout in code comments or this doc
+- [ ] Verify kernel `.text` runs from the higher-half — print RIP in debug output
+- [ ] Deliberate page fault on an unmapped address — confirm Phase 0 IDT handler fires
+- [ ] Account page-table / boot mapping memory in the memory map model (e.g. mark `bootloader_reclaimable` regions non-allocatable)
 
 ---
 
 ## Acceptance criteria
 
-1. **Kernel `.text` runs from the higher-half** — debug output confirms RIP is in the high canonical range.
-2. **Serial output works** after the paging transition (same messages as Phase 0).
-3. **Deliberate page fault** on an unmapped high-half address is caught by the Phase 0 IDT handler.
-4. **Low identity map removed** except regions still required (e.g. MMIO, boot structures until Phase 2 reserves them).
-5. **`zig build run` succeeds** with no QEMU triple-fault on boot.
-6. **Page table memory** is accounted for in the memory map model (not treated as free RAM).
+| # | Criterion | Status |
+|---|-----------|--------|
+| 1 | Kernel `.text` runs from the higher-half (RIP in high canonical range) | Pending — add RIP check |
+| 2 | Serial output works after handoff | **Done** |
+| 3 | Deliberate page fault caught by Phase 0 IDT handler | Pending |
+| 4 | No unnecessary low identity map in kernel page tables | **N/A** — Limine owns boot page tables; kernel does not install an identity map |
+| 5 | `zig build run` succeeds with no triple-fault | **Done** |
+| 6 | Page table memory not treated as free RAM | Pending |
 
 ---
 
 ## Notes
 
-- The bootloader currently loads the kernel at physical `0x100000`. Paging maps those frames — it does not relocate the ELF.
-- UEFI page tables are fully replaced; do not assume firmware mappings persist.
+- Limine loads the executable at its **linked virtual address**; the ELF is not relocated to a fixed physical base.
+- Limine provides HHDM (base revision 6): only selected memory-map region types are mapped — there is no full low-memory identity map.
+- Kernel-owned `paging.zig` helpers are still needed for runtime mapping (allocators, user pages) in Phase 2+, but not for the boot transition.
 - Keep paging helpers free of allocator dependencies (use preallocated or boot-time static tables for now).
