@@ -107,18 +107,25 @@ pub fn printMemoryMap(mmap_info: MemoryMapInfo) void {
 pub fn exitBootServices() ?MemoryMapInfo {
     const boot_services = uefi.system_table.boot_services.?;
 
-    // Get a fresh memory map right before exiting boot services
-    const mem_map = getMemoryMap() orelse {
-        printf("Failed to get memory map for exitBootServices\r\n", .{});
-        return null;
-    };
+    while (true) {
+        const mem_map = getMemoryMap() orelse {
+            printf("Failed to get memory map for exitBootServices\r\n", .{});
+            return null;
+        };
 
-    // Try to exit boot services with the fresh map key
-    boot_services.exitBootServices(uefi.handle, mem_map.map_key) catch {
-        printf("ExitBootServices failed\r\n", .{});
-        return null;
-    };
+        boot_services.exitBootServices(uefi.handle, mem_map.map_key) catch |err| switch (err) {
+            error.InvalidParameter => {
+                // The map changed between GetMemoryMap and ExitBootServices; fetch a fresh map.
+                boot_services.freePool(mem_map.mmap_ptr) catch {};
+                continue;
+            },
+            else => {
+                printf("ExitBootServices failed: {any}\r\n", .{err});
+                boot_services.freePool(mem_map.mmap_ptr) catch {};
+                return null;
+            },
+        };
 
-    // Return the memory map for the kernel to use
-    return mem_map;
+        return mem_map;
+    }
 }
