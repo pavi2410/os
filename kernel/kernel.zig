@@ -4,7 +4,11 @@ const gdt = @import("arch/x86_64/gdt.zig");
 const idt = @import("arch/x86_64/idt.zig");
 const limine = @import("limine");
 const memory_map = @import("mm/memory_map.zig");
+const paging = @import("arch/x86_64/paging.zig");
 const serial = @import("arch/x86_64/serial.zig");
+
+/// Deliberately unmapped higher-half address used to verify the page fault handler.
+const page_fault_test_addr: u64 = 0xFFFFFFFF90000000;
 
 pub const BootContext = struct {
     hhdm_offset: u64,
@@ -37,7 +41,32 @@ pub fn init(ctx: BootContext) void {
     memory_map.init(ctx.memory_map);
     printMemoryMap();
 
-    serial.writeString("Kernel initialized. Halting.\r\n");
+    verifyHigherHalfExecution();
+    verifyPagingHelpers();
+    triggerDeliberatePageFault();
+}
+
+fn verifyHigherHalfExecution() void {
+    const rip = cpu.readRip();
+    serial.printf("RIP: 0x{x} (higher-half: {s})\r\n", .{
+        rip,
+        if (address.isHigherHalf(rip)) "yes" else "NO",
+    });
+}
+
+fn verifyPagingHelpers() void {
+    serial.printf("CR3: 0x{x}\r\n", .{paging.readCr3()});
+    serial.printf("Page fault probe 0x{x} mapped: {s}\r\n", .{
+        page_fault_test_addr,
+        if (paging.isMapped(page_fault_test_addr)) "yes" else "no",
+    });
+}
+
+fn triggerDeliberatePageFault() noreturn {
+    serial.writeString("Triggering deliberate page fault...\r\n");
+    const bad_ptr: *volatile u8 = @ptrFromInt(page_fault_test_addr);
+    _ = bad_ptr.*;
+    cpu.haltForever();
 }
 
 fn printMemoryMap() void {

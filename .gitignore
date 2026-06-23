@@ -6,3 +6,4 @@ ovmf/
 limine-binary/
 iso_root/
 *.iso
+.DS_Store

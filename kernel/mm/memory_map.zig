@@ -46,13 +46,24 @@ pub fn loadMap(response: *const limine.MemmapResponse) void {
         region_count += 1;
     }
 
+    applyBootReservations();
+}
+
+fn applyBootReservations() void {
     for (regions[0..region_count]) |*region| {
-        if (region.kind == .boot_services or region.kind == .reserved) {
-            if (region.limine_type == @intFromEnum(limine.MemmapType.executable_and_modules)) {
+        const ty: limine.MemmapType = @enumFromInt(region.limine_type);
+        switch (ty) {
+            .executable_and_modules => {
                 region.allocatable = false;
                 region.boot_reserved = true;
                 region.reservation = "kernel image";
-            }
+            },
+            .bootloader_reclaimable => {
+                region.allocatable = false;
+                region.boot_reserved = true;
+                region.reservation = "page tables / boot mappings";
+            },
+            else => {},
         }
     }
 }

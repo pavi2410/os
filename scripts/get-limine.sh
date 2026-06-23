@@ -15,6 +15,14 @@ root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 limine_version="v12.3.3"
 limine_url="https://github.com/Limine-Bootloader/Limine/releases/download/${limine_version}/limine-binary.tar.gz"
 
+finish() {
+    return 0 2>/dev/null || exit 0
+}
+
+fail() {
+    return 1 2>/dev/null || exit 1
+}
+
 try_set() {
     bin="$1"
     share="$2"
@@ -29,14 +37,14 @@ try_set() {
 }
 
 if try_set "${LIMINE_BIN}" "${LIMINE_SHARE}"; then
-    exit 0
+    finish
 fi
 
 if command -v limine >/dev/null 2>&1; then
     limine_bin=$(command -v limine)
     prefix=$(CDPATH= cd -- "$(dirname "$limine_bin")/.." && pwd)
     if try_set "$limine_bin" "$prefix/share/limine"; then
-        exit 0
+        finish
     fi
 fi
 
@@ -44,7 +52,7 @@ if command -v brew >/dev/null 2>&1; then
     brew_prefix=$(brew --prefix limine 2>/dev/null || true)
     if [ -n "$brew_prefix" ]; then
         if try_set "$brew_prefix/bin/limine" "$brew_prefix/share/limine"; then
-            exit 0
+            finish
         fi
     fi
 fi
@@ -57,5 +65,5 @@ fi
 
 try_set "$root/limine-binary/limine" "$root/limine-binary" || {
     echo "error: could not find or install Limine" >&2
-    exit 1
+    fail
 }

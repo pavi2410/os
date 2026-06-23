@@ -13,6 +13,13 @@ pub inline fn hlt() void {
     asm volatile ("hlt");
 }
 
+/// Return the address of the next instruction (approximate RIP).
+pub inline fn readRip() u64 {
+    return asm volatile ("lea (%%rip), %[rip]"
+        : [rip] "=r" (-> u64),
+    );
+}
+
 /// Spin forever, halting the CPU between iterations.
 pub fn haltForever() noreturn {
     while (true) hlt();

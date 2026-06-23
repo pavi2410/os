@@ -68,3 +68,25 @@ test "executable_and_modules regions are non-allocatable" {
     try std.testing.expect(!regions[0].allocatable);
     try std.testing.expectEqualStrings("kernel image", regions[0].reservation.?);
 }
+
+test "bootloader_reclaimable regions are non-allocatable" {
+    var entry = limine.MemmapEntry{
+        .base = 0x900000,
+        .length = 0x100000,
+        .type = @intFromEnum(limine.MemmapType.bootloader_reclaimable),
+    };
+    var entries: [1]?*limine.MemmapEntry = .{&entry};
+
+    const response = limine.MemmapResponse{
+        .revision = 0,
+        .entry_count = 1,
+        .entries = @ptrCast(&entries),
+    };
+
+    memory_map.loadMap(&response);
+
+    const regions = memory_map.regionsSlice();
+    try std.testing.expect(regions[0].boot_reserved);
+    try std.testing.expect(!regions[0].allocatable);
+    try std.testing.expectEqualStrings("page tables / boot mappings", regions[0].reservation.?);
+}

@@ -21,15 +21,15 @@
 - [x] Document VA ↔ PA layout in [`kernel/mm/address.zig`](../../kernel/mm/address.zig)
 - [x] `zig build run` succeeds with no triple-fault on boot
 
-### Kernel-owned paging (remaining)
+### Kernel-owned paging
 
-- [ ] Add [`arch/x86_64/paging.zig`](../../kernel/arch/x86_64/paging.zig)
-  - [ ] 4-level page table types (PML4 → PDPT → PD → PT)
-  - [ ] `mapPage` / `unmapPage` helpers
-  - [ ] Page flag helpers (present, writable, no-exec, huge page optional)
-- [ ] Verify kernel `.text` runs from the higher-half — print RIP in debug output
-- [ ] Deliberate page fault on an unmapped address — confirm Phase 0 IDT handler fires
-- [ ] Account page-table / boot mapping memory in the memory map model (e.g. mark `bootloader_reclaimable` regions non-allocatable)
+- [x] Add [`arch/x86_64/paging.zig`](../../kernel/arch/x86_64/paging.zig)
+  - [x] 4-level page table types (PML4 → PDPT → PD → PT)
+  - [x] `mapPage` / `unmapPage` helpers
+  - [x] Page flag helpers (present, writable, no-exec, huge page optional)
+- [x] Verify kernel `.text` runs from the higher-half — print RIP in debug output
+- [x] Deliberate page fault on an unmapped address — confirm Phase 0 IDT handler fires
+- [x] Account page-table / boot mapping memory in the memory map model (mark `bootloader_reclaimable` non-allocatable)
 
 ---
 
@@ -37,12 +37,12 @@
 
 | # | Criterion | Status |
 |---|-----------|--------|
-| 1 | Kernel `.text` runs from the higher-half (RIP in high canonical range) | Pending — add RIP check |
+| 1 | Kernel `.text` runs from the higher-half (RIP in high canonical range) | **Done** |
 | 2 | Serial output works after handoff | **Done** |
-| 3 | Deliberate page fault caught by Phase 0 IDT handler | Pending |
+| 3 | Deliberate page fault caught by Phase 0 IDT handler | **Done** |
 | 4 | No unnecessary low identity map in kernel page tables | **N/A** — Limine owns boot page tables; kernel does not install an identity map |
 | 5 | `zig build run` succeeds with no triple-fault | **Done** |
-| 6 | Page table memory not treated as free RAM | Pending |
+| 6 | Page table memory not treated as free RAM | **Done** |
 
 ---
 
@@ -50,5 +50,5 @@
 
 - Limine loads the executable at its **linked virtual address**; the ELF is not relocated to a fixed physical base.
 - Limine provides HHDM (base revision 6): only selected memory-map region types are mapped — there is no full low-memory identity map.
-- Kernel-owned `paging.zig` helpers are still needed for runtime mapping (allocators, user pages) in Phase 2+, but not for the boot transition.
-- Keep paging helpers free of allocator dependencies (use preallocated or boot-time static tables for now).
+- Kernel-owned `paging.zig` helpers are for runtime mapping (allocators, user pages) in Phase 2+; boot transition paging remains Limine's responsibility.
+- Keep paging helpers free of allocator dependencies (static table pool in `paging.zig` for now).
