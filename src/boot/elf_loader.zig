@@ -163,41 +163,18 @@ fn parseAndLoadElf(file_buffer: []align(8) u8) ElfLoadError!LoadedElf {
     // Allocate pages for the kernel - try at requested address first, then anywhere
     const page_count = (total_size + 0xFFF) / 0x1000;
 
-    var pages_result = boot_services.allocatePages(
+    const pages = boot_services.allocatePages(
         .{ .address = @ptrFromInt(load_base) },
         .loader_data,
         page_count,
-    );
-
-    if (pages_result) |_| {
-        uefi_utils.printf("Successfully allocated at requested address\r\n", .{});
-    } else |_| {
-        uefi_utils.printf("Failed to allocate at requested address 0x{x}\r\n", .{load_base});
-        uefi_utils.printf("Trying to allocate anywhere below 4GB...\r\n", .{});
-
-        // Try allocating below 4GB as a fallback
-        pages_result = boot_services.allocatePages(
-            .{ .max_address = @ptrFromInt(0x100000000) },
-            .loader_data,
-            page_count,
-        );
-    }
-
-    const pages = pages_result catch {
-        uefi_utils.printf("Failed to allocate {d} pages\r\n", .{page_count});
+    ) catch {
+        uefi_utils.printf("Failed to allocate {d} pages at 0x{x}\r\n", .{ page_count, load_base });
         return ElfLoadError.OutOfMemory;
     };
 
     const physical_addr = @intFromPtr(pages.ptr);
 
     uefi_utils.printf("Allocated {d} pages at 0x{x}\r\n", .{ page_count, physical_addr });
-
-    // Verify we got the requested address
-    if (physical_addr != load_base) {
-        uefi_utils.printf("ERROR: Allocated at 0x{x} but kernel expects 0x{x}\r\n", .{ physical_addr, load_base });
-        uefi_utils.printf("Kernel is position-dependent and cannot be relocated!\r\n", .{});
-        return ElfLoadError.OutOfMemory;
-    }
 
     // Zero out the allocated memory
     const bytes: [*]u8 = @ptrCast(pages.ptr);
