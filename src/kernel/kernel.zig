@@ -1,4 +1,5 @@
-const serial = @import("serial.zig");
+const cpu = @import("arch/x86_64/cpu.zig");
+const serial = @import("arch/x86_64/serial.zig");
 const shared = @import("shared");
 
 var boot_info: *const shared.BootInfo = undefined;
@@ -27,5 +28,5 @@ pub fn init(bi: *const shared.BootInfo) void {
 }
 
 pub fn run() noreturn {
-    while (true) asm volatile ("hlt");
+    while (true) cpu.hlt();
 }
