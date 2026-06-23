@@ -106,6 +106,50 @@ pub fn loadKernel(kernel_path: [*:0]const u16) ElfLoadError!LoadedElf {
     return parseAndLoadElf(file_buffer);
 }
 
+fn validateProgramHeaders(file_buffer: []const u8, ehdr: *const elf.Elf64_Ehdr) ElfLoadError!void {
+    var entry_in_load = false;
+
+    for (0..ehdr.e_phnum) |i| {
+        const phdr_offset = ehdr.e_phoff + i * ehdr.e_phentsize;
+        if (phdr_offset + @sizeOf(elf.Elf64_Phdr) > file_buffer.len) {
+            uefi_utils.printf("Program header {d} extends past end of file\r\n", .{i});
+            return ElfLoadError.InvalidElf;
+        }
+
+        const phdr: *const elf.Elf64_Phdr = @ptrCast(@alignCast(file_buffer.ptr + phdr_offset));
+        if (phdr.p_type != elf.PT_LOAD) continue;
+
+        if (phdr.p_memsz > 0 and phdr.p_paddr == 0) {
+            uefi_utils.printf("PT_LOAD segment at vaddr 0x{x} has no physical address\r\n", .{phdr.p_vaddr});
+            return ElfLoadError.InvalidElf;
+        }
+
+        if (phdr.p_filesz > phdr.p_memsz) {
+            uefi_utils.printf("PT_LOAD segment at 0x{x} has filesz > memsz\r\n", .{phdr.p_paddr});
+            return ElfLoadError.InvalidElf;
+        }
+
+        if (phdr.p_offset + phdr.p_filesz > file_buffer.len) {
+            uefi_utils.printf("PT_LOAD segment at 0x{x} extends past end of file\r\n", .{phdr.p_paddr});
+            return ElfLoadError.InvalidElf;
+        }
+
+        const phys_end = phdr.p_paddr + phdr.p_memsz;
+        const virt_end = phdr.p_vaddr + phdr.p_memsz;
+        const entry = ehdr.e_entry;
+        if ((entry >= phdr.p_paddr and entry < phys_end) or
+            (entry >= phdr.p_vaddr and entry < virt_end))
+        {
+            entry_in_load = true;
+        }
+    }
+
+    if (!entry_in_load) {
+        uefi_utils.printf("ELF entry point 0x{x} is outside loadable segments\r\n", .{ehdr.e_entry});
+        return ElfLoadError.InvalidElf;
+    }
+}
+
 fn parseAndLoadElf(file_buffer: []align(8) u8) ElfLoadError!LoadedElf {
     const boot_services = uefi.system_table.boot_services.?;
 
@@ -132,6 +176,8 @@ fn parseAndLoadElf(file_buffer: []align(8) u8) ElfLoadError!LoadedElf {
 
     uefi_utils.printf("ELF entry point: 0x{x}\r\n", .{ehdr.e_entry});
     uefi_utils.printf("Program headers: {d} at offset 0x{x}\r\n", .{ ehdr.e_phnum, ehdr.e_phoff });
+
+    try validateProgramHeaders(file_buffer, ehdr);
 
     var load_base: u64 = 0xFFFFFFFF_FFFFFFFF;
     var load_end: u64 = 0;
