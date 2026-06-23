@@ -48,9 +48,8 @@ pub fn getMemoryMap() ?MemoryMapInfo {
         return null;
     };
 
-    // Allocate buffer with extra space for potential changes
-    // info.len is the number of descriptors, multiply by descriptor_size to get bytes
-    const mmap_size = (info.len + 2) * info.descriptor_size;
+    // Allocate extra space: firmware may add descriptors during ExitBootServices.
+    const mmap_size = info.len * info.descriptor_size + 4096;
 
     const buffer = boot_services.allocatePool(MemoryType.loader_data, mmap_size) catch {
         printf("UEFI AllocatePool failed\r\n", .{});
