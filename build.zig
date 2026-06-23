@@ -64,8 +64,8 @@ pub fn build(b: *std.Build) void {
     kernel.link_function_sections = true;
     kernel.setLinkerScript(b.path("linker.ld"));
 
-    // Set the image base to 1MB - this is critical for position-dependent code
-    kernel.image_base = 0x100000;
+    // Link at higher-half virtual base; physical load address is 1 MB (linker.ld AT()).
+    kernel.image_base = 0xFFFFFFFF80100000;
 
     b.default_step.dependOn(&kernel.step);
 
