@@ -13,6 +13,11 @@ pub inline fn hlt() void {
     asm volatile ("hlt");
 }
 
+/// Spin forever, halting the CPU between iterations.
+pub fn haltForever() noreturn {
+    while (true) hlt();
+}
+
 /// Read a model-specific register.
 pub inline fn rdmsr(msr: u32) u64 {
     const lo: u32 = undefined;

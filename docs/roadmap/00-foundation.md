@@ -2,7 +2,7 @@
 
 **Goal:** Take control of the CPU after UEFI handoff. Parse boot metadata and handle basic exceptions before paging.
 
-**Depends on:** UEFI bootloader ([`src/boot/`](../../src/boot/)), [`BootInfo`](../../src/shared/boot_info.zig)
+**Depends on:** Limine bootloader ([`scripts/`](../../scripts/)), [`kernel/boot/limine.zig`](../../kernel/boot/limine.zig)
 
 **Unlocks:** [Phase 1 — Page tables](01-page-tables-and-higher-half-kernel.md)
 
@@ -10,9 +10,9 @@
 
 ## Checklist
 
-- [x] Thin [`main.zig`](../../src/kernel/main.zig): entry, kernel stack, call `kernel.init()`
-- [x] Add [`kernel.zig`](../../src/kernel/kernel.zig) with top-level `init()` / `run()`
-- [x] Add [`mm/memory_map.zig`](../../src/kernel/mm/memory_map.zig)
+- [x] Thin [`main.zig`](../../kernel/main.zig): entry, kernel stack, call `kernel.init()`
+- [x] Add [`kernel.zig`](../../kernel/kernel.zig) with top-level `init()` / `run()`
+- [x] Add [`mm/memory_map.zig`](../../kernel/mm/memory_map.zig)
   - [x] Parse UEFI memory descriptors using `descriptor_size` from `BootInfo`
   - [x] Classify regions: conventional, reserved, runtime, MMIO, etc.
   - [x] Print region summary over serial
@@ -20,11 +20,11 @@
   - [x] Kernel image (`0x100000` … load end)
   - [x] Memory map buffer (`BootInfo.memory_map.entries` … `+ size`)
   - [x] Boot info location (until moved to static storage)
-- [x] Add [`arch/x86_64/cpu.zig`](../../src/kernel/arch/x86_64/cpu.zig): `cli` / `sti` / `hlt`, `rdmsr` / `wrmsr` helpers
+- [x] Add [`arch/x86_64/cpu.zig`](../../kernel/arch/x86_64/cpu.zig): `cli` / `sti` / `hlt`, `rdmsr` / `wrmsr` helpers
 - [x] Add fixed kernel stack in `.bss` and switch to it in `_start`
-- [x] Add [`arch/x86_64/gdt.zig`](../../src/kernel/arch/x86_64/gdt.zig): minimal flat 64-bit GDT
-- [x] Move [`serial.zig`](../../src/kernel/serial.zig) under `arch/x86_64/` (or `drivers/serial/`)
-- [x] Add [`arch/x86_64/idt.zig`](../../src/kernel/arch/x86_64/idt.zig)
+- [x] Add [`arch/x86_64/gdt.zig`](../../kernel/arch/x86_64/gdt.zig): minimal flat 64-bit GDT
+- [x] Move [`serial.zig`](../../kernel/serial.zig) under `arch/x86_64/` (or `drivers/serial/`)
+- [x] Add [`arch/x86_64/idt.zig`](../../kernel/arch/x86_64/idt.zig)
   - [x] Load IDT
   - [x] Page fault handler (print `CR2`, error code, RIP)
   - [x] General protection fault handler

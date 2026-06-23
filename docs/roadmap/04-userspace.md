@@ -10,10 +10,10 @@
 
 ## Checklist
 
-- [ ] Add [`proc/process.zig`](../../src/kernel/proc/process.zig)
+- [ ] Add [`proc/process.zig`](../../kernel/proc/process.zig)
   - [ ] Process address space (separate page tables)
   - [ ] Per-process file descriptor table (stub OK initially)
-- [ ] Add [`mm/user_loader.zig`](../../src/kernel/mm/user_loader.zig) or `proc/elf.zig`
+- [ ] Add [`mm/user_loader.zig`](../../kernel/mm/user_loader.zig) or `proc/elf.zig`
   - [ ] Parse ELF64 PT_LOAD for user programs
   - [ ] Map user segments at correct virtual addresses
   - [ ] Set user stack and entry point
@@ -23,7 +23,7 @@
   - [ ] `exit` / `exit_group`
   - [ ] `brk` or `mmap` (at least one for heap growth)
   - [ ] `getpid`
-- [ ] Add [`drivers/tty.zig`](../../src/kernel/drivers/tty.zig)
+- [ ] Add [`drivers/tty.zig`](../../kernel/drivers/tty.zig)
   - [ ] Line discipline (canonical mode optional)
   - [ ] Basic ANSI escape parsing
   - [ ] Backed by serial or VGA text for now

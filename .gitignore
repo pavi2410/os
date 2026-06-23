@@ -3,3 +3,6 @@ zig-out/
 *.o
 ovmf/
 .zig-docs/
+limine-binary/
+iso_root/
+*.iso

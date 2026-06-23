@@ -1,0 +1,42 @@
+const cpu = @import("arch/x86_64/cpu.zig");
+const kernel = @import("kernel.zig");
+const limine = @import("limine");
+
+export var limine_requests_start: [4]u64 linksection(".limine_requests_start") = limine.REQUESTS_START_MARKER;
+
+export var limine_base_revision: [3]u64 linksection(".limine_requests") = limine.baseRevisionTag(limine.BASE_REVISION);
+
+export var hhdm_request: limine.HhdmRequest linksection(".limine_requests") = .{};
+export var memmap_request: limine.MemmapRequest linksection(".limine_requests") = .{};
+export var bootloader_info_request: limine.BootloaderInfoRequest linksection(".limine_requests") = .{};
+
+export var limine_requests_end: [2]u64 linksection(".limine_requests_end") = limine.REQUESTS_END_MARKER;
+
+/// 64 KiB kernel stack in BSS (16-byte aligned).
+export var kernel_stack: [64 * 1024]u8 align(16) = undefined;
+
+inline fn switchToKernelStack() void {
+    const stack_top = @intFromPtr(&kernel_stack) + kernel_stack.len;
+    asm volatile ("mov %[stack], %%rsp"
+        :
+        : [stack] "r" (stack_top),
+    );
+}
+
+export fn _start() callconv(.c) noreturn {
+    switchToKernelStack();
+
+    if (!limine.baseRevisionSupported(&limine_base_revision)) {
+        cpu.haltForever();
+    }
+
+    const hhdm = hhdm_request.response orelse cpu.haltForever();
+    const memmap = memmap_request.response orelse cpu.haltForever();
+
+    kernel.init(.{
+        .hhdm_offset = hhdm.offset,
+        .memory_map = memmap,
+        .bootloader_info = bootloader_info_request.response,
+    });
+    kernel.run();
+}

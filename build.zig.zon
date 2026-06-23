@@ -78,9 +78,10 @@
     .paths = .{
         "build.zig",
         "build.zig.zon",
-        "src",
-        // For example...
-        //"LICENSE",
-        //"README.md",
+        "scripts",
+        "limine.conf",
+        "linker.ld",
+        "kernel",
+        "test",
     },
 }

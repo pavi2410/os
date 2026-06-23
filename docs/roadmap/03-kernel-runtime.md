@@ -13,19 +13,19 @@
 - [ ] Add interrupt controller support
   - [ ] Legacy PIC **or** APIC (LAPIC recommended for SMP path)
   - [ ] Mask/unmask IRQ helpers
-- [ ] Add [`arch/x86_64/interrupts.zig`](../../src/kernel/arch/x86_64/interrupts.zig) or extend `idt.zig`
+- [ ] Add [`arch/x86_64/interrupts.zig`](../../kernel/arch/x86_64/interrupts.zig) or extend `idt.zig`
   - [ ] IRQ dispatch table
   - [ ] Timer interrupt handler
   - [ ] EOI handling
 - [ ] Add timer driver (PIT for simplicity, or APIC timer)
-- [ ] Add [`proc/thread.zig`](../../src/kernel/proc/thread.zig)
+- [ ] Add [`proc/thread.zig`](../../kernel/proc/thread.zig)
   - [ ] Thread struct (context, stack, state)
   - [ ] Context switch (save/restore GPRs, RSP, RIP)
-- [ ] Add [`proc/scheduler.zig`](../../src/kernel/proc/scheduler.zig)
+- [ ] Add [`proc/scheduler.zig`](../../kernel/proc/scheduler.zig)
   - [ ] Round-robin or cooperative scheduler
   - [ ] Idle thread
 - [ ] Spawn at least two kernel threads that print on serial
-- [ ] Add [`syscall/`](../../src/kernel/syscall/) entry stub
+- [ ] Add [`syscall/`](../../kernel/syscall/) entry stub
   - [ ] Choose mechanism: `syscall`/`sysret`, `sysenter`, or `int 0x80`
   - [ ] Register convention documented (match future Linux ABI target)
   - [ ] Minimal handler table (e.g. debug `write`, `exit`)

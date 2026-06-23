@@ -2,38 +2,58 @@ OUTPUT_FORMAT(elf64-x86-64)
 OUTPUT_ARCH(i386:x86-64)
 ENTRY(_start)
 
-HIGHER_HALF_OFFSET = 0xFFFFFFFF80000000;
-KERNEL_PHYS_BASE   = 0x100000;
-KERNEL_VIRT_BASE   = HIGHER_HALF_OFFSET + KERNEL_PHYS_BASE;
+PHDRS
+{
+    limine_requests PT_LOAD;
+    text PT_LOAD;
+    rodata PT_LOAD;
+    data PT_LOAD;
+}
 
 SECTIONS
 {
-    /* Link at higher-half virtual addresses; load at physical 1 MB */
-    . = KERNEL_VIRT_BASE;
+    . = 0xffffffff80000000;
+
     _kernel_start = .;
 
-    .text ALIGN(4K) : AT(ADDR(.text) - HIGHER_HALF_OFFSET) {
-        *(.text*)
-    }
+    .limine_requests : {
+        KEEP(*(.limine_requests_start))
+        KEEP(*(.limine_requests))
+        KEEP(*(.limine_requests_end))
+    } :limine_requests
 
-    .rodata ALIGN(4K) : AT(ADDR(.rodata) - HIGHER_HALF_OFFSET) {
-        *(.rodata*)
-    }
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
 
-    .data ALIGN(4K) : AT(ADDR(.data) - HIGHER_HALF_OFFSET) {
-        *(.data*)
-    }
+    .text : {
+        *(.text .text.*)
+    } :text
 
-    .bss ALIGN(4K) : AT(ADDR(.bss) - HIGHER_HALF_OFFSET) {
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+
+    .rodata : {
+        *(.rodata .rodata.*)
+    } :rodata
+
+    .note.gnu.build-id : {
+        *(.note.gnu.build-id)
+    } :rodata
+
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+
+    .data : {
+        *(.data .data.*)
+    } :data
+
+    .bss : {
+        *(.bss .bss.*)
         *(COMMON)
-        *(.bss*)
-    }
+    } :data
 
     _kernel_end = .;
 
     /DISCARD/ : {
+        *(.eh_frame*)
+        *(.note .note.*)
         *(.comment)
-        *(.eh_frame)
-        *(.note*)
     }
 }

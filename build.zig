@@ -5,120 +5,101 @@ pub fn build(b: *std.Build) void {
         .preferred_optimize_mode = .ReleaseSmall,
     });
 
-    // Shared boot_info module
-    const shared_mod = b.createModule(.{
-        .root_source_file = b.path("src/shared/boot_info.zig"),
-    });
-
-    // Bootloader target (UEFI)
-    const boot_target = b.standardTargetOptions(.{
-        .default_target = .{
-            .cpu_arch = .x86_64,
-            .os_tag = .uefi,
-        },
-    });
-
-    const boot_mod = b.createModule(.{
-        .root_source_file = b.path("src/boot/main.zig"),
-        .target = boot_target,
-        .optimize = optimize,
-    });
-    boot_mod.addImport("shared", shared_mod);
-
-    const bootloader = b.addExecutable(.{
-        .name = "bootx64",
-        .root_module = boot_mod,
-    });
-
-    b.default_step.dependOn(&bootloader.step);
-
-    // Install bootloader to efi/boot/
-    const install_boot = b.addInstallArtifact(bootloader, .{
-        .dest_dir = .{
-            .override = .{ .custom = "efi/boot" },
-        },
-    });
-
-    // Kernel target (freestanding x86_64)
     const kernel_target = b.resolveTargetQuery(.{
         .cpu_arch = .x86_64,
         .os_tag = .freestanding,
         .abi = .none,
+        .cpu_features_add = std.Target.x86.featureSet(&.{ .popcnt, .soft_float }),
+        .cpu_features_sub = std.Target.x86.featureSet(&.{ .avx, .avx2, .sse, .sse2, .mmx }),
+    });
+
+    const limine_kernel_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/boot/limine.zig"),
+        .target = kernel_target,
+        .optimize = optimize,
     });
 
     const kernel_mod = b.createModule(.{
-        .root_source_file = b.path("src/kernel/main.zig"),
+        .root_source_file = b.path("kernel/main.zig"),
         .target = kernel_target,
         .optimize = optimize,
         .code_model = .kernel,
     });
-    kernel_mod.addImport("shared", shared_mod);
+    kernel_mod.addImport("limine", limine_kernel_mod);
 
     const kernel = b.addExecutable(.{
-        .name = "kernel.elf",
+        .name = "kernel",
         .root_module = kernel_mod,
     });
     kernel.use_llvm = true;
-
-    // Set kernel to output ELF format
     kernel.link_function_sections = true;
     kernel.setLinkerScript(b.path("linker.ld"));
 
-    // Link at higher-half virtual base; physical load address is 1 MB (linker.ld AT()).
-    kernel.image_base = 0xFFFFFFFF80100000;
-
-    b.default_step.dependOn(&kernel.step);
-
-    // Install kernel to root of zig-out/
-    const install_kernel = b.addInstallArtifact(kernel, .{
-        .dest_dir = .{
-            .override = .{ .custom = "" },
-        },
-    });
-
-    // Make sure both are installed
-    b.getInstallStep().dependOn(&install_boot.step);
+    const install_kernel = b.addInstallArtifact(kernel, .{});
     b.getInstallStep().dependOn(&install_kernel.step);
+    b.default_step.dependOn(&install_kernel.step);
 
-    // QEMU run command
-    const run_cmd = b.addSystemCommand(&[_][]const u8{
-        "qemu-system-x86_64",
-        // "-bios",
-        // "/usr/share/ovmf/OVMF.fd",
-        "-drive",
-        "if=pflash,format=raw,readonly=on,file=./ovmf/OVMF_CODE_4M.fd",
-        "-drive",
-        "if=pflash,format=raw,file=./ovmf/OVMF_VARS_4M.fd",
-        "-drive",
-        "format=raw,file=fat:rw:zig-out",
-        "-serial",
-        "stdio",
-        // "-nographic",
+    const kernel_path = b.getInstallPath(.bin, "kernel");
+    const iso_path = b.pathJoin(&.{ b.install_path, "os.iso" });
+
+    const build_iso = b.addSystemCommand(&.{
+        "sh",
+        b.path("scripts/build-iso.sh").getPath(b),
+        kernel_path,
+        iso_path,
     });
+    build_iso.step.dependOn(&install_kernel.step);
 
-    run_cmd.step.dependOn(&install_boot.step);
-    run_cmd.step.dependOn(&install_kernel.step);
+    const iso_step = b.step("iso", "Build a bootable Limine ISO");
+    iso_step.dependOn(&build_iso.step);
+
+    const run_cmd = b.addSystemCommand(&.{
+        "qemu-system-x86_64",
+        "-M", "q35",
+        "-cdrom", iso_path,
+        "-boot", "d",
+        "-serial", "stdio",
+    });
+    run_cmd.step.dependOn(&build_iso.step);
+
+    const run_uefi_cmd = b.addSystemCommand(&.{
+        "qemu-system-x86_64",
+        "-M", "q35",
+        "-drive", "if=pflash,format=raw,readonly=on,file=./ovmf/OVMF_CODE_4M.fd",
+        "-drive", "if=pflash,format=raw,file=./ovmf/OVMF_VARS_4M.fd",
+        "-cdrom", iso_path,
+        "-serial", "stdio",
+    });
+    run_uefi_cmd.step.dependOn(&build_iso.step);
 
     if (b.args) |args| {
         run_cmd.addArgs(args);
+        run_uefi_cmd.addArgs(args);
     }
 
-    const run_step = b.step("run", "Run the OS");
+    const run_step = b.step("run", "Build the ISO and run in QEMU (SeaBIOS)");
     run_step.dependOn(&run_cmd.step);
 
-    // Tests
-    const memory_map_host_mod = b.createModule(.{
-        .root_source_file = b.path("src/kernel/mm/memory_map.zig"),
+    const run_uefi_step = b.step("run-uefi", "Build the ISO and run in QEMU (OVMF/UEFI)");
+    run_uefi_step.dependOn(&run_uefi_cmd.step);
+
+    const limine_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/boot/limine.zig"),
         .target = b.graph.host,
     });
-    memory_map_host_mod.addImport("shared", shared_mod);
+
+    const memory_map_host_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/mm/memory_map.zig"),
+        .target = b.graph.host,
+    });
+    memory_map_host_mod.addImport("limine", limine_mod);
 
     const memory_map_test_mod = b.createModule(.{
         .root_source_file = b.path("test/memory_map_test.zig"),
         .target = b.graph.host,
     });
     memory_map_test_mod.addImport("memory_map", memory_map_host_mod);
-    memory_map_test_mod.addImport("shared", shared_mod);
+    memory_map_test_mod.addImport("limine", limine_mod);
 
     const memory_map_tests = b.addTest(.{
         .root_module = memory_map_test_mod,

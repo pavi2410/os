@@ -13,7 +13,7 @@
 - [ ] Choose higher-half base (e.g. `0xFFFF800000000000` + physical offset)
 - [ ] Update [`linker.ld`](../../linker.ld) for higher-half virtual addresses
 - [ ] Update [`build.zig`](../../build.zig) `image_base` / link settings if needed
-- [ ] Add [`arch/x86_64/paging.zig`](../../src/kernel/arch/x86_64/paging.zig)
+- [ ] Add [`arch/x86_64/paging.zig`](../../kernel/arch/x86_64/paging.zig)
   - [ ] 4-level page table types (PML4 → PDPT → PD → PT)
   - [ ] `mapPage` / `unmapPage` helpers
   - [ ] Page flag helpers (present, writable, no-exec, huge page optional)

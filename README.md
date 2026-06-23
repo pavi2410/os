@@ -1,12 +1,12 @@
 # os
 
-**A hobby operating system** in Zig, targeting x86-64 with UEFI, aiming for Linux ABI compatibility, multicore support, filesystems, networking, and eventually a GUI.
+**A hobby operating system** in Zig, targeting x86-64 with [Limine](https://github.com/Limine-Bootloader/Limine), aiming for Linux ABI compatibility, multicore support, filesystems, networking, and eventually a GUI.
 
 ## 🚀 Goals
 
 * x86-64 architecture
-* UEFI bootloader
-* Modern 64-bit kernel
+* Limine bootloader (protocol base revision 6)
+* Modern 64-bit higher-half kernel
 * Linux-compatible syscall interface
 * Multicore threading (SMP)
 * ext2 or FAT32 filesystem
@@ -18,20 +18,22 @@
 ## 🛠 Toolchain
 
 * Zig (v0.16+ recommended)
+* [Limine](https://github.com/Limine-Bootloader/Limine) — bootloader and ISO tooling
+* `xorriso` — builds the bootable ISO
 * QEMU — `qemu-system-x86_64`
-* OVMF (UEFI firmware for QEMU)
+* OVMF — optional, only for `zig build run-uefi`
 
 ### macOS
 
 Install [Homebrew](https://brew.sh) and [mise](https://mise.jdx.dev), then:
 
 ```bash
-brew install qemu
+brew install limine xorriso qemu
 mise install
 eval "$(mise activate zsh)"   # add to ~/.zshrc to persist
 ```
 
-Copy UEFI firmware into the project (one-time):
+For UEFI boot testing (`zig build run-uefi`), copy OVMF firmware into the project (one-time):
 
 ```bash
 mkdir -p ovmf
@@ -42,12 +44,15 @@ dd if=/dev/zero of=ovmf/OVMF_VARS_4M.fd bs=1m count=4
 ### Linux / WSL
 
 ```bash
-sudo apt install qemu-system-x86 ovmf
+sudo apt install qemu-system-x86 ovmf xorriso
 mise install
 eval "$(mise activate bash)"   # add to ~/.bashrc to persist
 ```
 
-Copy UEFI firmware into the project (one-time):
+If Limine is not available from your distro, `zig build iso` downloads the official
+`limine-binary` release (v12.3.3) automatically.
+
+For UEFI boot testing (`zig build run-uefi`), copy OVMF firmware into the project (one-time):
 
 ```bash
 mkdir -p ovmf
@@ -57,23 +62,39 @@ cp /usr/share/OVMF/OVMF_VARS_4M.fd ovmf/
 
 ## 💻 Building & Running
 
-To build the project:
+Build the kernel:
 
 ```bash
 zig build
 ```
 
-To build **and** run it automatically in QEMU:
+Build a bootable ISO (uses Homebrew Limine when installed, otherwise downloads it):
+
+```bash
+zig build iso
+```
+
+Build the ISO and run in QEMU (SeaBIOS, default):
 
 ```bash
 zig build run
 ```
 
-*This uses the `build.zig` configuration to launch QEMU and pass the kernel `.efi` automatically.*
+Run under OVMF/UEFI instead (requires OVMF firmware in `ovmf/`):
+
+```bash
+zig build run-uefi
+```
+
+Run unit tests:
+
+```bash
+zig build test
+```
 
 ## 📝 Roadmap
 
-* [x] Hello UEFI kernel in Zig
+* [x] Hello kernel in Zig
 * [ ] Page tables and higher-half kernel
 * [ ] Memory allocator (physical/virtual)
 * [ ] ELF loader for user programs
@@ -89,4 +110,5 @@ zig build run
 ## 🔗 Links
 
 * Zig: [https://ziglang.org](https://ziglang.org)
+* Limine: [https://github.com/Limine-Bootloader/Limine](https://github.com/Limine-Bootloader/Limine)
 * OSDev.org: [https://wiki.osdev.org](https://wiki.osdev.org)

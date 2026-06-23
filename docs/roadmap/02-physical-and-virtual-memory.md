@@ -10,15 +10,15 @@
 
 ## Checklist
 
-- [ ] Add [`mm/physical.zig`](../../src/kernel/mm/physical.zig)
+- [ ] Add [`mm/physical.zig`](../../kernel/mm/physical.zig)
   - [ ] Bitmap or buddy allocator over conventional RAM
   - [ ] Honor reserved regions from Phase 0 (kernel, map buffer, page tables)
   - [ ] `allocPage()` / `freePage()` API
-- [ ] Add [`mm/virtual.zig`](../../src/kernel/mm/virtual.zig)
+- [ ] Add [`mm/virtual.zig`](../../kernel/mm/virtual.zig)
   - [ ] Kernel virtual address space manager
   - [ ] `mapPages` / `unmapPages` using Phase 1 paging helpers
   - [ ] Track kernel virtual allocations
-- [ ] Add [`mm/heap.zig`](../../src/kernel/mm/heap.zig)
+- [ ] Add [`mm/heap.zig`](../../kernel/mm/heap.zig)
   - [ ] `kmalloc` / `kfree` (or `kalloc` / `kfree`) on top of virtual pages
   - [ ] Minimum alignment support (16 bytes for general use)
 - [ ] Wire allocators in `kernel.init()` after memory map parsing

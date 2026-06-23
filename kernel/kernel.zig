@@ -1,14 +1,19 @@
+const address = @import("mm/address.zig");
 const cpu = @import("arch/x86_64/cpu.zig");
 const gdt = @import("arch/x86_64/gdt.zig");
 const idt = @import("arch/x86_64/idt.zig");
+const limine = @import("limine");
 const memory_map = @import("mm/memory_map.zig");
 const serial = @import("arch/x86_64/serial.zig");
-const shared = @import("shared");
 
-var boot_info: *const shared.BootInfo = undefined;
+pub const BootContext = struct {
+    hhdm_offset: u64,
+    memory_map: *const limine.MemmapResponse,
+    bootloader_info: ?*const limine.BootloaderInfoResponse,
+};
 
-pub fn init(bi: *const shared.BootInfo) void {
-    boot_info = bi;
+pub fn init(ctx: BootContext) void {
+    address.setHhdmOffset(ctx.hhdm_offset);
 
     gdt.init();
     gdt.load();
@@ -20,13 +25,17 @@ pub fn init(bi: *const shared.BootInfo) void {
 
     serial.writeString("\r\n=== Kernel Entry ===\r\n");
 
-    memory_map.init(bi);
-    printMemoryMap();
+    if (ctx.bootloader_info) |info| {
+        if (info.name) |name| {
+            serial.printf("Bootloader: {s}\r\n", .{name});
+        }
+        if (info.version) |version| {
+            serial.printf("Version: {s}\r\n", .{version});
+        }
+    }
 
-    const vga: [*]volatile u16 = @ptrFromInt(0xb8000);
-    vga[0] = 0x2F4B; // 'K' in green
-    vga[1] = 0x2F4F; // 'O'
-    vga[2] = 0x2F4B; // 'K'
+    memory_map.init(ctx.memory_map);
+    printMemoryMap();
 
     serial.writeString("Kernel initialized. Halting.\r\n");
 }
@@ -51,5 +60,5 @@ fn printMemoryMap() void {
 }
 
 pub fn run() noreturn {
-    while (true) cpu.hlt();
+    cpu.haltForever();
 }

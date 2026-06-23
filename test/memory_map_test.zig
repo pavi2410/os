@@ -1,37 +1,28 @@
 const std = @import("std");
+const limine = @import("limine");
 const memory_map = @import("memory_map");
-const shared = @import("shared");
 
-test "parse descriptor with 48-byte stride" {
-    var buffer: [96]u8 align(8) = [_]u8{0} ** 96;
-
-    const desc0 = memory_map.UefiDescriptor{
-        .type = @intFromEnum(memory_map.UefiMemoryType.conventional),
-        .physical_start = 0x100000,
-        .virtual_start = 0x100000,
-        .number_of_pages = 16,
-        .attribute = 0,
+test "parse Limine memory map entries" {
+    var entry0 = limine.MemmapEntry{
+        .base = 0x100000,
+        .length = 0x10000,
+        .type = @intFromEnum(limine.MemmapType.usable),
     };
-    const desc1 = memory_map.UefiDescriptor{
-        .type = @intFromEnum(memory_map.UefiMemoryType.mmio),
-        .physical_start = 0xFED00000,
-        .virtual_start = 0xFED00000,
-        .number_of_pages = 1,
-        .attribute = 0,
+    var entry1 = limine.MemmapEntry{
+        .base = 0xFED00000,
+        .length = 0x1000,
+        .type = @intFromEnum(limine.MemmapType.framebuffer),
     };
 
-    @memcpy(buffer[0..@sizeOf(memory_map.UefiDescriptor)], std.mem.asBytes(&desc0));
-    @memcpy(buffer[48..][0..@sizeOf(memory_map.UefiDescriptor)], std.mem.asBytes(&desc1));
+    var entries: [2]?*limine.MemmapEntry = .{ &entry0, &entry1 };
 
-    const map = shared.MemoryMap{
-        .entries = @as([*]align(8) u8, @ptrCast(&buffer)),
-        .size = 96,
-        .descriptor_size = 48,
-        .descriptor_version = 1,
-        .count = 2,
+    const response = limine.MemmapResponse{
+        .revision = 0,
+        .entry_count = 2,
+        .entries = @ptrCast(&entries),
     };
 
-    memory_map.loadMap(&map);
+    memory_map.loadMap(&response);
 
     try std.testing.expectEqual(@as(usize, 2), memory_map.regionCount());
     const regions = memory_map.regionsSlice();
@@ -41,33 +32,36 @@ test "parse descriptor with 48-byte stride" {
     try std.testing.expect(!regions[1].allocatable);
 }
 
-test "classify UEFI memory types" {
-    try std.testing.expectEqual(memory_map.RegionKind.conventional, memory_map.classifyType(@intFromEnum(memory_map.UefiMemoryType.conventional)));
-    try std.testing.expectEqual(memory_map.RegionKind.runtime, memory_map.classifyType(@intFromEnum(memory_map.UefiMemoryType.runtime_services_data)));
-    try std.testing.expectEqual(memory_map.RegionKind.mmio, memory_map.classifyType(@intFromEnum(memory_map.UefiMemoryType.mmio)));
+test "classify Limine memory map types" {
+    try std.testing.expectEqual(
+        memory_map.RegionKind.conventional,
+        memory_map.classifyType(@intFromEnum(limine.MemmapType.usable)),
+    );
+    try std.testing.expectEqual(
+        memory_map.RegionKind.reserved,
+        memory_map.classifyType(@intFromEnum(limine.MemmapType.reserved_mapped)),
+    );
+    try std.testing.expectEqual(
+        memory_map.RegionKind.mmio,
+        memory_map.classifyType(@intFromEnum(limine.MemmapType.framebuffer)),
+    );
 }
 
-test "boot-owned regions become non-allocatable" {
-    var buffer: [48]u8 align(8) = [_]u8{0} ** 48;
-    const desc = memory_map.UefiDescriptor{
-        .type = @intFromEnum(memory_map.UefiMemoryType.conventional),
-        .physical_start = 0x100000,
-        .virtual_start = 0x100000,
-        .number_of_pages = 512,
-        .attribute = 0,
+test "executable_and_modules regions are non-allocatable" {
+    var entry = limine.MemmapEntry{
+        .base = 0x100000,
+        .length = 0x200000,
+        .type = @intFromEnum(limine.MemmapType.executable_and_modules),
     };
-    @memcpy(buffer[0..@sizeOf(memory_map.UefiDescriptor)], std.mem.asBytes(&desc));
+    var entries: [1]?*limine.MemmapEntry = .{&entry};
 
-    const map = shared.MemoryMap{
-        .entries = @as([*]align(8) u8, @ptrCast(&buffer)),
-        .size = 48,
-        .descriptor_size = 48,
-        .descriptor_version = 1,
-        .count = 1,
+    const response = limine.MemmapResponse{
+        .revision = 0,
+        .entry_count = 1,
+        .entries = @ptrCast(&entries),
     };
 
-    memory_map.loadMap(&map);
-    memory_map.markReserved(0x100000, 0x110000, "kernel image");
+    memory_map.loadMap(&response);
 
     const regions = memory_map.regionsSlice();
     try std.testing.expect(regions[0].boot_reserved);

@@ -10,11 +10,11 @@
 
 ## Checklist
 
-- [ ] Extend bootloader [`BootInfo`](../../src/shared/boot_info.zig)
+- [ ] Use Limine MP request for AP startup
   - [ ] ACPI RSDP pointer
   - [ ] GOP framebuffer (base, width, height, pitch, format)
   - [ ] Protocol version / magic field
-- [ ] Parse ACPI tables ([`arch/x86_64/acpi.zig`](../../src/kernel/arch/x86_64/acpi.zig))
+- [ ] Parse ACPI tables ([`arch/x86_64/acpi.zig`](../../kernel/arch/x86_64/acpi.zig))
   - [ ] RSDP → RSDT/XSDT
   - [ ] MADT (APIC entries)
   - [ ] FADT (for ACPI shutdown / timer if needed)
@@ -25,7 +25,7 @@
   - [ ] Per-CPU data (current thread, idle, run queues)
   - [ ] Per-CPU timer and IPI for reschedule
 - [ ] Make scheduler SMP-safe (spinlocks, per-CPU run queues)
-- [ ] Framebuffer driver ([`drivers/framebuffer.zig`](../../src/kernel/drivers/framebuffer.zig))
+- [ ] Framebuffer driver ([`drivers/framebuffer.zig`](../../kernel/drivers/framebuffer.zig))
   - [ ] Pixel plot, fill rect, blit
   - [ ] Optional double buffering
 - [ ] Basic font rendering (bitmap font)

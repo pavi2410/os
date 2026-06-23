@@ -10,11 +10,11 @@
 
 ## Checklist
 
-- [ ] Add PCI enumeration helper ([`drivers/pci.zig`](../../src/kernel/drivers/pci.zig))
+- [ ] Add PCI enumeration helper ([`drivers/pci.zig`](../../kernel/drivers/pci.zig))
 - [ ] Add block device driver
   - [ ] VirtIO-blk **or** ATA/AHCI for QEMU
   - [ ] Read/write sectors
-- [ ] Add [`fs/vfs.zig`](../../src/kernel/fs/vfs.zig)
+- [ ] Add [`fs/vfs.zig`](../../kernel/fs/vfs.zig)
   - [ ] Vnode/inode interface
   - [ ] Path lookup and file descriptors wired to syscalls
 - [ ] Add filesystem implementation
@@ -24,7 +24,7 @@
 - [ ] Add network device driver
   - [ ] VirtIO-net **or** e1000
   - [ ] TX/RX ring handling
-- [ ] Add [`net/`](../../src/kernel/net/)
+- [ ] Add [`net/`](../../kernel/net/)
   - [ ] Ethernet frame TX/RX
   - [ ] ARP
   - [ ] IPv4
