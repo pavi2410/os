@@ -1,6 +1,7 @@
 const cpu = @import("arch/x86_64/cpu.zig");
 const gdt = @import("arch/x86_64/gdt.zig");
 const idt = @import("arch/x86_64/idt.zig");
+const memory_map = @import("mm/memory_map.zig");
 const serial = @import("arch/x86_64/serial.zig");
 const shared = @import("shared");
 
@@ -18,14 +19,9 @@ pub fn init(bi: *const shared.BootInfo) void {
     serial.init();
 
     serial.writeString("\r\n=== Kernel Entry ===\r\n");
-    serial.printf("Memory map: {d} descriptors, size: {d} bytes\r\n", .{
-        boot_info.memory_map.count,
-        boot_info.memory_map.size,
-    });
-    serial.printf("Descriptor size: {d}, version: {d}\r\n", .{
-        boot_info.memory_map.descriptor_size,
-        boot_info.memory_map.descriptor_version,
-    });
+
+    memory_map.init(bi);
+    printMemoryMap();
 
     const vga: [*]volatile u16 = @ptrFromInt(0xb8000);
     vga[0] = 0x2F4B; // 'K' in green
@@ -33,6 +29,25 @@ pub fn init(bi: *const shared.BootInfo) void {
     vga[2] = 0x2F4B; // 'K'
 
     serial.writeString("Kernel initialized. Halting.\r\n");
+}
+
+fn printMemoryMap() void {
+    serial.writeString("\r\n--- Physical Memory Map ---\r\n");
+    for (memory_map.regionsSlice()) |region| {
+        serial.printf("  [{s}] 0x{x} - 0x{x} ({d} pages)", .{
+            region.kind.name(),
+            region.start,
+            region.end,
+            (region.end - region.start) / 4096,
+        });
+
+        if (region.boot_reserved) {
+            serial.printf("  BOOT:{s}", .{region.reservation.?});
+        }
+
+        serial.printf("  alloc={s}\r\n", .{if (region.allocatable) "yes" else "no"});
+    }
+    serial.printf("Total regions: {d}\r\n", .{memory_map.regionCount()});
 }
 
 pub fn run() noreturn {

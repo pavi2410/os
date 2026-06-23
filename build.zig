@@ -107,18 +107,25 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     // Tests
-    const boot_tests = b.addTest(.{
-        .root_module = boot_mod,
+    const memory_map_host_mod = b.createModule(.{
+        .root_source_file = b.path("src/kernel/mm/memory_map.zig"),
+        .target = b.graph.host,
+    });
+    memory_map_host_mod.addImport("shared", shared_mod);
+
+    const memory_map_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/memory_map_test.zig"),
+        .target = b.graph.host,
+    });
+    memory_map_test_mod.addImport("memory_map", memory_map_host_mod);
+    memory_map_test_mod.addImport("shared", shared_mod);
+
+    const memory_map_tests = b.addTest(.{
+        .root_module = memory_map_test_mod,
     });
 
-    const kernel_tests = b.addTest(.{
-        .root_module = kernel_mod,
-    });
-
-    const run_boot_tests = b.addRunArtifact(boot_tests);
-    const run_kernel_tests = b.addRunArtifact(kernel_tests);
+    const run_memory_map_tests = b.addRunArtifact(memory_map_tests);
 
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_boot_tests.step);
-    test_step.dependOn(&run_kernel_tests.step);
+    test_step.dependOn(&run_memory_map_tests.step);
 }

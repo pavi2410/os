@@ -6,6 +6,7 @@ SECTIONS
 {
     /* Start at 1MB to avoid low memory and UEFI reserved areas */
     . = 0x100000;
+    _kernel_start = .;
 
     .text ALIGN(4K) : {
         *(.text*)
@@ -23,6 +24,8 @@ SECTIONS
         *(COMMON)
         *(.bss*)
     }
+
+    _kernel_end = .;
 
     /DISCARD/ : {
         *(.comment)

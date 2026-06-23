@@ -12,14 +12,14 @@
 
 - [x] Thin [`main.zig`](../../src/kernel/main.zig): entry, kernel stack, call `kernel.init()`
 - [x] Add [`kernel.zig`](../../src/kernel/kernel.zig) with top-level `init()` / `run()`
-- [ ] Add [`mm/memory_map.zig`](../../src/kernel/mm/memory_map.zig)
-  - [ ] Parse UEFI memory descriptors using `descriptor_size` from `BootInfo`
-  - [ ] Classify regions: conventional, reserved, runtime, MMIO, etc.
-  - [ ] Print region summary over serial
-- [ ] Reserve boot-owned RAM in the map model
-  - [ ] Kernel image (`0x100000` … load end)
-  - [ ] Memory map buffer (`BootInfo.memory_map.entries` … `+ size`)
-  - [ ] Boot info location (until moved to static storage)
+- [x] Add [`mm/memory_map.zig`](../../src/kernel/mm/memory_map.zig)
+  - [x] Parse UEFI memory descriptors using `descriptor_size` from `BootInfo`
+  - [x] Classify regions: conventional, reserved, runtime, MMIO, etc.
+  - [x] Print region summary over serial
+- [x] Reserve boot-owned RAM in the map model
+  - [x] Kernel image (`0x100000` … load end)
+  - [x] Memory map buffer (`BootInfo.memory_map.entries` … `+ size`)
+  - [x] Boot info location (until moved to static storage)
 - [x] Add [`arch/x86_64/cpu.zig`](../../src/kernel/arch/x86_64/cpu.zig): `cli` / `sti` / `hlt`, `rdmsr` / `wrmsr` helpers
 - [x] Add fixed kernel stack in `.bss` and switch to it in `_start`
 - [x] Add [`arch/x86_64/gdt.zig`](../../src/kernel/arch/x86_64/gdt.zig): minimal flat 64-bit GDT
