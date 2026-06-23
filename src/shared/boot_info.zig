@@ -4,8 +4,12 @@ pub const BootInfo = struct {
     /// Memory map from UEFI
     memory_map: MemoryMap,
 
+    /// Physical address range of the loaded kernel image
+    kernel_phys_start: u64,
+    kernel_phys_end: u64,
+
     /// Reserved for future use (framebuffer, ACPI tables, etc.)
-    reserved: [56]u8 = [_]u8{0} ** 56,
+    reserved: [40]u8 = [_]u8{0} ** 40,
 };
 
 pub const MemoryMap = struct {

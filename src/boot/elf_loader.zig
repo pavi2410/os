@@ -15,6 +15,7 @@ pub const ElfLoadError = error{
 pub const LoadedElf = struct {
     entry_point: u64,
     load_base: u64,
+    load_end: u64,
 };
 
 /// Load an ELF file from the filesystem
@@ -233,5 +234,6 @@ fn parseAndLoadElf(file_buffer: []align(8) u8) ElfLoadError!LoadedElf {
     return LoadedElf{
         .entry_point = ehdr.e_entry,
         .load_base = physical_addr,
+        .load_end = load_end,
     };
 }

@@ -83,9 +83,6 @@ const max_regions = 256;
 var regions: [max_regions]Region = undefined;
 var region_count: usize = 0;
 
-extern var _kernel_start: u8;
-extern var _kernel_end: u8;
-
 pub fn init(boot_info: *const shared.BootInfo) void {
     loadMap(&boot_info.memory_map);
     reserveBootOwned(boot_info);
@@ -168,9 +165,7 @@ fn parseUefiMap(map: *const shared.MemoryMap) void {
 }
 
 fn reserveBootOwned(boot_info: *const shared.BootInfo) void {
-    const kernel_start = @intFromPtr(&_kernel_start);
-    const kernel_end = @intFromPtr(&_kernel_end);
-    markReserved(kernel_start, kernel_end, "kernel image");
+    markReserved(boot_info.kernel_phys_start, boot_info.kernel_phys_end, "kernel image");
 
     const mmap = boot_info.memory_map;
     const mmap_start = @intFromPtr(mmap.entries);

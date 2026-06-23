@@ -53,6 +53,8 @@ pub fn main() void {
             .descriptor_version = final_mem_map.desc_version,
             .count = final_mem_map.desc_count,
         },
+        .kernel_phys_start = loaded_kernel.load_base,
+        .kernel_phys_end = loaded_kernel.load_end,
     };
 
     // Jump to kernel entry point
