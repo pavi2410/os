@@ -15,6 +15,9 @@ const banner =
     \\ '
 ;
 
+/// Lives in loader BSS so it is not placed on the firmware stack at handoff.
+var boot_info_storage: shared.BootInfo = undefined;
+
 pub fn main() void {
     uefi.clearScreen();
     uefi.printMultine(banner);
@@ -45,7 +48,7 @@ pub fn main() void {
     };
 
     // Prepare boot info structure
-    var boot_info_data = shared.BootInfo{
+    boot_info_storage = .{
         .memory_map = .{
             .entries = final_mem_map.mmap_ptr,
             .size = final_mem_map.mmap_size,
@@ -60,5 +63,5 @@ pub fn main() void {
     // Jump to kernel entry point
     // Pass boot info pointer in RDI (System V ABI calling convention)
     const kernel_entry: *const fn (*const shared.BootInfo) callconv(.{ .x86_64_sysv = .{} }) noreturn = @ptrFromInt(loaded_kernel.entry_point);
-    kernel_entry(&boot_info_data);
+    kernel_entry(&boot_info_storage);
 }
