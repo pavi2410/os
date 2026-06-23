@@ -24,11 +24,11 @@
 - [x] Add fixed kernel stack in `.bss` and switch to it in `_start`
 - [x] Add [`arch/x86_64/gdt.zig`](../../src/kernel/arch/x86_64/gdt.zig): minimal flat 64-bit GDT
 - [x] Move [`serial.zig`](../../src/kernel/serial.zig) under `arch/x86_64/` (or `drivers/serial/`)
-- [ ] Add [`arch/x86_64/idt.zig`](../../src/kernel/arch/x86_64/idt.zig)
-  - [ ] Load IDT
-  - [ ] Page fault handler (print `CR2`, error code, RIP)
-  - [ ] General protection fault handler
-  - [ ] Default handler for unhandled vectors
+- [x] Add [`arch/x86_64/idt.zig`](../../src/kernel/arch/x86_64/idt.zig)
+  - [x] Load IDT
+  - [x] Page fault handler (print `CR2`, error code, RIP)
+  - [x] General protection fault handler
+  - [x] Default handler for unhandled vectors
 
 ---
 
