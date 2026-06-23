@@ -58,6 +58,7 @@ pub fn build(b: *std.Build) void {
         .name = "kernel.elf",
         .root_module = kernel_mod,
     });
+    kernel.use_llvm = true;
 
     // Set kernel to output ELF format
     kernel.link_function_sections = true;

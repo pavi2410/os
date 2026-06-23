@@ -1,4 +1,5 @@
 const cpu = @import("arch/x86_64/cpu.zig");
+const gdt = @import("arch/x86_64/gdt.zig");
 const serial = @import("arch/x86_64/serial.zig");
 const shared = @import("shared");
 
@@ -6,6 +7,9 @@ var boot_info: *const shared.BootInfo = undefined;
 
 pub fn init(bi: *const shared.BootInfo) void {
     boot_info = bi;
+
+    gdt.init();
+    gdt.load();
 
     serial.init();
 
