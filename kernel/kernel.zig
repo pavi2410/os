@@ -13,6 +13,12 @@ const virtual = @import("mm/virtual.zig");
 /// Deliberately unmapped higher-half address used to verify the page fault handler.
 const page_fault_test_addr: u64 = 0xFFFFFFFF90000000;
 
+/// Compile-time boot diagnostics. Disable for normal Phase 3 runtime development.
+const boot_debug = struct {
+    pub const allocator_stress: bool = false;
+    pub const page_fault_test: bool = false;
+};
+
 pub const BootContext = struct {
     hhdm_offset: u64,
     memory_map: *const limine.MemmapResponse,
@@ -50,12 +56,19 @@ pub fn init(ctx: BootContext) void {
 
     initMemoryAllocators();
     printAllocatorStats();
-    runPhysicalStressTest();
-    runHeapStressTest();
-    verifyMemoryMapBuffer(ctx.memory_map);
-    printAllocatorStats();
 
-    triggerDeliberatePageFault();
+    if (boot_debug.allocator_stress) {
+        runPhysicalStressTest();
+        runHeapStressTest();
+        verifyMemoryMapBuffer(ctx.memory_map);
+        printAllocatorStats();
+    }
+
+    serial.writeString("\r\n=== Phase 3 runtime ===\r\n");
+
+    if (boot_debug.page_fault_test) {
+        triggerDeliberatePageFault();
+    }
 }
 
 fn reserveMemoryMapBuffer(response: *const limine.MemmapResponse) void {
@@ -220,5 +233,9 @@ fn printMemoryMap() void {
 }
 
 pub fn run() noreturn {
-    cpu.haltForever();
+    serial.writeString("Entering idle loop (interrupts disabled)\r\n");
+    cpu.cli();
+    while (true) {
+        cpu.hlt();
+    }
 }
