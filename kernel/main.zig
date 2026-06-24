@@ -8,6 +8,7 @@ export var limine_base_revision: [3]u64 linksection(".limine_requests") = limine
 
 export var hhdm_request: limine.HhdmRequest linksection(".limine_requests") = .{};
 export var memmap_request: limine.MemmapRequest linksection(".limine_requests") = .{};
+export var rsdp_request: limine.RsdpRequest linksection(".limine_requests") = .{};
 export var bootloader_info_request: limine.BootloaderInfoRequest linksection(".limine_requests") = .{};
 
 export var limine_requests_end: [2]u64 linksection(".limine_requests_end") = limine.REQUESTS_END_MARKER;
@@ -32,10 +33,12 @@ export fn _start() callconv(.c) noreturn {
 
     const hhdm = hhdm_request.response orelse cpu.haltForever();
     const memmap = memmap_request.response orelse cpu.haltForever();
+    const rsdp = rsdp_request.response orelse cpu.haltForever();
 
     kernel.init(.{
         .hhdm_offset = hhdm.offset,
         .memory_map = memmap,
+        .rsdp_virt = rsdp.address,
         .bootloader_info = bootloader_info_request.response,
     });
     kernel.run();

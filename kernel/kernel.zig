@@ -1,4 +1,5 @@
 const address = @import("mm/address.zig");
+const apic = @import("arch/x86_64/apic.zig");
 const cpu = @import("arch/x86_64/cpu.zig");
 const gdt = @import("arch/x86_64/gdt.zig");
 const heap = @import("mm/heap.zig");
@@ -22,6 +23,7 @@ const boot_debug = struct {
 pub const BootContext = struct {
     hhdm_offset: u64,
     memory_map: *const limine.MemmapResponse,
+    rsdp_virt: u64,
     bootloader_info: ?*const limine.BootloaderInfoResponse,
 };
 
@@ -65,10 +67,22 @@ pub fn init(ctx: BootContext) void {
     }
 
     serial.writeString("\r\n=== Phase 3 runtime ===\r\n");
+    initApic(ctx.rsdp_virt);
 
     if (boot_debug.page_fault_test) {
         triggerDeliberatePageFault();
     }
+}
+
+fn initApic(rsdp_virt: u64) void {
+    serial.writeString("\r\n--- APIC ---\r\n");
+    apic.init(rsdp_virt) catch {
+        serial.writeString("APIC init failed\r\n");
+        cpu.haltForever();
+    };
+    serial.printf("LAPIC ID: {d}\r\n", .{apic.lapicId()});
+    serial.printf("IOAPIC count: {d}\r\n", .{apic.ioApicCount()});
+    serial.writeString("Legacy PIC masked, IOAPIC pins masked\r\n");
 }
 
 fn reserveMemoryMapBuffer(response: *const limine.MemmapResponse) void {

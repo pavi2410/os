@@ -21,6 +21,7 @@ pub const Flags = struct {
     pub const kernel_data: u64 = present | writable | no_exec;
     pub const kernel_code: u64 = present;
     pub const kernel_rw: u64 = present | writable;
+    pub const mmio: u64 = present | writable | cache_disable | no_exec;
 };
 
 pub const MapError = error{

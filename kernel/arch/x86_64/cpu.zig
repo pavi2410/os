@@ -27,8 +27,8 @@ pub fn haltForever() noreturn {
 
 /// Read a model-specific register.
 pub inline fn rdmsr(msr: u32) u64 {
-    const lo: u32 = undefined;
-    const hi: u32 = undefined;
+    var lo: u32 = undefined;
+    var hi: u32 = undefined;
     asm volatile ("rdmsr"
         : [_] "={eax}" (lo),
           [_] "={edx}" (hi),
@@ -46,5 +46,22 @@ pub inline fn wrmsr(msr: u32, value: u64) void {
         : [_] "{ecx}" (msr),
           [_] "{eax}" (lo),
           [_] "{edx}" (hi),
+    );
+}
+
+/// Output a byte to an I/O port.
+pub inline fn outb(port: u16, value: u8) void {
+    asm volatile ("outb %[value], %[port]"
+        :
+        : [value] "{al}" (value),
+          [port] "{dx}" (port),
+    );
+}
+
+/// Input a byte from an I/O port.
+pub inline fn inb(port: u16) u8 {
+    return asm volatile ("inb %[port], %[result]"
+        : [result] "={al}" (-> u8),
+        : [port] "{dx}" (port),
     );
 }
