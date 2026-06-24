@@ -18,7 +18,7 @@ pub const Flags = struct {
     pub const global: u64 = 1 << 8;
     pub const no_exec: u64 = 1 << 63;
 
-    pub const kernel_data: u64 = present | writable;
+    pub const kernel_data: u64 = present | writable | no_exec;
     pub const kernel_code: u64 = present;
     pub const kernel_rw: u64 = present | writable;
 };
@@ -38,7 +38,7 @@ const VirtIndices = struct {
     pt: u9,
 };
 
-const pool_size = 32;
+const pool_size = 128;
 var table_pool: [pool_size][page_size]u8 align(page_size) = undefined;
 var table_pool_used: usize = 0;
 
@@ -157,22 +157,28 @@ pub fn unmapPage(virt: u64) MapError!void {
 }
 
 pub fn isMapped(virt: u64) bool {
-    if (virt & (page_size - 1) != 0) return false;
+    return getPhys(virt) != null;
+}
+
+pub fn getPhys(virt: u64) ?u64 {
+    if (virt & (page_size - 1) != 0) return null;
 
     const idx = virtIndices(virt);
     const pml4 = tableFromPhys(readCr3());
 
     const pdpt_entry = pml4[idx.pml4];
-    if (!isPresent(pdpt_entry) or isHuge(pdpt_entry)) return false;
+    if (!isPresent(pdpt_entry) or isHuge(pdpt_entry)) return null;
     const pdpt = tableFromPhys(physAddr(pdpt_entry));
 
     const pd_entry = pdpt[idx.pdpt];
-    if (!isPresent(pd_entry) or isHuge(pd_entry)) return false;
+    if (!isPresent(pd_entry) or isHuge(pd_entry)) return null;
     const pd = tableFromPhys(physAddr(pd_entry));
 
     const pt_entry = pd[idx.pd];
-    if (!isPresent(pt_entry) or isHuge(pt_entry)) return false;
+    if (!isPresent(pt_entry) or isHuge(pt_entry)) return null;
     const pt = tableFromPhys(physAddr(pt_entry));
 
-    return isPresent(pt[idx.pt]);
+    const leaf = pt[idx.pt];
+    if (!isPresent(leaf)) return null;
+    return physAddr(leaf);
 }

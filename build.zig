@@ -107,6 +107,24 @@ pub fn build(b: *std.Build) void {
 
     const run_memory_map_tests = b.addRunArtifact(memory_map_tests);
 
+    const physical_bitmap_host_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/mm/physical_bitmap.zig"),
+        .target = b.graph.host,
+    });
+
+    const physical_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/physical_test.zig"),
+        .target = b.graph.host,
+    });
+    physical_test_mod.addImport("physical_bitmap", physical_bitmap_host_mod);
+
+    const physical_tests = b.addTest(.{
+        .root_module = physical_test_mod,
+    });
+
+    const run_physical_tests = b.addRunArtifact(physical_tests);
+
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_memory_map_tests.step);
+    test_step.dependOn(&run_physical_tests.step);
 }
