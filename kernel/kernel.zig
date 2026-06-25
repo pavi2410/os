@@ -11,6 +11,7 @@ const memory_map = @import("mm/memory_map.zig");
 const paging = @import("arch/x86_64/paging.zig");
 const physical = @import("mm/physical.zig");
 const serial = @import("arch/x86_64/serial.zig");
+const scheduler = @import("proc/scheduler.zig");
 const thread = @import("proc/thread.zig");
 const virtual = @import("mm/virtual.zig");
 
@@ -73,6 +74,7 @@ pub fn init(ctx: BootContext) void {
     serial.writeString("\r\n=== Phase 3 runtime ===\r\n");
     initApic(ctx.rsdp_virt);
     initTimer();
+    initScheduler();
 
     if (boot_debug.thread_switch_test) {
         thread.runSwitchTest(10_000);
@@ -105,6 +107,10 @@ fn initTimer() void {
         100,
         ticks_per_irq,
     });
+}
+
+fn initScheduler() void {
+    scheduler.init();
 }
 
 fn reserveMemoryMapBuffer(response: *const limine.MemmapResponse) void {
@@ -269,15 +275,5 @@ fn printMemoryMap() void {
 }
 
 pub fn run() noreturn {
-    serial.writeString("Enabling interrupts, entering idle loop\r\n");
-    var last_reported_ticks: u64 = 0;
-    cpu.sti();
-    while (true) {
-        const ticks = interrupts.timerTickCount();
-        if (ticks - last_reported_ticks >= 100) {
-            last_reported_ticks = ticks;
-            serial.printf("timer ticks: {d}\r\n", .{ticks});
-        }
-        cpu.hlt();
-    }
+    scheduler.start();
 }

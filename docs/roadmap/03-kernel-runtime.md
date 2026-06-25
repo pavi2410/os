@@ -21,10 +21,10 @@
 - [x] Add [`proc/thread.zig`](../../kernel/proc/thread.zig)
   - [x] Thread struct (context, stack, state)
   - [x] Context switch (save/restore GPRs, RSP, RIP)
-- [ ] Add [`proc/scheduler.zig`](../../kernel/proc/scheduler.zig)
-  - [ ] Round-robin or cooperative scheduler
-  - [ ] Idle thread
-- [ ] Spawn at least two kernel threads that print on serial
+- [x] Add [`proc/scheduler.zig`](../../kernel/proc/scheduler.zig)
+  - [x] Round-robin scheduler (timer-quantum preemption via `yieldIfRequested`)
+  - [x] Idle thread
+- [x] Spawn at least two kernel threads that print on serial
 - [ ] Add [`syscall/`](../../kernel/syscall/) entry stub
   - [ ] Choose mechanism: `syscall`/`sysret`, `sysenter`, or `int 0x80`
   - [ ] Register convention documented (match future Linux ABI target)

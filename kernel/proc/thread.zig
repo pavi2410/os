@@ -50,6 +50,7 @@ pub const default_stack_size: usize = 32 * 1024;
 
 var next_id: usize = 1;
 var current: ?*Thread = null;
+var on_exit: ?*const fn () noreturn = null;
 
 extern fn switch_context(from: *SavedContext, to: *SavedContext) callconv(.{ .x86_64_sysv = .{} }) void;
 
@@ -95,6 +96,14 @@ pub fn currentThread() ?*Thread {
     return current;
 }
 
+pub fn setCurrent(t: ?*Thread) void {
+    current = t;
+}
+
+pub fn setExitHandler(handler: *const fn () noreturn) void {
+    on_exit = handler;
+}
+
 pub fn create(entry: EntryFn, name: []const u8, stack_size: usize) ThreadError!*Thread {
     const thread_mem = heap.kmalloc(@sizeOf(Thread)) catch return ThreadError.OutOfMemory;
     const stack_mem = heap.kmalloc(stack_size) catch {
@@ -118,6 +127,9 @@ pub fn create(entry: EntryFn, name: []const u8, stack_size: usize) ThreadError!*
 pub fn exit() noreturn {
     if (current) |thread| {
         thread.state = .dead;
+    }
+    if (on_exit) |handler| {
+        handler();
     }
     serial.writeString("\r\nthread exited without a scheduler\r\n");
     cpu.haltForever();

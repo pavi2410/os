@@ -1,6 +1,7 @@
 const acpi_madt = @import("../../acpi/madt.zig");
 const cpu = @import("cpu.zig");
 const paging = @import("paging.zig");
+const virtual = @import("../../mm/virtual.zig");
 
 pub const ApicError = error{
     MadtParseFailed,
@@ -71,6 +72,8 @@ pub fn init(rsdp_virt: u64) ApicError!void {
         maskAllPins(ioapic_count);
         ioapic_count += 1;
     }
+
+    virtual.reserveAddressRange(next_mmio_map);
 }
 
 pub fn lapicId() u8 {

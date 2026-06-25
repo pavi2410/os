@@ -1,5 +1,6 @@
 const apic = @import("apic.zig");
 const cpu = @import("cpu.zig");
+const scheduler = @import("../../proc/scheduler.zig");
 const serial = @import("serial.zig");
 const std = @import("std");
 
@@ -97,6 +98,7 @@ pub fn timerIrqHandler(vector: u8) void {
     _ = vector;
     _ = timer_ticks.fetchAdd(1, .monotonic);
     apic.lapicEoi();
+    scheduler.onTimerTick();
 }
 
 fn readCr2() u64 {

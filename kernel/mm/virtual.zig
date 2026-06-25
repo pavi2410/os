@@ -22,6 +22,11 @@ pub fn init() void {
     mapped_page_count = 0;
 }
 
+/// Skip a virtual address range so later heap allocations do not overlap MMIO windows.
+pub fn reserveAddressRange(end_exclusive: u64) void {
+    if (next_virt < end_exclusive) next_virt = end_exclusive;
+}
+
 pub fn mapPages(virt: u64, phys: u64, count: usize, flags: u64) VirtError!void {
     if (virt & (page_size - 1) != 0 or phys & (page_size - 1) != 0) {
         return VirtError.UnalignedAddress;
