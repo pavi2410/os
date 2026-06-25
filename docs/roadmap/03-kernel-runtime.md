@@ -18,9 +18,9 @@
   - [x] Timer interrupt handler
   - [x] EOI handling
 - [x] Add timer driver (LAPIC periodic timer, PIT-calibrated)
-- [ ] Add [`proc/thread.zig`](../../kernel/proc/thread.zig)
-  - [ ] Thread struct (context, stack, state)
-  - [ ] Context switch (save/restore GPRs, RSP, RIP)
+- [x] Add [`proc/thread.zig`](../../kernel/proc/thread.zig)
+  - [x] Thread struct (context, stack, state)
+  - [x] Context switch (save/restore GPRs, RSP, RIP)
 - [ ] Add [`proc/scheduler.zig`](../../kernel/proc/scheduler.zig)
   - [ ] Round-robin or cooperative scheduler
   - [ ] Idle thread

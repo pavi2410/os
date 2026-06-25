@@ -11,6 +11,7 @@ const memory_map = @import("mm/memory_map.zig");
 const paging = @import("arch/x86_64/paging.zig");
 const physical = @import("mm/physical.zig");
 const serial = @import("arch/x86_64/serial.zig");
+const thread = @import("proc/thread.zig");
 const virtual = @import("mm/virtual.zig");
 
 /// Deliberately unmapped higher-half address used to verify the page fault handler.
@@ -20,6 +21,7 @@ const page_fault_test_addr: u64 = 0xFFFFFFFF90000000;
 const boot_debug = struct {
     pub const allocator_stress: bool = false;
     pub const page_fault_test: bool = false;
+    pub const thread_switch_test: bool = false;
 };
 
 pub const BootContext = struct {
@@ -71,6 +73,10 @@ pub fn init(ctx: BootContext) void {
     serial.writeString("\r\n=== Phase 3 runtime ===\r\n");
     initApic(ctx.rsdp_virt);
     initTimer();
+
+    if (boot_debug.thread_switch_test) {
+        thread.runSwitchTest(10_000);
+    }
 
     if (boot_debug.page_fault_test) {
         triggerDeliberatePageFault();
