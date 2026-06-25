@@ -33,6 +33,11 @@ comptime {
         \\  mov %ax, %fs
         \\  mov %ax, %gs
         \\  mov %ax, %ss
+        \\  push $0x08
+        \\  lea 1f(%rip), %rax
+        \\  push %rax
+        \\  lretq
+        \\1:
         \\  retq
     );
 }

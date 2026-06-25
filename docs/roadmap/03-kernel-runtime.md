@@ -10,14 +10,14 @@
 
 ## Checklist
 
-- [ ] Add interrupt controller support
-  - [ ] Legacy PIC **or** APIC (LAPIC recommended for SMP path)
-  - [ ] Mask/unmask IRQ helpers
-- [ ] Add [`arch/x86_64/interrupts.zig`](../../kernel/arch/x86_64/interrupts.zig) or extend `idt.zig`
-  - [ ] IRQ dispatch table
-  - [ ] Timer interrupt handler
-  - [ ] EOI handling
-- [ ] Add timer driver (PIT for simplicity, or APIC timer)
+- [x] Add interrupt controller support
+  - [x] APIC (LAPIC + IOAPIC; legacy PIC masked)
+  - [x] Mask/unmask IRQ helpers (`maskGsi` / `unmaskGsi`)
+- [x] Add [`arch/x86_64/interrupts.zig`](../../kernel/arch/x86_64/interrupts.zig) or extend `idt.zig`
+  - [x] IRQ dispatch table
+  - [x] Timer interrupt handler
+  - [x] EOI handling
+- [x] Add timer driver (LAPIC periodic timer, PIT-calibrated)
 - [ ] Add [`proc/thread.zig`](../../kernel/proc/thread.zig)
   - [ ] Thread struct (context, stack, state)
   - [ ] Context switch (save/restore GPRs, RSP, RIP)

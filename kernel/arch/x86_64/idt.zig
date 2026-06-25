@@ -1,7 +1,9 @@
 const cpu = @import("cpu.zig");
 const gdt = @import("gdt.zig");
-const serial = @import("serial.zig");
+const interrupts = @import("interrupts.zig");
 const std = @import("std");
+
+pub const ExceptionFrame = interrupts.Frame;
 
 const IdtEntry = extern struct {
     offset_low: u16,
@@ -18,28 +20,8 @@ const IdtPointer = packed struct {
     base: u64,
 };
 
-pub const ExceptionFrame = extern struct {
-    rax: u64,
-    rbx: u64,
-    rcx: u64,
-    rdx: u64,
-    rbp: u64,
-    rdi: u64,
-    rsi: u64,
-    r8: u64,
-    r9: u64,
-    r10: u64,
-    r11: u64,
-    r12: u64,
-    r13: u64,
-    r14: u64,
-    r15: u64,
-    vector: u64,
-    error_code: u64,
-    rip: u64,
-    cs: u64,
-    rflags: u64,
-};
+const irq_vector_start: usize = 32;
+const irq_vector_end: usize = 48;
 
 var idt: [256]IdtEntry = undefined;
 
@@ -47,6 +29,23 @@ extern fn isr_13() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn isr_14() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn isr_default() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn idt_load(ptr: *const IdtPointer) callconv(.{ .x86_64_sysv = .{} }) void;
+
+extern fn isr_32() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_33() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_34() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_35() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_36() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_37() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_38() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_39() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_40() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_41() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_42() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_43() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_44() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_45() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_46() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_47() callconv(.{ .x86_64_sysv = .{} }) void;
 
 comptime {
     asm (
@@ -96,54 +95,72 @@ comptime {
         \\  hlt
         \\  jmp 1b
         \\
+        \\.global irq_stub
+        \\.type irq_stub, @function
+        \\irq_stub:
+        \\  push %r15
+        \\  push %r14
+        \\  push %r13
+        \\  push %r12
+        \\  push %r11
+        \\  push %r10
+        \\  push %r9
+        \\  push %r8
+        \\  push %rsi
+        \\  push %rdi
+        \\  push %rbp
+        \\  push %rdx
+        \\  push %rcx
+        \\  push %rbx
+        \\  push %rax
+        \\  mov %rsp, %rdi
+        \\  call irq_dispatch
+        \\  pop %rax
+        \\  pop %rbx
+        \\  pop %rcx
+        \\  pop %rdx
+        \\  pop %rbp
+        \\  pop %rdi
+        \\  pop %rsi
+        \\  pop %r8
+        \\  pop %r9
+        \\  pop %r10
+        \\  pop %r11
+        \\  pop %r12
+        \\  pop %r13
+        \\  pop %r14
+        \\  pop %r15
+        \\  add $16, %rsp
+        \\  iretq
+        \\
         \\.global idt_load
         \\.type idt_load, @function
         \\idt_load:
         \\  lidt (%rdi)
         \\  retq
     );
-}
 
-export fn exception_dispatch(frame: *ExceptionFrame) callconv(.{ .x86_64_sysv = .{} }) void {
-    switch (frame.vector) {
-        13 => handleGeneralProtectionFault(frame),
-        14 => handlePageFault(frame),
-        else => handleDefault(frame),
+    for (irq_vector_start..irq_vector_end) |vector| {
+        const stub = std.fmt.comptimePrint(
+            \\.global isr_{d}
+            \\.type isr_{d}, @function
+            \\isr_{d}:
+            \\  cli
+            \\  push $0
+            \\  push ${d}
+            \\  jmp irq_stub
+            \\
+        , .{ vector, vector, vector, vector });
+        asm (stub);
     }
 }
 
-fn handlePageFault(frame: *ExceptionFrame) void {
-    const cr2 = readCr2();
-    serial.writeString("\r\n!!! Page Fault !!!\r\n");
-    serial.printf("CR2:  0x{x}\r\n", .{cr2});
-    serial.printf("RIP:  0x{x}\r\n", .{frame.rip});
-    serial.printf("Code: 0x{x}\r\n", .{frame.error_code});
-    haltForever();
+export fn exception_dispatch(frame: *ExceptionFrame) callconv(.{ .x86_64_sysv = .{} }) void {
+    interrupts.dispatchException(frame);
 }
 
-fn handleGeneralProtectionFault(frame: *ExceptionFrame) void {
-    serial.writeString("\r\n!!! General Protection Fault !!!\r\n");
-    serial.printf("RIP:  0x{x}\r\n", .{frame.rip});
-    serial.printf("Code: 0x{x}\r\n", .{frame.error_code});
-    haltForever();
-}
-
-fn handleDefault(frame: *ExceptionFrame) void {
-    serial.writeString("\r\n!!! Unhandled Exception !!!\r\n");
-    serial.printf("Vector: {d}\r\n", .{frame.vector});
-    serial.printf("RIP:    0x{x}\r\n", .{frame.rip});
-    serial.printf("Code:   0x{x}\r\n", .{frame.error_code});
-    haltForever();
-}
-
-fn haltForever() noreturn {
-    while (true) cpu.hlt();
-}
-
-fn readCr2() u64 {
-    return asm volatile ("mov %%cr2, %[result]"
-        : [result] "=r" (-> u64),
-    );
+export fn irq_dispatch(frame: *ExceptionFrame) callconv(.{ .x86_64_sysv = .{} }) void {
+    interrupts.dispatchIrq(frame);
 }
 
 fn setHandler(vector: usize, handler: *const fn () callconv(.{ .x86_64_sysv = .{} }) void) void {
@@ -159,6 +176,28 @@ fn setHandler(vector: usize, handler: *const fn () callconv(.{ .x86_64_sysv = .{
     };
 }
 
+fn irqHandler(vector: usize) *const fn () callconv(.{ .x86_64_sysv = .{} }) void {
+    return switch (vector) {
+        32 => isr_32,
+        33 => isr_33,
+        34 => isr_34,
+        35 => isr_35,
+        36 => isr_36,
+        37 => isr_37,
+        38 => isr_38,
+        39 => isr_39,
+        40 => isr_40,
+        41 => isr_41,
+        42 => isr_42,
+        43 => isr_43,
+        44 => isr_44,
+        45 => isr_45,
+        46 => isr_46,
+        47 => isr_47,
+        else => isr_default,
+    };
+}
+
 pub fn init() void {
     @memset(std.mem.asBytes(&idt), 0);
     for (0..256) |vector| {
@@ -166,6 +205,10 @@ pub fn init() void {
     }
     setHandler(13, isr_13);
     setHandler(14, isr_14);
+
+    for (irq_vector_start..irq_vector_end) |vector| {
+        setHandler(vector, irqHandler(vector));
+    }
 }
 
 pub fn load() void {

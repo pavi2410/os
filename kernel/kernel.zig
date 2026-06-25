@@ -4,6 +4,8 @@ const cpu = @import("arch/x86_64/cpu.zig");
 const gdt = @import("arch/x86_64/gdt.zig");
 const heap = @import("mm/heap.zig");
 const idt = @import("arch/x86_64/idt.zig");
+const interrupts = @import("arch/x86_64/interrupts.zig");
+const timer = @import("arch/x86_64/timer.zig");
 const limine = @import("limine");
 const memory_map = @import("mm/memory_map.zig");
 const paging = @import("arch/x86_64/paging.zig");
@@ -68,6 +70,7 @@ pub fn init(ctx: BootContext) void {
 
     serial.writeString("\r\n=== Phase 3 runtime ===\r\n");
     initApic(ctx.rsdp_virt);
+    initTimer();
 
     if (boot_debug.page_fault_test) {
         triggerDeliberatePageFault();
@@ -83,6 +86,19 @@ fn initApic(rsdp_virt: u64) void {
     serial.printf("LAPIC ID: {d}\r\n", .{apic.lapicId()});
     serial.printf("IOAPIC count: {d}\r\n", .{apic.ioApicCount()});
     serial.writeString("Legacy PIC masked, IOAPIC pins masked\r\n");
+}
+
+fn initTimer() void {
+    serial.writeString("\r\n--- Timer ---\r\n");
+    interrupts.registerIrq(timer.timer_vector, interrupts.timerIrqHandler);
+    const ticks_per_irq = timer.init() catch {
+        serial.writeString("LAPIC timer init failed\r\n");
+        cpu.haltForever();
+    };
+    serial.printf("LAPIC periodic timer started ({d} Hz, {d} ticks/irq)\r\n", .{
+        100,
+        ticks_per_irq,
+    });
 }
 
 fn reserveMemoryMapBuffer(response: *const limine.MemmapResponse) void {
@@ -247,9 +263,15 @@ fn printMemoryMap() void {
 }
 
 pub fn run() noreturn {
-    serial.writeString("Entering idle loop (interrupts disabled)\r\n");
-    cpu.cli();
+    serial.writeString("Enabling interrupts, entering idle loop\r\n");
+    var last_reported_ticks: u64 = 0;
+    cpu.sti();
     while (true) {
+        const ticks = interrupts.timerTickCount();
+        if (ticks - last_reported_ticks >= 100) {
+            last_reported_ticks = ticks;
+            serial.printf("timer ticks: {d}\r\n", .{ticks});
+        }
         cpu.hlt();
     }
 }

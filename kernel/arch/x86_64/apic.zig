@@ -24,7 +24,16 @@ const lapic_reg = struct {
     pub const tpr: u32 = 0x80;
     pub const eoi: u32 = 0xB0;
     pub const spurious: u32 = 0xF0;
+    pub const lvt_timer: u32 = 0x320;
+    pub const timer_init_count: u32 = 0x380;
+    pub const timer_current_count: u32 = 0x390;
+    pub const timer_divide: u32 = 0x3E0;
 };
+
+const lapic_timer_divide: u32 = 0x3;
+const lvt_timer_masked: u32 = 1 << 16;
+const lvt_timer_periodic: u32 = 1 << 17;
+const lvt_timer_one_shot: u32 = 0;
 
 const ioapic_reg = struct {
     pub const index: u32 = 0x00;
@@ -93,6 +102,26 @@ pub fn unmaskGsi(gsi: u32, vector: u8) ApicError!void {
 
 pub fn lapicEoi() void {
     lapicWrite(lapic_reg.eoi, 0);
+}
+
+pub fn lapicWriteTimerInitCount(count: u32) void {
+    lapicWrite(lapic_reg.timer_init_count, count);
+}
+
+pub fn lapicReadTimerCurrentCount() u32 {
+    return lapicRead(lapic_reg.timer_current_count);
+}
+
+pub fn prepareLapicTimerCalibration() void {
+    lapicWrite(lapic_reg.timer_divide, lapic_timer_divide);
+    lapicWrite(lapic_reg.lvt_timer, lvt_timer_one_shot | lvt_timer_masked);
+    lapicWrite(lapic_reg.timer_init_count, 0xFFFF_FFFF);
+}
+
+pub fn startLapicTimer(vector: u8, ticks_per_irq: u32) void {
+    lapicWrite(lapic_reg.timer_divide, lapic_timer_divide);
+    lapicWrite(lapic_reg.lvt_timer, @as(u32, vector) | lvt_timer_periodic);
+    lapicWrite(lapic_reg.timer_init_count, ticks_per_irq);
 }
 
 fn mapMmio(phys: u64) ApicError!u64 {
