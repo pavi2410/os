@@ -1,6 +1,7 @@
 const apic = @import("apic.zig");
 const cpu = @import("cpu.zig");
 const serial = @import("serial.zig");
+const std = @import("std");
 
 pub const Frame = extern struct {
     rax: u64,
@@ -30,15 +31,14 @@ pub const HandlerFn = *const fn (vector: u8) void;
 const irq_vector_end: usize = 48;
 
 var irq_handlers: [256]?HandlerFn = [_]?HandlerFn{null} ** 256;
-var timer_ticks: u64 = 0;
+var timer_ticks = std.atomic.Value(u64).init(0);
 
 pub fn registerIrq(vector: u8, handler: HandlerFn) void {
     irq_handlers[vector] = handler;
 }
 
 pub fn timerTickCount() u64 {
-    const ptr: *volatile u64 = &timer_ticks;
-    return ptr.*;
+    return timer_ticks.load(.monotonic);
 }
 
 pub fn dispatchException(frame: *Frame) void {
@@ -95,8 +95,7 @@ fn handleUnhandledIrq(vector: u8) void {
 
 pub fn timerIrqHandler(vector: u8) void {
     _ = vector;
-    const ptr: *volatile u64 = &timer_ticks;
-    ptr.* += 1;
+    _ = timer_ticks.fetchAdd(1, .monotonic);
     apic.lapicEoi();
 }
 
