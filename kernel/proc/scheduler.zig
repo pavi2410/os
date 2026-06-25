@@ -1,6 +1,7 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
 const heap = @import("../mm/heap.zig");
 const serial = @import("../arch/x86_64/serial.zig");
+const syscall_test = @import("../syscall/test.zig");
 const thread = @import("thread.zig");
 const std = @import("std");
 
@@ -9,6 +10,7 @@ pub const SchedulerError = error{
 };
 
 /// Timer ticks between preemption requests.
+/// Threads must call `yieldIfRequested()`; true IRQ-level preemption is deferred.
 const time_slice_ticks: u64 = 10;
 
 const ReadyQueue = struct {
@@ -104,6 +106,11 @@ pub fn yield() void {
 
 pub fn start() noreturn {
     serial.writeString("\r\n--- Scheduler ---\r\n");
+
+    spawn(syscall_test.threadEntry, "syscall-test") catch {
+        serial.writeString("spawn syscall-test failed\r\n");
+        cpu.haltForever();
+    };
 
     spawn(demoThreadA, "thread-a") catch {
         serial.writeString("spawn thread-a failed\r\n");

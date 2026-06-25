@@ -102,6 +102,7 @@ fn getOrCreateTable(parent: *PageTable, index: u9, flags: u64) MapError!*PageTab
     const entry = &parent[index];
     if (isPresent(entry.*)) {
         if (isHuge(entry.*)) return MapError.HugePageConflict;
+        if (flags & Flags.user != 0) entry.* |= Flags.user;
         return tableFromPhys(physAddr(entry.*));
     }
 
@@ -125,6 +126,54 @@ pub fn mapPage(virt: u64, phys: u64, flags: u64) MapError!void {
     const leaf = &pt[idx.pt];
     if (isPresent(leaf.*)) return MapError.AlreadyMapped;
 
+    leaf.* = makeEntry(phys, flags | Flags.present);
+    invlpg(virt);
+}
+
+/// Map a page for ring-3 access; sets the user flag on intermediate tables too.
+pub fn mapUserPage(virt: u64, phys: u64, flags: u64) MapError!void {
+    if (virt & (page_size - 1) != 0 or phys & (page_size - 1) != 0) {
+        return MapError.UnalignedAddress;
+    }
+
+    const table_flags = Flags.writable | Flags.user;
+    const idx = virtIndices(virt);
+    const pml4 = tableFromPhys(readCr3());
+
+    if (pml4[idx.pml4] & Flags.present != 0) pml4[idx.pml4] |= Flags.user;
+    const pdpt = try getOrCreateTable(pml4, idx.pml4, table_flags);
+    const pd = try getOrCreateTable(pdpt, idx.pdpt, table_flags);
+    const pt = try getOrCreateTable(pd, idx.pd, table_flags);
+
+    const leaf = &pt[idx.pt];
+    if (isPresent(leaf.*)) return MapError.AlreadyMapped;
+
+    leaf.* = makeEntry(phys, flags | Flags.present | Flags.user);
+    invlpg(virt);
+}
+
+pub fn setPageFlags(virt: u64, flags: u64) MapError!void {
+    if (virt & (page_size - 1) != 0) return MapError.UnalignedAddress;
+
+    const idx = virtIndices(virt);
+    const pml4 = tableFromPhys(readCr3());
+
+    const pdpt_entry = pml4[idx.pml4];
+    if (!isPresent(pdpt_entry) or isHuge(pdpt_entry)) return MapError.NotMapped;
+    const pdpt = tableFromPhys(physAddr(pdpt_entry));
+
+    const pd_entry = pdpt[idx.pdpt];
+    if (!isPresent(pd_entry) or isHuge(pd_entry)) return MapError.NotMapped;
+    const pd = tableFromPhys(physAddr(pd_entry));
+
+    const pt_entry = pd[idx.pd];
+    if (!isPresent(pt_entry) or isHuge(pt_entry)) return MapError.NotMapped;
+    const pt = tableFromPhys(physAddr(pt_entry));
+
+    const leaf = &pt[idx.pt];
+    if (!isPresent(leaf.*)) return MapError.NotMapped;
+
+    const phys = physAddr(leaf.*);
     leaf.* = makeEntry(phys, flags | Flags.present);
     invlpg(virt);
 }

@@ -22,13 +22,13 @@
   - [x] Thread struct (context, stack, state)
   - [x] Context switch (save/restore GPRs, RSP, RIP)
 - [x] Add [`proc/scheduler.zig`](../../kernel/proc/scheduler.zig)
-  - [x] Round-robin scheduler (timer-quantum preemption via `yieldIfRequested`)
+  - [x] Round-robin scheduler (timer-quantum preemption via `yieldIfRequested`; true involuntary preemption deferred — see Notes)
   - [x] Idle thread
 - [x] Spawn at least two kernel threads that print on serial
-- [ ] Add [`syscall/`](../../kernel/syscall/) entry stub
-  - [ ] Choose mechanism: `syscall`/`sysret`, `sysenter`, or `int 0x80`
-  - [ ] Register convention documented (match future Linux ABI target)
-  - [ ] Minimal handler table (e.g. debug `write`, `exit`)
+- [x] Add [`syscall/`](../../kernel/syscall/) entry stub
+  - [x] Choose mechanism: `syscall`/`sysret`, `sysenter`, or `int 0x80`
+  - [x] Register convention documented (match future Linux ABI target)
+  - [x] Minimal handler table (e.g. debug `write`, `exit`)
 
 ---
 
@@ -46,5 +46,6 @@
 ## Notes
 
 - SMP is out of scope here; design with per-CPU data in mind but run single-core first.
-- Syscall machinery can be tested from ring 0 with a simulated user stack before real userspace in Phase 4.
-- Document the chosen syscall ABI in `docs/` when frozen.
+- **Preemption (deferred):** The LAPIC timer sets `preempt_requested`; threads honor it at `yieldIfRequested()` boundaries. That is timer-quantum *cooperative* scheduling, not involuntary preemption from the IRQ handler. True preemptive switching (interrupt-frame context save, `iretq`/`sysret` from the timer path) is deferred until after syscalls; it is not required to finish Phase 3 or start Phase 4.
+- Syscall machinery can be tested from ring 3 with a small user stub before real ELF userspace in Phase 4.
+- Document the chosen syscall ABI in `docs/syscall-abi.md`.
