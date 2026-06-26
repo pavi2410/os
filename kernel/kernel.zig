@@ -16,6 +16,7 @@ const process = @import("proc/process.zig");
 const tty = @import("drivers/tty.zig");
 const pci = @import("drivers/pci.zig");
 const virtio_blk = @import("drivers/virtio_blk.zig");
+const vfs = @import("fs/vfs.zig");
 const syscall = @import("syscall/entry.zig");
 const thread = @import("proc/thread.zig");
 const virtual = @import("mm/virtual.zig");
@@ -101,7 +102,16 @@ fn initBlock() void {
         return;
     };
     virtio_blk.logStatus();
-    virtio_blk.selfTest();
+    initVfs();
+}
+
+fn initVfs() void {
+    vfs.init() catch {
+        serial.writeString("VFS init failed\r\n");
+        return;
+    };
+    vfs.logStatus();
+    vfs.selfTest();
 }
 
 fn initPci(rsdp_virt: u64) void {

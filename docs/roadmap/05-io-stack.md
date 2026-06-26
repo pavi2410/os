@@ -14,13 +14,13 @@
 - [x] Add block device driver
   - [x] VirtIO-blk **or** ATA/AHCI for QEMU
   - [x] Read/write sectors
-- [ ] Add [`fs/vfs.zig`](../../kernel/fs/vfs.zig)
-  - [ ] Vnode/inode interface
-  - [ ] Path lookup and file descriptors wired to syscalls
-- [ ] Add filesystem implementation
-  - [ ] FAT32 first (aligns with boot volume), **or** ext2
-  - [ ] `open`, `read`, `close` via VFS
-- [ ] Extend syscalls: `open`, `close`, `lseek`, `stat` (minimal subset)
+- [x] Add [`fs/vfs.zig`](../../kernel/fs/vfs.zig)
+  - [x] Vnode/inode interface
+  - [x] Path lookup and file descriptors wired to syscalls
+- [x] Add filesystem implementation
+  - [x] FAT32 first (aligns with boot volume), **or** ext2
+  - [x] `open`, `read`, `close` via VFS
+- [x] Extend syscalls: `open`, `close`, `lseek`, `stat` (minimal subset)
 - [ ] Add network device driver
   - [ ] VirtIO-net **or** e1000
   - [ ] TX/RX ring handling

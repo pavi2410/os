@@ -10,15 +10,20 @@ pub const VirtError = error{
     NotMapped,
 };
 
-/// Kernel-only dynamic mapping window (above the linked image, below the page-fault probe).
-pub const KERNEL_HEAP_BASE: u64 = 0xFFFFFFFF80100000;
-pub const KERNEL_HEAP_LIMIT: u64 = KERNEL_HEAP_BASE + (256 * 1024 * 1024);
+extern var _kernel_end: u8;
 
-var next_virt: u64 = KERNEL_HEAP_BASE;
+/// Kernel-only dynamic mapping window (above the linked image, below the page-fault probe).
+pub const kernel_heap_size: u64 = 256 * 1024 * 1024;
+
+var heap_base: u64 = 0;
+var heap_limit: u64 = 0;
+var next_virt: u64 = 0;
 var mapped_page_count: usize = 0;
 
 pub fn init() void {
-    next_virt = KERNEL_HEAP_BASE;
+    heap_base = (@intFromPtr(&_kernel_end) + page_size - 1) & ~(page_size - 1);
+    heap_limit = heap_base + kernel_heap_size;
+    next_virt = heap_base;
     mapped_page_count = 0;
 }
 
@@ -68,7 +73,7 @@ pub fn mapMmioPages(phys: u64, count: usize) VirtError!u64 {
 
     const virt_page = next_virt;
     const bytes = @as(u64, @intCast(count)) * page_size;
-    if (virt_page + bytes > KERNEL_HEAP_LIMIT) return VirtError.OutOfVirtualMemory;
+    if (virt_page + bytes > heap_limit) return VirtError.OutOfVirtualMemory;
     next_virt += bytes;
 
     var i: usize = 0;
@@ -88,7 +93,7 @@ pub fn allocPages(count: usize) VirtError!u64 {
 
     const virt = next_virt;
     const bytes = @as(u64, @intCast(count)) * page_size;
-    if (virt + bytes > KERNEL_HEAP_LIMIT) return VirtError.OutOfVirtualMemory;
+    if (virt + bytes > heap_limit) return VirtError.OutOfVirtualMemory;
     next_virt += bytes;
 
     var i: usize = 0;

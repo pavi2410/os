@@ -17,6 +17,8 @@ rm -f "$out"
     sleep 7
     printf 'help\r'
     sleep 1
+    printf 'cat /README.TXT\r'
+    sleep 1
     printf 'hello\r'
     sleep 2
     printf 'pid\r'
@@ -42,15 +44,16 @@ kill "$qpid" 2>/dev/null || true
 pkill -f "qemu-system-x86_64.*os.iso" 2>/dev/null || true
 
 echo "=== serial log (tail) ==="
-tail -20 "$out"
+tail -25 "$out"
 
 echo ""
 echo "=== checks ==="
 fail=0
 for needle in \
     "Simple shell ready" \
-    "Built-ins: help, exit, pid" \
+    "Built-ins: help, exit, pid, cat" \
     "Programs: hello" \
+    "Hello from FAT on virtio-blk" \
     "Hello from userspace!"
 do
     if grep -q "$needle" "$out"; then

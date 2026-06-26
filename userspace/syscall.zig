@@ -12,6 +12,18 @@ pub fn read(fd: u32, buf: [*]u8, count: usize) isize {
     return syscall6(0, fd, @intFromPtr(buf), count, 0, 0, 0);
 }
 
+pub fn open(path: [*:0]const u8, flags: u32, mode: u32) isize {
+    return syscall6(2, @intFromPtr(path), flags, mode, 0, 0, 0);
+}
+
+pub fn close(fd: u32) isize {
+    return syscall6(3, fd, 0, 0, 0, 0, 0);
+}
+
+pub fn lseek(fd: u32, offset: i64, whence: u32) isize {
+    return syscall6(8, fd, @bitCast(@as(u64, @intCast(offset))), whence, 0, 0, 0);
+}
+
 pub fn getpid() isize {
     return syscall6(39, 0, 0, 0, 0, 0, 0);
 }

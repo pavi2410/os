@@ -26,10 +26,12 @@ pub const user_brk_base: u64 = 0x0000000000400000;
 pub const FdKind = enum {
     none,
     console,
+    file,
 };
 
 pub const Fd = struct {
     kind: FdKind = .none,
+    vfs_handle: u32 = 0,
 };
 
 pub const max_fds = 32;
@@ -49,6 +51,14 @@ pub const FdTable = struct {
         table.fds[1] = .{ .kind = .console };
         table.fds[2] = .{ .kind = .console };
         return table;
+    }
+
+    pub fn allocFd(self: *FdTable) ?usize {
+        var i: usize = 3;
+        while (i < max_fds) : (i += 1) {
+            if (self.fds[i].kind == .none) return i;
+        }
+        return null;
     }
 };
 

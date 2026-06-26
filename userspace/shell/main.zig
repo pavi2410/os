@@ -63,6 +63,30 @@ fn printPid(pid: isize) void {
     writeStr(buf[0 .. n + 1]);
 }
 
+fn catFile(path: []const u8) void {
+    var pathbuf: [128]u8 = undefined;
+    if (path.len + 1 > pathbuf.len) {
+        writeStr("path too long\n");
+        return;
+    }
+    @memcpy(pathbuf[0..path.len], path);
+    pathbuf[path.len] = 0;
+
+    const fd = libc.syscall.open(@ptrCast(&pathbuf), 0, 0);
+    if (fd < 0) {
+        writeStr("cat: open failed\n");
+        return;
+    }
+
+    var buf: [512]u8 = undefined;
+    while (true) {
+        const n = libc.syscall.read(@intCast(fd), &buf, buf.len);
+        if (n <= 0) break;
+        _ = libc.syscall.write(1, &buf, @intCast(n));
+    }
+    _ = libc.syscall.close(@intCast(fd));
+}
+
 export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
     writeStr("Simple shell ready. Type 'help'.\n");
 
@@ -79,11 +103,13 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
 
         if (eql(cmd, "exit")) {
             libc.syscall.exit(0);
-        } else if (eql(cmd, "help")) {
-            writeStr("Built-ins: help, exit, pid\n");
+        } else         if (eql(cmd, "help")) {
+            writeStr("Built-ins: help, exit, pid, cat\n");
             writeStr("Programs: hello\n");
         } else if (eql(cmd, "pid")) {
             printPid(libc.syscall.getpid());
+        } else if (startsWith(cmd, "cat ")) {
+            catFile(cmd[4..len]);
         } else if (startsWith(cmd, "hello")) {
             const path = "/hello";
             const rc = libc.syscall.spawn(path);

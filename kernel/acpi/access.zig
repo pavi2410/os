@@ -8,6 +8,10 @@ pub fn virtBytes(virt: u64) [*]const u8 {
     return @ptrFromInt(virt);
 }
 
+pub fn readU16(bytes: [*]const u8, off: usize) u16 {
+    return @as(u16, bytes[off]) | (@as(u16, bytes[off + 1]) << 8);
+}
+
 pub fn readU32(bytes: [*]const u8, off: usize) u32 {
     return @as(u32, bytes[off]) |
         (@as(u32, bytes[off + 1]) << 8) |
