@@ -14,6 +14,7 @@ const serial = @import("arch/x86_64/serial.zig");
 const scheduler = @import("proc/scheduler.zig");
 const process = @import("proc/process.zig");
 const tty = @import("drivers/tty.zig");
+const pci = @import("drivers/pci.zig");
 const syscall = @import("syscall/entry.zig");
 const thread = @import("proc/thread.zig");
 const virtual = @import("mm/virtual.zig");
@@ -79,6 +80,7 @@ pub fn init(ctx: BootContext) void {
     process.init();
     tty.init();
     initApic(ctx.rsdp_virt);
+    initPci(ctx.rsdp_virt);
     initTimer();
     initScheduler();
 
@@ -89,6 +91,14 @@ pub fn init(ctx: BootContext) void {
     if (boot_debug.page_fault_test) {
         triggerDeliberatePageFault();
     }
+}
+
+fn initPci(rsdp_virt: u64) void {
+    pci.init(rsdp_virt) catch {
+        serial.writeString("PCI init failed\r\n");
+        return;
+    };
+    pci.logDevices();
 }
 
 fn initApic(rsdp_virt: u64) void {

@@ -10,7 +10,7 @@
 
 ## Checklist
 
-- [ ] Add PCI enumeration helper ([`drivers/pci.zig`](../../kernel/drivers/pci.zig))
+- [x] Add PCI enumeration helper ([`drivers/pci.zig`](../../kernel/drivers/pci.zig))
 - [ ] Add block device driver
   - [ ] VirtIO-blk **or** ATA/AHCI for QEMU
   - [ ] Read/write sectors
