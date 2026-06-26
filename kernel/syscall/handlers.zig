@@ -2,6 +2,7 @@ const numbers = @import("numbers.zig");
 const process = @import("../proc/process.zig");
 const serial = @import("../arch/x86_64/serial.zig");
 const thread = @import("../proc/thread.zig");
+const tty = @import("../drivers/tty.zig");
 
 /// Matches the stack layout built by `syscall_entry` (r9 pushed first).
 pub const Frame = extern struct {
@@ -38,14 +39,10 @@ fn sysRead(fd: u64, buf_ptr: u64, count: u64) i64 {
     const len: usize = @intCast(@min(count, max_len));
     const buf: [*]u8 = @ptrFromInt(buf_ptr);
 
-    var read_count: usize = 0;
-    while (read_count < len) {
-        buf[read_count] = serial.readByteBlocking();
-        read_count += 1;
-        if (buf[read_count - 1] == '\n') break;
-    }
-
-    return @intCast(read_count);
+    const read_len = tty.get().read(buf[0..len]) catch |err| switch (err) {
+        tty.TtyError.WouldBlock => return -4, // EINTR
+    };
+    return @intCast(read_len);
 }
 
 fn sysWrite(fd: u64, buf_ptr: u64, count: u64) i64 {
@@ -55,8 +52,8 @@ fn sysWrite(fd: u64, buf_ptr: u64, count: u64) i64 {
     const max_len: usize = 4096;
     const len: usize = @intCast(@min(count, max_len));
     const buf: [*]const u8 = @ptrFromInt(buf_ptr);
-    serial.writeString(buf[0..len]);
-    return @intCast(len);
+    const written = tty.get().write(buf[0..len]);
+    return @intCast(written);
 }
 
 fn sysBrk(addr: u64) i64 {
