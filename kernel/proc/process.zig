@@ -1,6 +1,8 @@
 const heap = @import("../mm/heap.zig");
 const paging = @import("../arch/x86_64/paging.zig");
+const physical = @import("../mm/physical.zig");
 const gdt = @import("../arch/x86_64/gdt.zig");
+const thread = @import("thread.zig");
 const user_loader = @import("../mm/user_loader.zig");
 const user_entry = @import("user_entry.zig");
 
@@ -75,6 +77,7 @@ pub const Process = struct {
     fds: FdTable,
     exit_status: ?u32,
     state: State,
+    brk: u64,
 
     pub fn destroy(self: *Process) void {
         self.address_space.destroy();
@@ -112,6 +115,7 @@ pub fn create() ProcessError!*Process {
         .fds = FdTable.init(),
         .exit_status = null,
         .state = .created,
+        .brk = user_brk_base,
     };
     next_id += 1;
     return proc;
@@ -131,4 +135,41 @@ pub fn enterUser(proc: *Process, image: user_loader.LoadedImage, kernel_stack_to
     setCurrent(proc);
     proc.state = .running;
     user_entry.jumpToUser(image.entry, image.stack_top, proc.address_space.cr3);
+}
+
+/// Linux `brk`: grow the heap mapping or return the current break.
+pub fn sysBrk(proc: *Process, addr: u64) i64 {
+    if (addr == 0) return @bitCast(@as(i64, @intCast(proc.brk)));
+
+    if (addr < user_brk_base) return @bitCast(@as(i64, @intCast(proc.brk)));
+
+    const page_size = paging.page_size;
+    const new_end = (addr + page_size - 1) & ~(page_size - 1);
+    const old_end = (proc.brk + page_size - 1) & ~(page_size - 1);
+    const heap_flags = paging.Flags.user | paging.Flags.present | paging.Flags.writable | paging.Flags.no_exec;
+
+    if (new_end > old_end) {
+        var page = old_end;
+        while (page < new_end) : (page += page_size) {
+            const phys = physical.allocPage() catch return @bitCast(@as(i64, @intCast(proc.brk)));
+            proc.address_space.mapUserPage(page, phys, heap_flags) catch {
+                return @bitCast(@as(i64, @intCast(proc.brk)));
+            };
+        }
+    }
+
+    proc.brk = addr;
+    return @bitCast(@as(i64, @intCast(addr)));
+}
+
+/// Tear down the current user process after `exit` / `exit_group`.
+pub fn terminateCurrent(status: u32) noreturn {
+    const proc = current orelse {
+        thread.exit();
+    };
+    proc.exit_status = status;
+    proc.state = .zombie;
+    paging.writeCr3(kernelAddressSpace().cr3);
+    setCurrent(null);
+    thread.exit();
 }

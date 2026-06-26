@@ -62,6 +62,23 @@ pub fn writeByte(byte: u8) void {
     outb(COM1 + DATA, byte);
 }
 
+/// Check if receive buffer has data
+pub fn dataReady() bool {
+    return (inb(COM1 + LINE_STATUS) & 0x01) != 0;
+}
+
+/// Read a byte when available.
+pub fn readByte() ?u8 {
+    if (!dataReady()) return null;
+    return inb(COM1 + DATA);
+}
+
+/// Block until a byte is available, then return it.
+pub fn readByteBlocking() u8 {
+    while (!dataReady()) {}
+    return inb(COM1 + DATA);
+}
+
 /// Write a string to the serial port
 pub fn writeString(str: []const u8) void {
     for (str) |c| {
