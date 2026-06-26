@@ -1,6 +1,8 @@
 const heap = @import("../mm/heap.zig");
 const paging = @import("../arch/x86_64/paging.zig");
+const gdt = @import("../arch/x86_64/gdt.zig");
 const user_loader = @import("../mm/user_loader.zig");
+const user_entry = @import("user_entry.zig");
 
 pub const ProcessError = error{
     OutOfMemory,
@@ -122,4 +124,11 @@ pub fn destroy(proc: *Process) void {
 
 pub fn loadElf(proc: *Process, image: []const u8) user_loader.LoadError!user_loader.LoadedImage {
     return user_loader.load(proc.address_space.cr3, image);
+}
+
+pub fn enterUser(proc: *Process, image: user_loader.LoadedImage, kernel_stack_top: u64) noreturn {
+    gdt.setKernelStack(kernel_stack_top);
+    setCurrent(proc);
+    proc.state = .running;
+    user_entry.jumpToUser(image.entry, image.stack_top, proc.address_space.cr3);
 }
