@@ -1,4 +1,5 @@
 const std = @import("std");
+const cpu = @import("cpu.zig");
 
 /// COM1 serial port base address
 const COM1: u16 = 0x3F8;
@@ -75,7 +76,11 @@ pub fn readByte() ?u8 {
 
 /// Block until a byte is available, then return it.
 pub fn readByteBlocking() u8 {
-    while (!dataReady()) {}
+    while (!dataReady()) {
+        cpu.sti();
+        cpu.hlt();
+        cpu.cli();
+    }
     return inb(COM1 + DATA);
 }
 

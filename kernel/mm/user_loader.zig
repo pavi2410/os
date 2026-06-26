@@ -108,6 +108,17 @@ fn segmentFlags(p_flags: u32) u64 {
     return flags;
 }
 
+fn mergeSegmentPageFlags(existing: u64, incoming: u64) u64 {
+    var merged = (existing | incoming) | paging.Flags.present | paging.Flags.user;
+    if ((existing & paging.Flags.writable) != 0 or (incoming & paging.Flags.writable) != 0) {
+        merged |= paging.Flags.writable;
+    }
+    if ((existing & paging.Flags.no_exec) == 0 or (incoming & paging.Flags.no_exec) == 0) {
+        merged &= ~@as(u64, paging.Flags.no_exec);
+    }
+    return merged;
+}
+
 fn loadSegment(cr3: u64, image: []const u8, ph: Elf64Phdr) LoadError!void {
     if (ph.p_filesz > image.len or ph.p_offset > image.len - ph.p_filesz) {
         return LoadError.InvalidElf;
@@ -120,13 +131,19 @@ fn loadSegment(cr3: u64, image: []const u8, ph: Elf64Phdr) LoadError!void {
 
     var page = first_page;
     while (page < last_page) : (page += paging.page_size) {
-        const phys = physical.allocPage() catch return LoadError.OutOfMemory;
-        const page_buf = @as([*]u8, @ptrFromInt(address.physToVirt(phys)))[0..paging.page_size];
-        @memset(page_buf, 0);
-
         const page_end = page + paging.page_size;
         const seg_start = @max(page, ph.p_vaddr);
         const seg_end = @min(page_end, ph.p_vaddr + ph.p_memsz);
+
+        const page_buf: []u8 = if (paging.getPhysIn(cr3, page)) |mapped_phys|
+            @as([*]u8, @ptrFromInt(address.physToVirt(mapped_phys)))[0..paging.page_size]
+        else blk: {
+            const phys = physical.allocPage() catch return LoadError.OutOfMemory;
+            const buf = @as([*]u8, @ptrFromInt(address.physToVirt(phys)))[0..paging.page_size];
+            @memset(buf, 0);
+            paging.mapUserPageIn(cr3, page, phys, flags) catch return LoadError.OutOfMemory;
+            break :blk buf;
+        };
 
         if (seg_start < seg_end) {
             const seg_off = seg_start - ph.p_vaddr;
@@ -138,7 +155,11 @@ fn loadSegment(cr3: u64, image: []const u8, ph: Elf64Phdr) LoadError!void {
             }
         }
 
-        paging.mapUserPageIn(cr3, page, phys, flags) catch return LoadError.OutOfMemory;
+        if (paging.getPhysIn(cr3, page) != null) {
+            const current = paging.getPageFlagsIn(cr3, page) orelse flags;
+            const merged = mergeSegmentPageFlags(current, flags);
+            paging.setPageFlagsIn(cr3, page, merged) catch return LoadError.OutOfMemory;
+        }
     }
 }
 

@@ -1,7 +1,9 @@
 const apic = @import("apic.zig");
 const cpu = @import("cpu.zig");
+const process = @import("../../proc/process.zig");
 const scheduler = @import("../../proc/scheduler.zig");
 const serial = @import("serial.zig");
+const user_spawn = @import("../../proc/user_spawn.zig");
 const std = @import("std");
 
 pub const Frame = extern struct {
@@ -65,6 +67,12 @@ pub fn dispatchIrq(frame: *Frame) void {
 
 fn handlePageFault(frame: *Frame) void {
     const cr2 = readCr2();
+    if (frame.cs & 3 == 3) {
+        serial.printf("\r\nUser page fault at 0x{x}, terminating process\r\n", .{cr2});
+        if (user_spawn.isWaiting()) user_spawn.onChildExit(139);
+        process.terminateCurrent(139);
+    }
+
     serial.writeString("\r\n!!! Page Fault !!!\r\n");
     serial.printf("CR2:  0x{x}\r\n", .{cr2});
     serial.printf("RIP:  0x{x}\r\n", .{frame.rip});
@@ -73,6 +81,12 @@ fn handlePageFault(frame: *Frame) void {
 }
 
 fn handleGeneralProtectionFault(frame: *Frame) void {
+    if (frame.cs & 3 == 3) {
+        serial.writeString("\r\nUser general protection fault, terminating process\r\n");
+        if (user_spawn.isWaiting()) user_spawn.onChildExit(139);
+        process.terminateCurrent(139);
+    }
+
     serial.writeString("\r\n!!! General Protection Fault !!!\r\n");
     serial.printf("RIP:  0x{x}\r\n", .{frame.rip});
     serial.printf("Code: 0x{x}\r\n", .{frame.error_code});

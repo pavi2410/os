@@ -36,10 +36,12 @@ pub const Tss = extern struct {
     reserved8: u16 = 0,
 };
 
+// Order is required by SYSCALL/SYSRET: user data must sit at
+// `kernel_data_selector + 8` and user code at `kernel_data_selector + 16`.
 pub const kernel_code_selector: u16 = 0x08;
 pub const kernel_data_selector: u16 = 0x10;
-pub const user_code_selector: u16 = 0x18;
-pub const user_data_selector: u16 = 0x20;
+pub const user_data_selector: u16 = 0x18;
+pub const user_code_selector: u16 = 0x20;
 pub const tss_selector: u16 = 0x28;
 
 var tss: Tss = .{};
@@ -47,8 +49,8 @@ var gdt: [7]GdtEntry = .{
     .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0, .limit_high_flags = 0, .base_high = 0 },
     .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0x9A, .limit_high_flags = 0xA0, .base_high = 0 },
     .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0x92, .limit_high_flags = 0xC0, .base_high = 0 },
-    .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0xFA, .limit_high_flags = 0xA0, .base_high = 0 },
     .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0xF2, .limit_high_flags = 0xC0, .base_high = 0 },
+    .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0xFA, .limit_high_flags = 0xA0, .base_high = 0 },
     .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0, .limit_high_flags = 0, .base_high = 0 },
     .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0, .limit_high_flags = 0, .base_high = 0 },
 };
@@ -105,8 +107,12 @@ fn installTssDescriptor() void {
     };
 }
 
+/// Mirror of `tss.rsp0`, read directly (RIP-relative) by the syscall stub.
+export var gdt_kernel_rsp0: u64 = 0;
+
 pub fn setKernelStack(stack_top: u64) void {
     tss.rsp0 = stack_top;
+    gdt_kernel_rsp0 = stack_top;
 }
 
 pub fn init() void {

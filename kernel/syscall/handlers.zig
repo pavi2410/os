@@ -3,6 +3,7 @@ const process = @import("../proc/process.zig");
 const serial = @import("../arch/x86_64/serial.zig");
 const thread = @import("../proc/thread.zig");
 const tty = @import("../drivers/tty.zig");
+const user_spawn = @import("../proc/user_spawn.zig");
 
 /// Matches the stack layout built by `syscall_entry` (r9 pushed first).
 pub const Frame = extern struct {
@@ -15,6 +16,7 @@ pub const Frame = extern struct {
     nr: u64,
     user_rip: u64,
     user_rflags: u64,
+    user_rsp: u64,
 };
 
 const ENOSYS: i64 = -38;
@@ -26,6 +28,7 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.write => sysWrite(frame.arg0, frame.arg1, frame.arg2),
         numbers.brk => sysBrk(frame.arg0),
         numbers.getpid => sysGetpid(),
+        numbers.spawn => sysSpawn(frame.arg0),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
         else => ENOSYS,
     };
@@ -66,10 +69,26 @@ fn sysGetpid() i64 {
     return @intCast(proc.id);
 }
 
+fn sysSpawn(path_ptr: u64) i64 {
+    const path = userCString(path_ptr) orelse return -14; // EFAULT
+    return user_spawn.spawn(path);
+}
+
 fn sysExit(status: u64) i64 {
     if (process.currentProcess() != null) {
+        user_spawn.onChildExit(@truncate(status));
         process.terminateCurrent(@truncate(status));
     }
     serial.printf("\r\nsyscall exit({d})\r\n", .{status});
     thread.exit();
+}
+
+fn userCString(ptr: u64) ?[]const u8 {
+    if (ptr == 0) return null;
+    const start: [*]const u8 = @ptrFromInt(ptr);
+    var len: usize = 0;
+    while (len < 256) : (len += 1) {
+        if (start[len] == 0) return start[0..len];
+    }
+    return null;
 }

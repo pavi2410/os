@@ -341,3 +341,79 @@ pub fn mapUserPageIn(cr3_phys: u64, virt: u64, phys: u64, flags: u64) MapError!v
 
     leaf.* = makeEntry(phys, flags | Flags.present | Flags.user);
 }
+
+pub fn getPhysIn(cr3_phys: u64, virt: u64) ?u64 {
+    if (virt & (page_size - 1) != 0) return null;
+
+    const idx = virtIndices(virt);
+    const pml4 = tableFromPhys(cr3_phys);
+
+    const pdpt_entry = pml4[idx.pml4];
+    if (!isPresent(pdpt_entry) or isHuge(pdpt_entry)) return null;
+    const pdpt = tableFromPhys(physAddr(pdpt_entry));
+
+    const pd_entry = pdpt[idx.pdpt];
+    if (!isPresent(pd_entry) or isHuge(pd_entry)) return null;
+    const pd = tableFromPhys(physAddr(pd_entry));
+
+    const pt_entry = pd[idx.pd];
+    if (!isPresent(pt_entry) or isHuge(pt_entry)) return null;
+    const pt = tableFromPhys(physAddr(pt_entry));
+
+    const leaf = pt[idx.pt];
+    if (!isPresent(leaf)) return null;
+    return physAddr(leaf);
+}
+
+pub fn getPageFlagsIn(cr3_phys: u64, virt: u64) ?u64 {
+    const leaf = getLeafEntryIn(cr3_phys, virt) orelse return null;
+    return leaf & 0x8000000000000fff;
+}
+
+fn getLeafEntryIn(cr3_phys: u64, virt: u64) ?u64 {
+    if (virt & (page_size - 1) != 0) return null;
+
+    const idx = virtIndices(virt);
+    const pml4 = tableFromPhys(cr3_phys);
+
+    const pdpt_entry = pml4[idx.pml4];
+    if (!isPresent(pdpt_entry) or isHuge(pdpt_entry)) return null;
+    const pdpt = tableFromPhys(physAddr(pdpt_entry));
+
+    const pd_entry = pdpt[idx.pdpt];
+    if (!isPresent(pd_entry) or isHuge(pd_entry)) return null;
+    const pd = tableFromPhys(physAddr(pd_entry));
+
+    const pt_entry = pd[idx.pd];
+    if (!isPresent(pt_entry) or isHuge(pt_entry)) return null;
+    const pt = tableFromPhys(physAddr(pt_entry));
+
+    const leaf = pt[idx.pt];
+    if (!isPresent(leaf)) return null;
+    return leaf;
+}
+
+pub fn setPageFlagsIn(cr3_phys: u64, virt: u64, flags: u64) MapError!void {
+    if (virt & (page_size - 1) != 0) return MapError.UnalignedAddress;
+
+    const idx = virtIndices(virt);
+    const pml4 = tableFromPhys(cr3_phys);
+
+    const pdpt_entry = pml4[idx.pml4];
+    if (!isPresent(pdpt_entry) or isHuge(pdpt_entry)) return MapError.NotMapped;
+    const pdpt = tableFromPhys(physAddr(pdpt_entry));
+
+    const pd_entry = pdpt[idx.pdpt];
+    if (!isPresent(pd_entry) or isHuge(pd_entry)) return MapError.NotMapped;
+    const pd = tableFromPhys(physAddr(pd_entry));
+
+    const pt_entry = pd[idx.pd];
+    if (!isPresent(pt_entry) or isHuge(pt_entry)) return MapError.NotMapped;
+    const pt = tableFromPhys(physAddr(pt_entry));
+
+    const leaf = &pt[idx.pt];
+    if (!isPresent(leaf.*)) return MapError.NotMapped;
+
+    const phys = physAddr(leaf.*);
+    leaf.* = makeEntry(phys, flags | Flags.present | Flags.user);
+}

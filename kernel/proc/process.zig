@@ -1,3 +1,4 @@
+const cpu = @import("../arch/x86_64/cpu.zig");
 const heap = @import("../mm/heap.zig");
 const paging = @import("../arch/x86_64/paging.zig");
 const physical = @import("../mm/physical.zig");
@@ -39,8 +40,11 @@ pub const FdTable = struct {
 
     pub fn init() FdTable {
         var table = FdTable{
-            .fds = .{.{}} ** max_fds,
+            .fds = undefined,
         };
+        for (&table.fds) |*fd| {
+            fd.* = .{};
+        }
         table.fds[0] = .{ .kind = .console };
         table.fds[1] = .{ .kind = .console };
         table.fds[2] = .{ .kind = .console };
@@ -165,11 +169,13 @@ pub fn sysBrk(proc: *Process, addr: u64) i64 {
 /// Tear down the current user process after `exit` / `exit_group`.
 pub fn terminateCurrent(status: u32) noreturn {
     const proc = current orelse {
-        thread.exit();
+        while (true) cpu.hlt();
     };
     proc.exit_status = status;
-    proc.state = .zombie;
-    paging.writeCr3(kernelAddressSpace().cr3);
+    proc.state = .dead;
+    destroy(proc);
     setCurrent(null);
+    paging.writeCr3(kernelAddressSpace().cr3);
+
     thread.exit();
 }

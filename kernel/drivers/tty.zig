@@ -4,12 +4,13 @@ pub const TtyError = error{
     WouldBlock,
 };
 
-/// Minimal TTY backed by COM1 serial for Phase 4.
+/// Serial console TTY with canonical line editing.
 pub const Tty = struct {
     canonical: bool = true,
     echo: bool = true,
     line_buf: [256]u8 = undefined,
     line_len: usize = 0,
+    line_ready: bool = false,
     parse_state: AnsiState = .ground,
 
     pub fn init() Tty {
@@ -17,8 +18,7 @@ pub const Tty = struct {
     }
 
     pub fn write(self: *Tty, buf: []const u8) usize {
-        _ = self;
-        serial.writeString(buf);
+        for (buf) |ch| self.writeOut(ch);
         return buf.len;
     }
 
@@ -31,15 +31,30 @@ pub const Tty = struct {
             return 1;
         }
 
-        while (self.line_len == 0) {
+        while (!self.line_ready) {
             const ch = serial.readByteBlocking();
             try self.handleInput(ch);
         }
+        self.line_ready = false;
 
         const copy_len = @min(buf.len, self.line_len);
         @memcpy(buf[0..copy_len], self.line_buf[0..copy_len]);
         self.consumeLine(copy_len);
         return copy_len;
+    }
+
+    fn writeOut(self: *Tty, ch: u8) void {
+        _ = self;
+        if (ch == '\n') {
+            serial.writeString("\r\n");
+            return;
+        }
+        serial.writeByte(ch);
+    }
+
+    fn echoByte(self: *Tty, ch: u8) void {
+        if (!self.echo) return;
+        self.writeOut(ch);
     }
 
     fn consumeLine(self: *Tty, count: usize) void {
@@ -50,6 +65,12 @@ pub const Tty = struct {
         const remain = self.line_len - count;
         @memcpy(self.line_buf[0..remain], self.line_buf[count..][0..remain]);
         self.line_len = remain;
+    }
+
+    fn finishLine(self: *Tty) TtyError!void {
+        if (self.echo) self.writeOut('\n');
+        try self.pushLine('\n');
+        self.line_ready = true;
     }
 
     fn handleInput(self: *Tty, ch: u8) TtyError!void {
@@ -66,15 +87,12 @@ pub const Tty = struct {
     fn handleGround(self: *Tty, ch: u8) TtyError!void {
         switch (ch) {
             0x03 => return TtyError.WouldBlock, // Ctrl-C
-            '\r' => {},
-            '\n' => {
-                if (self.echo) serial.writeByte('\r');
-                if (self.echo) serial.writeByte('\n');
-                try self.pushLine('\n');
+            '\r', '\n' => {
+                if (!self.line_ready) try self.finishLine();
             },
             0x7F, '\x08' => try self.backspace(),
             else => {
-                if (self.echo) serial.writeByte(ch);
+                self.echoByte(ch);
                 try self.pushLine(ch);
             },
         }
@@ -83,7 +101,7 @@ pub const Tty = struct {
     fn handleCsi(self: *Tty, ch: u8) TtyError!void {
         switch (ch) {
             'A' => try self.backspace(),
-            'C' => if (self.echo) serial.writeString(" "),
+            'C' => if (self.echo) self.echoByte(' '),
             else => {},
         }
     }

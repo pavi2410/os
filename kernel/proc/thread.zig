@@ -1,4 +1,5 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
+const gdt = @import("../arch/x86_64/gdt.zig");
 const heap = @import("../mm/heap.zig");
 const serial = @import("../arch/x86_64/serial.zig");
 
@@ -40,9 +41,19 @@ pub const Thread = struct {
         self.state = .ready;
         other.state = .running;
         current = other;
+        other.activateKernelStack();
         switch_context(&self.context, &other.context);
         current = self;
         self.state = prev_state;
+        self.activateKernelStack();
+    }
+
+    /// Point the TSS `rsp0` at this thread's kernel stack so ring-3 syscalls and
+    /// interrupts land on the correct per-thread stack.
+    fn activateKernelStack(self: *Thread) void {
+        if (self.stack_size == 0) return;
+        const top = (@intFromPtr(self.stack) + self.stack_size) & ~@as(u64, 15);
+        gdt.setKernelStack(top);
     }
 };
 

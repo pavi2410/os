@@ -11,13 +11,25 @@ const SFMASK_MSR: u32 = 0xC0000084;
 const EFER_SCE: u64 = 1 << 0;
 const SFMASK_IF: u64 = 1 << 9;
 
+/// Scratch used by the syscall stub before a kernel stack is available.
+/// Safe as plain globals: syscall entry runs with interrupts masked on a
+/// single CPU, so there is no reentrancy until we switch stacks.
+export var syscall_user_rsp: u64 = 0;
+
 extern fn syscall_entry() callconv(.{ .x86_64_sysv = .{} }) void;
 
 comptime {
+    // The stub must not clobber any callee-saved register (rbx, rbp, r12-r15):
+    // user code relies on them being preserved across `syscall`. We therefore
+    // use memory scratch + the kernel stack instead of spare registers.
     asm (
         \\.global syscall_entry
         \\.type syscall_entry, @function
         \\syscall_entry:
+        \\  mov %rsp, syscall_user_rsp(%rip)
+        \\  mov gdt_kernel_rsp0(%rip), %rsp
+        \\
+        \\  pushq syscall_user_rsp(%rip)
         \\  push %r11
         \\  push %rcx
         \\  push %rax
@@ -29,31 +41,46 @@ comptime {
         \\  push %r9
         \\  mov %rsp, %rdi
         \\  call syscall_dispatch
-        \\  add $56, %rsp
+        \\
+        \\  // rax holds the return value. The Linux syscall ABI preserves every
+        \\  // other register except rcx and r11, so restore the argument
+        \\  // registers (the C dispatcher clobbered them) to their entry values.
+        \\  pop %r9
+        \\  pop %r8
+        \\  pop %r10
+        \\  pop %rdx
+        \\  pop %rsi
+        \\  pop %rdi
+        \\  add $8, %rsp
         \\  pop %rcx
         \\  pop %r11
-        \\  mov $0xFFFFFFFF80000000, %rdx
-        \\  cmp %rdx, %rcx
-        \\  jb 1f
+        \\  pop %rsp
+        \\
+        \\  cmp $0xFFFFFFFF80000000, %rcx
+        \\  jae 2f
+        \\  sysretq
+        \\2:
         \\  push %r11
         \\  popfq
         \\  jmp *%rcx
-        \\1:
-        \\  sysretq
     );
 }
 
 comptime {
-    if (@sizeOf(handlers.Frame) != 72) @compileError("syscall Frame must be 72 bytes");
+    if (@sizeOf(handlers.Frame) != 80) @compileError("syscall Frame must be 80 bytes");
     if (@offsetOf(handlers.Frame, "nr") != 48) @compileError("syscall Frame layout mismatch");
     if (@offsetOf(handlers.Frame, "user_rip") != 56) @compileError("syscall Frame layout mismatch");
     if (@offsetOf(handlers.Frame, "user_rflags") != 64) @compileError("syscall Frame layout mismatch");
+    if (@offsetOf(handlers.Frame, "user_rsp") != 72) @compileError("syscall Frame layout mismatch");
 }
 
 pub fn init() void {
+    // SYSCALL loads CS from STAR[47:32] (kernel code) and SS = that + 8.
+    // SYSRET loads CS from STAR[63:48] + 16 and SS from STAR[63:48] + 8,
+    // so the SYSRET base is the kernel data selector (user data/code follow it).
     const star: u64 =
-        (@as(u64, gdt.kernel_code_selector) << 48) |
-        (@as(u64, gdt.user_code_selector) << 32);
+        (@as(u64, gdt.kernel_data_selector) << 48) |
+        (@as(u64, gdt.kernel_code_selector) << 32);
 
     const efer = cpu.rdmsr(EFER_MSR);
     cpu.wrmsr(EFER_MSR, efer | EFER_SCE);

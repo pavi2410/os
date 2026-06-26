@@ -13,8 +13,8 @@
 ### Higher-half link and boot handoff
 
 - [x] Choose higher-half base — `0xFFFFFFFF80000000` (Limine top 2 GiB / kernel code model) in [`kernel/mm/address.zig`](../../kernel/mm/address.zig)
-- [x] Update [`linker.ld`](../../linker.ld) for higher-half virtual addresses (`.limine_requests`, page-aligned segments)
-- [x] Update [`build.zig`](../../build.zig) link settings — `.code_model = .kernel` + linker script (no `image_base`; VA comes from `linker.ld`)
+- [x] Update [`kernel/linker.ld`](../../kernel/linker.ld) for higher-half virtual addresses (`.limine_requests`, page-aligned segments)
+- [x] Update [`build.zig`](../../build.zig) link settings — `.code_model = .kernel` + linker script (no `image_base`; VA comes from `kernel/linker.ld`)
 - [x] Boot paging and higher-half entry — Limine loads the kernel at its linked VA and sets up HHDM (replaces manual `CR3` / identity-map bootstrap)
 - [x] Request HHDM offset from Limine and store it in [`kernel/mm/address.zig`](../../kernel/mm/address.zig) (`physToVirt` / `virtToPhys`)
 - [x] Verify serial MMIO (`0x3F8`) works after Limine handoff

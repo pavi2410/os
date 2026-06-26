@@ -7,3 +7,4 @@ limine-binary/
 iso_root/
 *.iso
 .DS_Store
+kernel/proc/bins/

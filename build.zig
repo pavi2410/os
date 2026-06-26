@@ -13,6 +13,55 @@ pub fn build(b: *std.Build) void {
         .cpu_features_sub = std.Target.x86.featureSet(&.{ .avx, .avx2, .sse, .sse2, .mmx }),
     });
 
+    const user_target = b.resolveTargetQuery(.{
+        .cpu_arch = .x86_64,
+        .os_tag = .freestanding,
+        .abi = .none,
+    });
+
+    const user_optimize: std.builtin.OptimizeMode = .ReleaseSmall;
+
+    const user_libc = b.createModule(.{
+        .root_source_file = b.path("userspace/libc.zig"),
+        .target = user_target,
+        .optimize = user_optimize,
+    });
+
+    const hello = b.addExecutable(.{
+        .name = "hello",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("userspace/hello/main.zig"),
+            .target = user_target,
+            .optimize = user_optimize,
+        }),
+    });
+    hello.setLinkerScript(b.path("userspace/linker.ld"));
+    hello.root_module.addImport("libc", user_libc);
+
+    const shell = b.addExecutable(.{
+        .name = "shell",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("userspace/shell/main.zig"),
+            .target = user_target,
+            .optimize = user_optimize,
+        }),
+    });
+    shell.setLinkerScript(b.path("userspace/linker.ld"));
+    shell.root_module.addImport("libc", user_libc);
+
+    const install_hello = b.addInstallArtifact(hello, .{});
+    const install_shell = b.addInstallArtifact(shell, .{});
+    b.getInstallStep().dependOn(&install_hello.step);
+    b.getInstallStep().dependOn(&install_shell.step);
+
+    const sync_bins = b.addSystemCommand(&.{
+        "sh",
+        "-c",
+        "mkdir -p kernel/proc/bins && cp zig-out/bin/hello zig-out/bin/shell kernel/proc/bins/",
+    });
+    sync_bins.step.dependOn(&install_hello.step);
+    sync_bins.step.dependOn(&install_shell.step);
+
     const limine_kernel_mod = b.createModule(.{
         .root_source_file = b.path("kernel/boot/limine.zig"),
         .target = kernel_target,
@@ -33,7 +82,10 @@ pub fn build(b: *std.Build) void {
     });
     kernel.use_llvm = true;
     kernel.link_function_sections = true;
-    kernel.setLinkerScript(b.path("linker.ld"));
+    kernel.setLinkerScript(b.path("kernel/linker.ld"));
+    kernel.step.dependOn(&install_hello.step);
+    kernel.step.dependOn(&install_shell.step);
+    kernel.step.dependOn(&sync_bins.step);
 
     const install_kernel = b.addInstallArtifact(kernel, .{});
     b.getInstallStep().dependOn(&install_kernel.step);

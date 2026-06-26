@@ -1,5 +1,6 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
 const heap = @import("../mm/heap.zig");
+const init_shell = @import("init_shell.zig");
 const serial = @import("../arch/x86_64/serial.zig");
 const syscall_test = @import("../syscall/test.zig");
 const thread = @import("thread.zig");
@@ -107,21 +108,9 @@ pub fn yield() void {
 pub fn start() noreturn {
     serial.writeString("\r\n--- Scheduler ---\r\n");
 
-    spawn(syscall_test.threadEntry, "syscall-test") catch {
-        serial.writeString("spawn syscall-test failed\r\n");
-        cpu.haltForever();
-    };
+    init_shell.launch();
 
-    spawn(demoThreadA, "thread-a") catch {
-        serial.writeString("spawn thread-a failed\r\n");
-        cpu.haltForever();
-    };
-    spawn(demoThreadB, "thread-b") catch {
-        serial.writeString("spawn thread-b failed\r\n");
-        cpu.haltForever();
-    };
-
-    serial.writeString("Spawned demo threads, enabling interrupts\r\n");
+    serial.writeString("Enabling interrupts\r\n");
     cpu.sti();
     schedule();
     cpu.haltForever();

@@ -80,7 +80,6 @@
         "build.zig.zon",
         "scripts",
         "limine.conf",
-        "linker.ld",
         "kernel",
         "test",
     },
