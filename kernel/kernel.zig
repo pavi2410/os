@@ -12,6 +12,7 @@ const paging = @import("arch/x86_64/paging.zig");
 const physical = @import("mm/physical.zig");
 const serial = @import("arch/x86_64/serial.zig");
 const scheduler = @import("proc/scheduler.zig");
+const process = @import("proc/process.zig");
 const syscall = @import("syscall/entry.zig");
 const thread = @import("proc/thread.zig");
 const virtual = @import("mm/virtual.zig");
@@ -74,6 +75,7 @@ pub fn init(ctx: BootContext) void {
 
     serial.writeString("\r\n=== Phase 3 runtime ===\r\n");
     syscall.init();
+    process.init();
     initApic(ctx.rsdp_virt);
     initTimer();
     initScheduler();

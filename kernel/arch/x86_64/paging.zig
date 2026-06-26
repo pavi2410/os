@@ -1,4 +1,5 @@
 const address = @import("../../mm/address.zig");
+const physical = @import("../../mm/physical.zig");
 
 pub const page_size: u64 = 4096;
 pub const page_shift: u6 = 12;
@@ -65,6 +66,13 @@ pub inline fn readCr3() u64 {
     );
 }
 
+pub inline fn writeCr3(cr3: u64) void {
+    asm volatile ("mov %[cr3], %%cr3"
+        :
+        : [cr3] "r" (cr3),
+    );
+}
+
 pub inline fn invlpg(virt: u64) void {
     asm volatile ("invlpg (%[virt])"
         :
@@ -92,6 +100,30 @@ fn allocTable() MapError!*PageTable {
     table_pool_used += 1;
     @memset(page, 0);
     return @ptrCast(@alignCast(page));
+}
+
+fn allocTablePhys() MapError!*PageTable {
+    const phys = physical.allocPage() catch return MapError.OutOfTables;
+    const table = tableFromPhys(phys);
+    @memset(table, 0);
+    return table;
+}
+
+fn tablePhysFrom(table: *PageTable) u64 {
+    return address.virtToPhys(@intFromPtr(table));
+}
+
+fn getOrCreateTablePhys(parent: *PageTable, index: u9, flags: u64) MapError!*PageTable {
+    const entry = &parent[index];
+    if (isPresent(entry.*)) {
+        if (isHuge(entry.*)) return MapError.HugePageConflict;
+        if (flags & Flags.user != 0) entry.* |= Flags.user;
+        return tableFromPhys(physAddr(entry.*));
+    }
+
+    const table = try allocTablePhys();
+    entry.* = makeEntry(tablePhysFrom(table), flags | Flags.present | Flags.writable);
+    return table;
 }
 
 fn tablePhys(table: *PageTable) u64 {
@@ -231,4 +263,81 @@ pub fn getPhys(virt: u64) ?u64 {
     const leaf = pt[idx.pt];
     if (!isPresent(leaf)) return null;
     return physAddr(leaf);
+}
+
+/// First PML4 index that maps the kernel higher half.
+const kernel_pml4_start: usize = 256;
+
+/// Allocate a fresh PML4 with the kernel higher-half entries shared from the boot tables.
+pub fn createUserAddressSpace() MapError!u64 {
+    const pml4 = try allocTablePhys();
+    const kernel_pml4 = tableFromPhys(readCr3());
+
+    var i: usize = kernel_pml4_start;
+    while (i < entries_per_table) : (i += 1) {
+        pml4[i] = kernel_pml4[i];
+    }
+
+    return tablePhysFrom(pml4);
+}
+
+fn freeUserPageTableSubtree(table: *PageTable, level: usize) void {
+    var i: usize = 0;
+    while (i < entries_per_table) : (i += 1) {
+        const entry = table[i];
+        if (!isPresent(entry)) continue;
+        if (isHuge(entry)) {
+            physical.freePage(physAddr(entry)) catch {};
+            continue;
+        }
+
+        if (level == 3) {
+            physical.freePage(physAddr(entry)) catch {};
+            continue;
+        }
+
+        const child = tableFromPhys(physAddr(entry));
+        freeUserPageTableSubtree(child, level + 1);
+        physical.freePage(physAddr(entry)) catch {};
+    }
+}
+
+/// Tear down the user half of an address space and free its PML4.
+pub fn destroyUserAddressSpace(cr3_phys: u64) MapError!void {
+    if (cr3_phys & (page_size - 1) != 0) return MapError.UnalignedAddress;
+
+    const pml4 = tableFromPhys(cr3_phys);
+
+    var i: usize = 0;
+    while (i < kernel_pml4_start) : (i += 1) {
+        const entry = pml4[i];
+        if (!isPresent(entry) or isHuge(entry)) continue;
+
+        const pdpt = tableFromPhys(physAddr(entry));
+        freeUserPageTableSubtree(pdpt, 1);
+        physical.freePage(physAddr(entry)) catch {};
+    }
+
+    physical.freePage(cr3_phys) catch {};
+}
+
+/// Map a user-accessible page in a specific address space without switching CR3.
+pub fn mapUserPageIn(cr3_phys: u64, virt: u64, phys: u64, flags: u64) MapError!void {
+    if (virt & (page_size - 1) != 0 or phys & (page_size - 1) != 0) {
+        return MapError.UnalignedAddress;
+    }
+
+    const table_flags = Flags.writable | Flags.user;
+    const idx = virtIndices(virt);
+    const pml4 = tableFromPhys(cr3_phys);
+
+    if (pml4[idx.pml4] & Flags.present != 0) pml4[idx.pml4] |= Flags.user;
+    const pdpt = try getOrCreateTablePhys(pml4, idx.pml4, table_flags);
+    const pd = try getOrCreateTablePhys(pdpt, idx.pdpt, table_flags);
+    const pt = try getOrCreateTablePhys(pd, idx.pd, table_flags);
+
+    const leaf = &pt[idx.pt];
+    if (isPresent(leaf.*)) return MapError.AlreadyMapped;
+
+    leaf.* = makeEntry(phys, flags | Flags.present | Flags.user);
 }
