@@ -1,5 +1,6 @@
 const heap = @import("../mm/heap.zig");
 const paging = @import("../arch/x86_64/paging.zig");
+const user_loader = @import("../mm/user_loader.zig");
 
 pub const ProcessError = error{
     OutOfMemory,
@@ -13,8 +14,8 @@ pub const State = enum {
 };
 
 /// Linux-style user virtual layout constants for later ELF loading.
-pub const user_stack_top: u64 = 0x00007FFFFFFFE000;
-pub const user_stack_pages: usize = 16;
+pub const user_stack_top = user_loader.user_stack_top;
+pub const user_stack_pages = user_loader.user_stack_pages;
 pub const user_brk_base: u64 = 0x0000000000400000;
 
 pub const FdKind = enum {
@@ -117,4 +118,8 @@ pub fn create() ProcessError!*Process {
 pub fn destroy(proc: *Process) void {
     if (current == proc) current = null;
     proc.destroy();
+}
+
+pub fn loadElf(proc: *Process, image: []const u8) user_loader.LoadError!user_loader.LoadedImage {
+    return user_loader.load(proc.address_space.cr3, image);
 }
