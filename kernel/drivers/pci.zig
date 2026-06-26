@@ -1,5 +1,11 @@
+const acpi_access = @import("../acpi/access.zig");
 const address = @import("../mm/address.zig");
 const serial = @import("../arch/x86_64/serial.zig");
+
+pub const DeviceId = struct {
+    pub const blk_modern: u16 = 0x1042;
+    pub const blk_legacy: u16 = 0x1001;
+};
 
 pub const Vendor = struct {
     pub const virtio: u16 = 0x1AF4;
@@ -51,34 +57,10 @@ pub const PciError = error{
 const config_address_port: u16 = 0xCF8;
 const config_data_port: u16 = 0xCFC;
 
-const Rsdp = extern struct {
-    signature: [8]u8,
-    checksum: u8,
-    oem_id: [6]u8,
-    revision: u8,
-    rsdt_address: u32,
-    length: u32,
-    xsdt_address: u64,
-};
+const mcfg_header_size = acpi_access.sdt_header_size + 8;
+const mcfg_alloc_size = 16;
 
-const SdtHeader = extern struct {
-    signature: [4]u8,
-    length: u32,
-    revision: u8,
-    checksum: u8,
-    oem_id: [6]u8,
-    oem_table_id: [8]u8,
-    oem_revision: u32,
-    creator_id: u32,
-    creator_revision: u32,
-};
-
-const Mcfg = extern struct {
-    header: SdtHeader,
-    reserved: u64,
-};
-
-const McfgAllocation = extern struct {
+const McfgAllocation = struct {
     base: u64,
     segment: u16,
     start_bus: u8,
@@ -96,28 +78,10 @@ var mcfg_allocs: []const McfgAllocation = &.{};
 var use_mcfg = false;
 
 pub fn init(rsdp_virt: u64) PciError!void {
+    _ = rsdp_virt;
     device_count = 0;
     use_mcfg = false;
     mcfg_allocs = &.{}; // reset slice
-
-    if (findMcfg(rsdp_virt)) |mcfg| {
-        const mcfg_bytes: [*]const u8 = @ptrCast(mcfg);
-        const alloc_bytes = mcfg.header.length - @sizeOf(Mcfg);
-        const alloc_count = alloc_bytes / @sizeOf(McfgAllocation);
-        if (alloc_count > max_mcfg_allocs) return PciError.TooManyDevices;
-
-        var i: usize = 0;
-        while (i < alloc_count) : (i += 1) {
-            const alloc = @as(*const McfgAllocation, @ptrCast(@alignCast(
-                mcfg_bytes + @sizeOf(Mcfg) + i * @sizeOf(McfgAllocation),
-            )));
-            mcfg_storage[i] = alloc.*;
-        }
-        if (alloc_count > 0) {
-            mcfg_allocs = mcfg_storage[0..alloc_count];
-            use_mcfg = true;
-        }
-    }
 
     try enumerateBuses();
 }
@@ -167,6 +131,51 @@ pub fn readConfig32(addr: Addr, offset: u8) u32 {
         (@as(u32, offset) & 0xFC);
     outl(config_address_port, config_addr);
     return inl(config_data_port);
+}
+
+pub fn writeConfig16(addr: Addr, offset: u8, value: u16) void {
+    const aligned = offset & 0xFC;
+    const shift: u5 = @truncate((offset & 2) * 8);
+    const orig = readConfig32(addr, aligned);
+    const mask = ~(@as(u32, 0xFFFF) << shift);
+    writeConfig32(addr, aligned, (orig & mask) | (@as(u32, value) << shift));
+}
+
+pub fn writeConfig8(addr: Addr, offset: u8, value: u8) void {
+    const aligned = offset & 0xFC;
+    const shift: u5 = @truncate((offset & 3) * 8);
+    const orig = readConfig32(addr, aligned);
+    const mask = ~(@as(u32, 0xFF) << shift);
+    writeConfig32(addr, aligned, (orig & mask) | (@as(u32, value) << shift));
+}
+
+pub fn enableDevice(addr: Addr) void {
+    const cmd = readConfig16(addr, 0x04);
+    writeConfig16(addr, 0x04, cmd | 0x0006);
+}
+
+pub fn barAddress(addr: Addr, bar_index: usize) u64 {
+    const bar_off: u8 = @intCast(0x10 + bar_index * 4);
+    const bar_lo = readConfig32(addr, bar_off);
+    if (bar_lo == 0 and bar_index == 0) {
+        const bar_hi = readConfig32(addr, bar_off + 4);
+        if (bar_hi & 1 == 0 and bar_hi >= 0x1000) return bar_hi & 0xFFFF_FFF0;
+    }
+    if (bar_lo & 1 != 0) return 0;
+
+    var result: u64 = bar_lo & 0xFFFF_FFF0;
+    if ((bar_lo & 0x6) == 0x4) {
+        const bar_hi = readConfig32(addr, bar_off + 4);
+        result |= @as(u64, bar_hi) << 32;
+    }
+    return result;
+}
+
+pub fn findVendor(vendor_id: u16) ?*const Device {
+    for (devices()) |*dev| {
+        if (dev.vendor_id == vendor_id) return dev;
+    }
+    return null;
 }
 
 pub fn writeConfig32(addr: Addr, offset: u8, value: u32) void {
@@ -276,49 +285,18 @@ fn enumerateBus(segment: u16, bus: u8) PciError!void {
     }
 }
 
-fn findMcfg(rsdp_virt: u64) ?*const Mcfg {
-    const rsdp = ptrFromVirt(Rsdp, rsdp_virt);
-    if (!sigEq8(&rsdp.signature, "RSD PTR ")) return null;
+fn findMcfg(rsdp_virt: u64) ?[*]const u8 {
+    const rsdp = acpi_access.virtBytes(rsdp_virt);
+    if (!acpi_access.sigEq8At(rsdp, 0, "RSD PTR ")) return null;
 
-    const root_phys: u64 = if (rsdp.revision >= 2) rsdp.xsdt_address else rsdp.rsdt_address;
-    return findTable(root_phys, .{ 'M', 'C', 'F', 'G' });
-}
+    const revision = rsdp[15];
+    const root_phys: u64 = if (revision >= 2)
+        acpi_access.readU64(rsdp, 24)
+    else
+        acpi_access.readU32(rsdp, 16);
 
-fn findTable(root_phys: u64, signature: [4]u8) ?*const Mcfg {
-    const root = ptrFromPhys(SdtHeader, root_phys);
-    if (root.length < @sizeOf(SdtHeader)) return null;
-
-    if (sigEq4(&root.signature, .{ 'X', 'S', 'D', 'T' })) {
-        const xsdt_bytes: [*]const u8 = @ptrCast(root);
-        const entry_bytes = root.length - @sizeOf(SdtHeader);
-        const entry_count = entry_bytes / 8;
-        var i: usize = 0;
-        while (i < entry_count) : (i += 1) {
-            const table_phys = @as(*const u64, @ptrCast(@alignCast(xsdt_bytes + @sizeOf(SdtHeader) + i * 8))).*;
-            const table = ptrFromPhys(SdtHeader, table_phys);
-            if (sigEq4(&table.signature, signature)) {
-                return @ptrCast(@alignCast(table));
-            }
-        }
-        return null;
-    }
-
-    if (sigEq4(&root.signature, .{ 'R', 'S', 'D', 'T' })) {
-        const rsdt_bytes: [*]const u8 = @ptrCast(root);
-        const entry_bytes = root.length - @sizeOf(SdtHeader);
-        const entry_count = entry_bytes / 4;
-        var i: usize = 0;
-        while (i < entry_count) : (i += 1) {
-            const table_phys = @as(u64, @as(*const u32, @ptrCast(@alignCast(rsdt_bytes + @sizeOf(SdtHeader) + i * 4))).*);
-            const table = ptrFromPhys(SdtHeader, table_phys);
-            if (sigEq4(&table.signature, signature)) {
-                return @ptrCast(@alignCast(table));
-            }
-        }
-        return null;
-    }
-
-    return null;
+    const mcfg_phys = acpi_access.findTablePhys(root_phys, .{ 'M', 'C', 'F', 'G' }) orelse return null;
+    return acpi_access.physBytes(mcfg_phys);
 }
 
 fn mcfgConfigPtr(addr: Addr, offset: u8) ?[*]u8 {
@@ -333,27 +311,6 @@ fn mcfgConfigPtr(addr: Addr, offset: u8) ?[*]u8 {
         return @ptrFromInt(address.physToVirt(cfg_phys));
     }
     return null;
-}
-
-fn ptrFromPhys(comptime T: type, phys: u64) *const T {
-    return @ptrCast(@alignCast(@as(*const anyopaque, @ptrFromInt(address.physToVirt(phys)))));
-}
-
-fn ptrFromVirt(comptime T: type, virt: u64) *const T {
-    return @ptrCast(@alignCast(@as(*const anyopaque, @ptrFromInt(virt))));
-}
-
-fn sigEq4(sig: *const [4]u8, expected: [4]u8) bool {
-    return sig[0] == expected[0] and sig[1] == expected[1] and
-        sig[2] == expected[2] and sig[3] == expected[3];
-}
-
-fn sigEq8(sig: *const [8]u8, expected: []const u8) bool {
-    var i: usize = 0;
-    while (i < 8) : (i += 1) {
-        if (sig[i] != expected[i]) return false;
-    }
-    return true;
 }
 
 fn outl(port: u16, value: u32) void {

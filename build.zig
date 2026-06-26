@@ -93,6 +93,12 @@ pub fn build(b: *std.Build) void {
 
     const kernel_path = b.getInstallPath(.bin, "kernel");
     const iso_path = b.pathJoin(&.{ b.install_path, "os.iso" });
+    const disk_path = b.pathJoin(&.{ b.install_path, "disk.img" });
+
+    const create_disk = b.addSystemCommand(&.{
+        "sh",
+        b.path("scripts/create-disk.sh").getPath(b),
+    });
 
     const build_iso = b.addSystemCommand(&.{
         "sh",
@@ -110,9 +116,12 @@ pub fn build(b: *std.Build) void {
         "-M", "q35",
         "-cdrom", iso_path,
         "-boot", "d",
+        "-drive", b.fmt("file={s},if=none,format=raw,id=disk0", .{disk_path}),
+        "-device", "virtio-blk-pci,drive=disk0,disable-legacy=on",
         "-serial", "stdio",
     });
     run_cmd.step.dependOn(&build_iso.step);
+    run_cmd.step.dependOn(&create_disk.step);
 
     const run_uefi_cmd = b.addSystemCommand(&.{
         "qemu-system-x86_64",
@@ -120,9 +129,12 @@ pub fn build(b: *std.Build) void {
         "-drive", "if=pflash,format=raw,readonly=on,file=./ovmf/OVMF_CODE_4M.fd",
         "-drive", "if=pflash,format=raw,file=./ovmf/OVMF_VARS_4M.fd",
         "-cdrom", iso_path,
+        "-drive", b.fmt("file={s},if=none,format=raw,id=disk0", .{disk_path}),
+        "-device", "virtio-blk-pci,drive=disk0,disable-legacy=on",
         "-serial", "stdio",
     });
     run_uefi_cmd.step.dependOn(&build_iso.step);
+    run_uefi_cmd.step.dependOn(&create_disk.step);
 
     if (b.args) |args| {
         run_cmd.addArgs(args);

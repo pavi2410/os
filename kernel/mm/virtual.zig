@@ -58,6 +58,31 @@ pub fn unmapPages(virt: u64, count: usize) VirtError!void {
     mapped_page_count -= count;
 }
 
+pub fn mapMmio(phys: u64) VirtError!u64 {
+    return mapMmioPages(phys, 1);
+}
+
+pub fn mapMmioPages(phys: u64, count: usize) VirtError!u64 {
+    const page_phys = phys & ~(page_size - 1);
+    const page_off = phys & (page_size - 1);
+
+    const virt_page = next_virt;
+    const bytes = @as(u64, @intCast(count)) * page_size;
+    if (virt_page + bytes > KERNEL_HEAP_LIMIT) return VirtError.OutOfVirtualMemory;
+    next_virt += bytes;
+
+    var i: usize = 0;
+    while (i < count) : (i += 1) {
+        try mapPages(
+            virt_page + @as(u64, @intCast(i)) * page_size,
+            page_phys + @as(u64, @intCast(i)) * page_size,
+            1,
+            paging.Flags.mmio,
+        );
+    }
+    return virt_page + page_off;
+}
+
 pub fn allocPages(count: usize) VirtError!u64 {
     if (count == 0) return VirtError.UnalignedAddress;
 

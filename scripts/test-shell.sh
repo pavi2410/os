@@ -8,6 +8,7 @@ root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
 zig build iso >/dev/null 2>&1
+sh scripts/create-disk.sh >/dev/null 2>&1
 
 out="/tmp/os-shell-test.log"
 rm -f "$out"
@@ -28,6 +29,8 @@ rm -f "$out"
     -M q35 \
     -cdrom zig-out/os.iso \
     -boot d \
+    -drive file=zig-out/disk.img,if=none,format=raw,id=disk0 \
+    -device virtio-blk-pci,drive=disk0,disable-legacy=on \
     -serial stdio \
     -display none \
     -no-reboot \

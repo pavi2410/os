@@ -15,6 +15,7 @@ const scheduler = @import("proc/scheduler.zig");
 const process = @import("proc/process.zig");
 const tty = @import("drivers/tty.zig");
 const pci = @import("drivers/pci.zig");
+const virtio_blk = @import("drivers/virtio_blk.zig");
 const syscall = @import("syscall/entry.zig");
 const thread = @import("proc/thread.zig");
 const virtual = @import("mm/virtual.zig");
@@ -81,6 +82,7 @@ pub fn init(ctx: BootContext) void {
     tty.init();
     initApic(ctx.rsdp_virt);
     initPci(ctx.rsdp_virt);
+    initBlock();
     initTimer();
     initScheduler();
 
@@ -91,6 +93,15 @@ pub fn init(ctx: BootContext) void {
     if (boot_debug.page_fault_test) {
         triggerDeliberatePageFault();
     }
+}
+
+fn initBlock() void {
+    virtio_blk.init() catch {
+        serial.writeString("virtio-blk not available\r\n");
+        return;
+    };
+    virtio_blk.logStatus();
+    virtio_blk.selfTest();
 }
 
 fn initPci(rsdp_virt: u64) void {

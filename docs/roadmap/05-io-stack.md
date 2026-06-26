@@ -11,9 +11,9 @@
 ## Checklist
 
 - [x] Add PCI enumeration helper ([`drivers/pci.zig`](../../kernel/drivers/pci.zig))
-- [ ] Add block device driver
-  - [ ] VirtIO-blk **or** ATA/AHCI for QEMU
-  - [ ] Read/write sectors
+- [x] Add block device driver
+  - [x] VirtIO-blk **or** ATA/AHCI for QEMU
+  - [x] Read/write sectors
 - [ ] Add [`fs/vfs.zig`](../../kernel/fs/vfs.zig)
   - [ ] Vnode/inode interface
   - [ ] Path lookup and file descriptors wired to syscalls
