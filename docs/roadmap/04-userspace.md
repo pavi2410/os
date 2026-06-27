@@ -35,7 +35,7 @@
 - [ ] Linux `fork` / `execve` / `wait4` (replacing OS-specific `spawn`)
   - [x] `fork` (57) — eager address-space copy (see COW note below)
   - [x] `execve` (59)
-  - [ ] `wait4` (61)
+  - [x] `wait4` (61)
 
 ---
 

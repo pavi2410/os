@@ -116,7 +116,7 @@ pub const Zombie = struct {
 };
 
 const max_zombies = 16;
-var zombies: [max_zombies]Zombie = .{.{}} ** max_zombies;
+var zombies: [max_zombies]Zombie = @splat(.{});
 
 const max_processes = 16;
 var live: [max_processes]?*Process = .{null} ** max_processes;
@@ -247,6 +247,24 @@ pub fn reapZombieAny(parent_id: usize, pid: isize) ?Zombie {
     return null;
 }
 
+/// True if `parent_id` still has a live or unreaped child matching `pid`.
+pub fn hasChild(parent_id: usize, pid: i64) bool {
+    for (live) |slot| {
+        if (slot) |proc| {
+            if (proc.parent_id != parent_id) continue;
+            if (pid < 0) return true;
+            if (@as(usize, @intCast(pid)) == proc.id) return true;
+        }
+    }
+    for (zombies) |slot| {
+        if (!slot.in_use) continue;
+        if (slot.parent_id != parent_id) continue;
+        if (pid < 0) return true;
+        if (@as(usize, @intCast(pid)) == slot.pid) return true;
+    }
+    return false;
+}
+
 pub fn destroy(proc: *Process) void {
     if (current == proc) current = null;
     unregister(proc);
@@ -300,9 +318,21 @@ pub fn terminateCurrent(status: u32) noreturn {
     const proc = current orelse {
         while (true) cpu.hlt();
     };
+
+    const pid = proc.id;
+    const parent_id = proc.parent_id;
     proc.exit_status = status;
+
+    if (parent_id != no_parent) {
+        enqueueZombie(pid, parent_id, status) catch {};
+    }
+
+    proc.address_space.destroy();
+    proc.address_space.cr3 = 0;
     proc.state = .dead;
-    destroy(proc);
+    unregister(proc);
+    heap.kfree(@ptrCast(proc)) catch {};
+
     setCurrent(null);
     paging.writeCr3(kernelAddressSpace().cr3);
 

@@ -69,7 +69,11 @@ fn handlePageFault(frame: *Frame) void {
     const cr2 = readCr2();
     if (frame.cs & 3 == 3) {
         serial.printf("\r\nUser page fault at 0x{x}, terminating process\r\n", .{cr2});
-        if (user_spawn.isWaiting()) user_spawn.onChildExit(139);
+        if (user_spawn.isWaiting()) {
+            if (process.currentProcess()) |proc| {
+                if (proc.parent_id == process.no_parent) user_spawn.onChildExit(139);
+            }
+        }
         process.terminateCurrent(139);
     }
 
@@ -83,7 +87,11 @@ fn handlePageFault(frame: *Frame) void {
 fn handleGeneralProtectionFault(frame: *Frame) void {
     if (frame.cs & 3 == 3) {
         serial.writeString("\r\nUser general protection fault, terminating process\r\n");
-        if (user_spawn.isWaiting()) user_spawn.onChildExit(139);
+        if (user_spawn.isWaiting()) {
+            if (process.currentProcess()) |proc| {
+                if (proc.parent_id == process.no_parent) user_spawn.onChildExit(139);
+            }
+        }
         process.terminateCurrent(139);
     }
 

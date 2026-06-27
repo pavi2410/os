@@ -71,6 +71,11 @@ pub fn execve(path: [*:0]const u8, argv: [*:null]?[*:0]const u8, envp: [*:null]?
     return syscall6(59, @intFromPtr(path), @intFromPtr(argv), @intFromPtr(envp), 0, 0, 0);
 }
 
+pub fn waitpid(pid: isize, status: ?*u32, options: u32) isize {
+    const status_ptr: u64 = if (status) |s| @intFromPtr(s) else 0;
+    return syscall6(61, @bitCast(@as(u64, @intCast(pid))), status_ptr, options, 0, 0, 0);
+}
+
 fn syscall6(
     nr: u64,
     arg0: u64,
