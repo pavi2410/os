@@ -22,7 +22,7 @@ pub fn build(b: *std.Build) void {
     const user_optimize: std.builtin.OptimizeMode = .ReleaseSmall;
 
     const user_libc = b.createModule(.{
-        .root_source_file = b.path("userspace/libc.zig"),
+        .root_source_file = b.path("userspace/libc/mod.zig"),
         .target = user_target,
         .optimize = user_optimize,
     });
