@@ -1,6 +1,8 @@
 [tools]
 zig = "latest"
 shellcheck = "latest"
+python = "latest"
+uv = "latest"
 
 [tasks.build]
 description = "Build kernel and userspace binaries"
@@ -27,9 +29,16 @@ run = "sh scripts/build-iso.sh zig-out/bin/kernel zig-out/os.iso"
 [tasks.disk]
 description = "Create the FAT32 virtio test disk (README.TXT, /BIN/* user programs)"
 depends = ["build"]
-sources = ["scripts/create-disk.sh", "userspace/**/*", "build.zig", "zig-out/userspace/bin/**"]
+sources = [
+  "scripts/create_disk.py",
+  "pyproject.toml",
+  "uv.lock",
+  "userspace/**/*",
+  "build.zig",
+  "zig-out/userspace/bin/**",
+]
 outputs = ["zig-out/disk.img"]
-run = "sh scripts/create-disk.sh"
+run = "uv sync --group build && uv run python scripts/create_disk.py"
 
 [tasks.boot]
 description = "Build ISO + disk, then boot in QEMU (SeaBIOS)"
@@ -53,9 +62,16 @@ sources = ["scripts/**/*.sh", ".shellcheckrc"]
 run = "shellcheck scripts/*.sh"
 
 [tasks."test-shell"]
-description = "Boot the OS and smoke-test the serial shell (host-driven)"
+description = "Boot the OS and smoke-test the serial shell (pytest + pexpect)"
 depends = ["iso", "disk"]
-run = "sh scripts/test-shell.sh"
+sources = [
+  "pyproject.toml",
+  "uv.lock",
+  "test/integration/**/*",
+  "scripts/run-qemu.sh",
+  "scripts/create_disk.py",
+]
+run = "uv sync --group dev --group build && uv run pytest test/integration -v"
 
 [tasks."kill-qemu"]
 description = "Stop any QEMU instance booting this project's ISO"

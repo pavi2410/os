@@ -44,8 +44,9 @@ Then Phase 5 networking: VirtIO-net and a minimal TCP/IP stack.
 
 ## 🛠 Toolchain
 
-* [mise](https://mise.jdx.dev) — pins Zig and defines project tasks (`mise.toml`)
+* [mise](https://mise.jdx.dev) — pins Zig, Python, uv, and defines project tasks (`mise.toml`)
 * Zig (v0.16+ recommended)
+* [uv](https://docs.astral.sh/uv/) — Python tooling: integration tests (`pytest`, `pexpect`) and disk image sync (`pyfatfs`)
 * [Limine](https://github.com/Limine-Bootloader/Limine) — bootloader and ISO tooling
 * `xorriso` — builds the bootable ISO
 * QEMU — `qemu-system-x86_64`
@@ -96,11 +97,12 @@ This project uses mise tasks for build, ISO, disk, and QEMU workflows. Run `mise
 |------|-------------|
 | `mise run build` | Build kernel (`zig-out/bin/`) and userspace programs (`zig-out/userspace/bin/`) |
 | `mise run iso` | Build bootable Limine ISO (`zig-out/os.iso`) |
-| `mise run disk` | Create or update FAT32 VirtIO disk (`zig-out/disk.img`) |
+| `mise run disk` | Create or update FAT32 VirtIO disk (`zig-out/disk.img`) via Python/pyfatfs |
 | `mise run boot` | ISO + disk + QEMU (SeaBIOS, interactive serial) |
 | `mise run boot-uefi` | Same, under OVMF/UEFI |
-| `mise run test` | Host-side unit tests |
-| `mise run test-shell` | End-to-end smoke test (shell, `write`, persistence) |
+| `mise run test` | Host-side kernel unit tests (`test/kernel/`, no QEMU) |
+| `mise run test-shell` | Serial shell integration test (pytest + pexpect, turn-by-turn) |
+| `mise run shellcheck` | Lint `scripts/*.sh` |
 | `mise run kill-qemu` | Stop a stuck QEMU instance |
 | `mise run clean` | Remove `zig-out/` and `.zig-cache/` |
 | `mise run clean-disk` | Delete `disk.img` to force a full reformat on next boot |
@@ -132,17 +134,22 @@ mise run test
 # or: zig build test
 ```
 
-Integration smoke test:
+Tests live under `test/kernel/` (memory map parsing, physical page bitmap).
+
+Serial shell integration test (boots QEMU twice — smoke cases, then disk persistence):
 
 ```bash
 mise run test-shell
+# or: uv sync --group dev && uv run pytest test/integration -v
 ```
+
+The integration harness drives the shell turn-by-turn (sync on the `os> ` prompt) via `test/integration/`. First run creates `.venv/` through `uv sync`.
 
 ### VirtIO disk
 
 QEMU uses a VirtIO block device backed by `zig-out/disk.img`.
 
-* If `disk.img` **already exists**, `mise run disk` only refreshes `/README.TXT` and `/BIN/*` — files you create at the volume root (e.g. with `write`) are **kept** across reboots.
+* If `disk.img` **already exists**, `mise run disk` only refreshes `/README.TXT` and `/BIN/*` — files you create at the volume root (e.g. with `write`) are **kept** across reboots. Updates use `scripts/create_disk.py` (pyfatfs) and do not mount the image on the host.
 * Run `mise run clean-disk` (or set `OS_DISK_FORCE=1`) to wipe the image and start fresh.
 * If VFS behaves oddly after a failed setup, recreate with `clean-disk` then `mise run boot`.
 

@@ -97,7 +97,7 @@ pub fn build(b: *std.Build) void {
     memory_map_host_mod.addImport("limine", limine_mod);
 
     const memory_map_test_mod = b.createModule(.{
-        .root_source_file = b.path("test/memory_map_test.zig"),
+        .root_source_file = b.path("test/kernel/memory_map_test.zig"),
         .target = b.graph.host,
     });
     memory_map_test_mod.addImport("memory_map", memory_map_host_mod);
@@ -115,7 +115,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const physical_test_mod = b.createModule(.{
-        .root_source_file = b.path("test/physical_test.zig"),
+        .root_source_file = b.path("test/kernel/physical_test.zig"),
         .target = b.graph.host,
     });
     physical_test_mod.addImport("physical_bitmap", physical_bitmap_host_mod);

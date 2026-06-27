@@ -7,3 +7,6 @@ limine-binary/
 iso_root/
 *.iso
 .DS_Store
+.venv/
+.pytest_cache/
+test/integration/__pycache__/
