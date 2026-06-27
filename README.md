@@ -21,7 +21,7 @@
 * [Limine](https://github.com/Limine-Bootloader/Limine) — bootloader and ISO tooling
 * `xorriso` — builds the bootable ISO
 * QEMU — `qemu-system-x86_64`
-* OVMF — optional, only for `mise run run-uefi`
+* OVMF — optional, only for `mise run boot-uefi`
 
 ### macOS
 
@@ -33,7 +33,7 @@ mise install
 eval "$(mise activate zsh)"   # add to ~/.zshrc to persist
 ```
 
-For UEFI boot testing (`mise run run-uefi`), copy OVMF firmware into the project (one-time):
+For UEFI boot testing (`mise run boot-uefi`), copy OVMF firmware into the project (one-time):
 
 ```bash
 mkdir -p ovmf
@@ -52,7 +52,7 @@ eval "$(mise activate bash)"   # add to ~/.bashrc to persist
 If Limine is not available from your distro, `mise run iso` downloads the official
 `limine-binary` release (v12.3.3) automatically.
 
-For UEFI boot testing (`mise run run-uefi`), copy OVMF firmware into the project (one-time):
+For UEFI boot testing (`mise run boot-uefi`), copy OVMF firmware into the project (one-time):
 
 ```bash
 mkdir -p ovmf
@@ -81,13 +81,13 @@ mise run iso
 Create the FAT32 test disk and run in QEMU (SeaBIOS, default):
 
 ```bash
-mise run run
+mise run boot
 ```
 
 Run under OVMF/UEFI instead (requires OVMF firmware in `ovmf/`):
 
 ```bash
-mise run run-uefi
+mise run boot-uefi
 ```
 
 Run host unit tests:

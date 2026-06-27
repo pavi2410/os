@@ -29,12 +29,12 @@ sources = ["scripts/create-disk.sh"]
 outputs = ["zig-out/disk.img"]
 run = "sh scripts/create-disk.sh"
 
-[tasks.run]
+[tasks.boot]
 description = "Build ISO + disk, then boot in QEMU (SeaBIOS)"
 depends = ["iso", "disk"]
 run = "sh scripts/run-qemu.sh"
 
-[tasks."run-uefi"]
+[tasks."boot-uefi"]
 description = "Build ISO + disk, then boot in QEMU (OVMF/UEFI)"
 depends = ["iso", "disk"]
 run = "sh scripts/run-qemu.sh --uefi"
