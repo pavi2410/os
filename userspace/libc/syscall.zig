@@ -24,6 +24,29 @@ pub fn lseek(fd: u32, offset: i64, whence: u32) isize {
     return syscall6(8, fd, @bitCast(@as(u64, @intCast(offset))), whence, 0, 0, 0);
 }
 
+pub const Stat = extern struct {
+    st_dev: u64 = 0,
+    st_ino: u64 = 0,
+    st_nlink: u64 = 1,
+    st_mode: u32 = 0,
+    _pad0: u32 = 0,
+    st_uid: u32 = 0,
+    st_gid: u32 = 0,
+    _pad1: u32 = 0,
+    st_rdev: u64 = 0,
+    st_size: i64 = 0,
+    st_blksize: i64 = 4096,
+    st_blocks: i64 = 0,
+    st_atime: i64 = 0,
+    st_mtime: i64 = 0,
+    st_ctime: i64 = 0,
+    _pad2: [24]u8 = .{0} ** 24,
+};
+
+pub fn stat(path: [*:0]const u8, out: *Stat) isize {
+    return syscall6(4, @intFromPtr(path), @intFromPtr(out), 0, 0, 0, 0);
+}
+
 pub fn getpid() isize {
     return syscall6(39, 0, 0, 0, 0, 0, 0);
 }
@@ -34,6 +57,10 @@ pub fn brk(addr: usize) isize {
 
 pub fn spawn(path: [*:0]const u8) isize {
     return syscall6(548, @intFromPtr(path), 0, 0, 0, 0, 0);
+}
+
+pub fn listdir(path: [*:0]const u8, buf: [*]u8, count: usize) isize {
+    return syscall6(549, @intFromPtr(path), @intFromPtr(buf), count, 0, 0, 0);
 }
 
 pub fn execve(path: [*:0]const u8, argv: [*:null]?[*:0]const u8, envp: [*:null]?[*:0]const u8) isize {

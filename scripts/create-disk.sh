@@ -35,12 +35,20 @@ dd if=/dev/zero of="$disk" bs=1M count=64 status=none 2>/dev/null
 
 copy_disk_files() {
     target="$1"
-    cp "$readme" "$target/README.TXT"
+    # Prevent macOS AppleDouble (._*) sidecars when copying onto FAT.
+    COPYFILE_DISABLE=1 cp "$readme" "$target/README.TXT"
     mkdir "$target/BIN"
     for bin in $user_bins; do
         base=$(basename "$bin")
-        cp "$bin" "$target/BIN/$(fat_name "$base")"
+        COPYFILE_DISABLE=1 cp "$bin" "$target/BIN/$(fat_name "$base")"
     done
+}
+
+clean_macos_junk() {
+    target="$1"
+    rm -rf "$target/.fseventsd" "$target/.DS_Store" "$target/.Spotlight-V100" "$target/.Trashes" 2>/dev/null || true
+    rm -f "$target"/._* 2>/dev/null || true
+    rm -f "$target"/*/._* 2>/dev/null || true
 }
 
 format_macos() {
@@ -53,6 +61,7 @@ format_macos() {
     dev="$(printf '%s\n' "$line" | awk '{print $1}')"
     mnt="$(printf '%s\n' "$line" | awk '{print $NF}')"
     copy_disk_files "$mnt"
+    clean_macos_junk "$mnt"
     hdiutil detach "$dev" >/dev/null
 }
 
@@ -77,11 +86,14 @@ format_mtools() {
 
 case "$(uname -s)" in
     Darwin)
-        if ! command -v newfs_msdos >/dev/null 2>&1; then
-            echo "error: newfs_msdos not found" >&2
+        if command -v mformat >/dev/null 2>&1 && command -v mcopy >/dev/null 2>&1; then
+            format_mtools
+        elif command -v newfs_msdos >/dev/null 2>&1; then
+            format_macos
+        else
+            echo "error: need mtools or newfs_msdos on macOS" >&2
             exit 1
         fi
-        format_macos
         ;;
     Linux)
         if command -v mkfs.vfat >/dev/null 2>&1; then

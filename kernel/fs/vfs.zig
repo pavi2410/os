@@ -114,6 +114,10 @@ pub fn stat(path: []const u8, out: *Stat) VfsError!void {
     out.st_size = @intCast(entry.size);
 }
 
+pub fn listDir(path: []const u8, out: []u8) VfsError!usize {
+    return fat32.listDir(path, out);
+}
+
 pub fn logStatus() void {
     serial.writeString("\r\n--- VFS ---\r\n");
     if (!isReady()) {

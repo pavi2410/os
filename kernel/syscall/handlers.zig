@@ -39,6 +39,7 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.brk => sysBrk(frame.arg0),
         numbers.getpid => sysGetpid(),
         numbers.spawn => sysSpawn(frame.arg0),
+        numbers.listdir => sysListdir(frame.arg0, frame.arg1, frame.arg2),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
         else => ENOSYS,
     };
@@ -138,6 +139,21 @@ fn sysSpawn(path_ptr: u64) i64 {
     return user_spawn.spawn(path);
 }
 
+fn sysListdir(path_ptr: u64, buf_ptr: u64, cap: u64) i64 {
+    const path = userCString(path_ptr) orelse return EFAULT;
+    if (buf_ptr == 0 or cap == 0) return EINVAL;
+
+    const max_cap: usize = 4096;
+    const cap_len: usize = @intCast(@min(cap, max_cap));
+
+    var kbuf: [4096]u8 = undefined;
+    const n = vfs.listDir(path, kbuf[0..cap_len]) catch |err| return errnoFromVfsErr(err);
+
+    const user_buf: [*]u8 = @ptrFromInt(buf_ptr);
+    @memcpy(user_buf[0..n], kbuf[0..n]);
+    return @intCast(n);
+}
+
 fn sysExit(status: u64) i64 {
     if (process.currentProcess() != null) {
         user_spawn.onChildExit(@truncate(status));
@@ -162,6 +178,7 @@ fn errnoFromVfsErr(err: vfs.VfsError) i64 {
         vfs.VfsError.InvalidBpb => -5,
         vfs.VfsError.NotFile => EINVAL,
         vfs.VfsError.NameTooLong, vfs.VfsError.PathTooLong => EINVAL,
+        vfs.VfsError.BufferTooSmall => EINVAL,
     };
 }
 

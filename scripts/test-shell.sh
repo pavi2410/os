@@ -17,6 +17,12 @@ rm -f "$out"
     sleep 1
     printf 'cat /README.TXT\r'
     sleep 1
+    printf 'ls\r'
+    sleep 1
+    printf 'ls /BIN\r'
+    sleep 1
+    printf 'ls -l /BIN\r'
+    sleep 1
     printf 'hello\r'
     sleep 2
     printf 'pid\r'
@@ -40,12 +46,15 @@ echo "=== checks ==="
 fail=0
 for needle in \
     "Simple shell ready" \
-    "Built-ins: help, exit, pid, cat" \
+    "Built-ins: help, exit, pid, cat, ls" \
     "Programs in /BIN: hello" \
+    "README.TXT" \
+    "HELLO" \
+    "4880 HELLO" \
     "Hello from FAT on virtio-blk" \
     "Hello from userspace!"
 do
-    if grep -q "$needle" "$out"; then
+    if grep -qF -- "$needle" "$out"; then
         echo "ok: $needle"
     else
         echo "MISSING: $needle"

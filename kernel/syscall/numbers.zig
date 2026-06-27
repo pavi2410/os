@@ -11,3 +11,5 @@ pub const exit = 60;
 pub const exit_group = 231;
 /// OS-specific: run an embedded program and wait for it to exit.
 pub const spawn = 548;
+/// OS-specific: list directory entries (newline-separated) into a user buffer.
+pub const listdir = 549;

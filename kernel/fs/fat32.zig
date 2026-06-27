@@ -10,6 +10,7 @@ pub const FatError = error{
     IoError,
     NameTooLong,
     PathTooLong,
+    BufferTooSmall,
 };
 
 pub const Entry = struct {
@@ -136,6 +137,79 @@ pub fn read(entry: Entry, offset: u64, buf: []u8) FatError!usize {
     }
 
     return copied;
+}
+
+/// List directory entries at `path`, writing newline-separated names into `out`.
+pub fn listDir(path: []const u8, out: []u8) FatError!usize {
+    if (!mounted) return FatError.NotReady;
+
+    const dir = try lookup(path);
+    if (dir.attr & 0x10 == 0) return FatError.NotFile;
+    return listInDirectory(dir.start_cluster, out);
+}
+
+fn listInDirectory(dir_cluster: u32, out: []u8) FatError!usize {
+    var pos: usize = 0;
+    var cluster = dir_cluster;
+    var name_buf: [13]u8 = undefined;
+
+    while (cluster >= 2 and cluster < 0x0FFFFFF8) {
+        try readCluster(cluster, cluster_buf[0..fs.cluster_bytes]);
+        var off: usize = 0;
+        while (off + 32 <= fs.cluster_bytes) {
+            const entry = cluster_buf[off .. off + 32];
+            if (entry[0] == 0) return pos;
+            if (entry[0] == 0xE5 or entry[0] == 0x2E) {
+                off += 32;
+                continue;
+            }
+            if (entry[11] == 0x0F) {
+                off += 32;
+                continue;
+            }
+            // Skip volume label, hidden, and system entries (e.g. macOS metadata).
+            if (entry[11] & 0x0E != 0) {
+                off += 32;
+                continue;
+            }
+
+            var short: [11]u8 = undefined;
+            @memcpy(&short, entry[0..11]);
+            const name = formatShortName(&short, &name_buf);
+            if (name.len == 0) {
+                off += 32;
+                continue;
+            }
+            if (pos + name.len + 1 > out.len) return FatError.BufferTooSmall;
+
+            @memcpy(out[pos .. pos + name.len], name);
+            pos += name.len;
+            out[pos] = '\n';
+            pos += 1;
+            off += 32;
+        }
+        cluster = try nextCluster(cluster);
+    }
+    return pos;
+}
+
+fn formatShortName(short: *const [11]u8, out: *[13]u8) []const u8 {
+    var base_len: usize = 8;
+    while (base_len > 0 and short[base_len - 1] == ' ') base_len -= 1;
+
+    var ext_len: usize = 3;
+    while (ext_len > 0 and short[7 + ext_len] == ' ') ext_len -= 1;
+
+    var len: usize = 0;
+    @memcpy(out[0..base_len], short[0..base_len]);
+    len = base_len;
+    if (ext_len > 0) {
+        out[len] = '.';
+        len += 1;
+        @memcpy(out[len .. len + ext_len], short[8 .. 8 + ext_len]);
+        len += ext_len;
+    }
+    return out[0..len];
 }
 
 fn findInDirectory(dir_cluster: u32, name: []const u8) FatError!Entry {
