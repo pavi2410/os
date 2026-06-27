@@ -91,62 +91,6 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_kernel.step);
     b.default_step.dependOn(&install_kernel.step);
 
-    const kernel_path = b.getInstallPath(.bin, "kernel");
-    const iso_path = b.pathJoin(&.{ b.install_path, "os.iso" });
-    const disk_path = b.pathJoin(&.{ b.install_path, "disk.img" });
-
-    const create_disk = b.addSystemCommand(&.{
-        "sh",
-        b.path("scripts/create-disk.sh").getPath(b),
-    });
-
-    const build_iso = b.addSystemCommand(&.{
-        "sh",
-        b.path("scripts/build-iso.sh").getPath(b),
-        kernel_path,
-        iso_path,
-    });
-    build_iso.step.dependOn(&install_kernel.step);
-
-    const iso_step = b.step("iso", "Build a bootable Limine ISO");
-    iso_step.dependOn(&build_iso.step);
-
-    const run_cmd = b.addSystemCommand(&.{
-        "qemu-system-x86_64",
-        "-M", "q35",
-        "-cdrom", iso_path,
-        "-boot", "d",
-        "-drive", b.fmt("file={s},if=none,format=raw,id=disk0", .{disk_path}),
-        "-device", "virtio-blk-pci,drive=disk0,disable-legacy=on",
-        "-serial", "stdio",
-    });
-    run_cmd.step.dependOn(&build_iso.step);
-    run_cmd.step.dependOn(&create_disk.step);
-
-    const run_uefi_cmd = b.addSystemCommand(&.{
-        "qemu-system-x86_64",
-        "-M", "q35",
-        "-drive", "if=pflash,format=raw,readonly=on,file=./ovmf/OVMF_CODE_4M.fd",
-        "-drive", "if=pflash,format=raw,file=./ovmf/OVMF_VARS_4M.fd",
-        "-cdrom", iso_path,
-        "-drive", b.fmt("file={s},if=none,format=raw,id=disk0", .{disk_path}),
-        "-device", "virtio-blk-pci,drive=disk0,disable-legacy=on",
-        "-serial", "stdio",
-    });
-    run_uefi_cmd.step.dependOn(&build_iso.step);
-    run_uefi_cmd.step.dependOn(&create_disk.step);
-
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-        run_uefi_cmd.addArgs(args);
-    }
-
-    const run_step = b.step("run", "Build the ISO and run in QEMU (SeaBIOS)");
-    run_step.dependOn(&run_cmd.step);
-
-    const run_uefi_step = b.step("run-uefi", "Build the ISO and run in QEMU (OVMF/UEFI)");
-    run_uefi_step.dependOn(&run_uefi_cmd.step);
-
     const limine_mod = b.createModule(.{
         .root_source_file = b.path("kernel/boot/limine.zig"),
         .target = b.graph.host,

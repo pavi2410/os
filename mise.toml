@@ -3,26 +3,41 @@ zig = "latest"
 
 [tasks.build]
 description = "Build kernel and userspace binaries"
+sources = ["build.zig", "build.zig.zon", "kernel/**", "userspace/**"]
+outputs = ["zig-out/bin/kernel", "zig-out/bin/hello", "zig-out/bin/shell"]
 run = "zig build"
 
 [tasks.iso]
 description = "Build a bootable Limine ISO"
 depends = ["build"]
-run = "zig build iso"
+sources = [
+  "build.zig",
+  "build.zig.zon",
+  "kernel/**",
+  "userspace/**",
+  "scripts/build-iso.sh",
+  "scripts/get-limine.sh",
+  "limine.conf",
+  "limine-binary/**",
+]
+outputs = ["zig-out/os.iso"]
+run = "sh scripts/build-iso.sh zig-out/bin/kernel zig-out/os.iso"
 
 [tasks.disk]
 description = "Create the FAT32 virtio test disk (README.TXT)"
+sources = ["scripts/create-disk.sh"]
+outputs = ["zig-out/disk.img"]
 run = "sh scripts/create-disk.sh"
 
 [tasks.run]
 description = "Build ISO + disk, then boot in QEMU (SeaBIOS)"
 depends = ["iso", "disk"]
-run = "zig build run"
+run = "sh scripts/run-qemu.sh"
 
 [tasks."run-uefi"]
 description = "Build ISO + disk, then boot in QEMU (OVMF/UEFI)"
 depends = ["iso", "disk"]
-run = "zig build run-uefi"
+run = "sh scripts/run-qemu.sh --uefi"
 
 [tasks.test]
 description = "Run host-side unit tests"

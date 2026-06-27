@@ -7,9 +7,7 @@ set -e
 root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-zig build iso >/dev/null 2>&1
-sh scripts/create-disk.sh >/dev/null 2>&1
-
+# Expects zig-out/os.iso and zig-out/disk.img (mise run test-shell runs iso + disk first).
 out="/tmp/os-shell-test.log"
 rm -f "$out"
 

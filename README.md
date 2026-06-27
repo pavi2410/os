@@ -21,7 +21,7 @@
 * [Limine](https://github.com/Limine-Bootloader/Limine) — bootloader and ISO tooling
 * `xorriso` — builds the bootable ISO
 * QEMU — `qemu-system-x86_64`
-* OVMF — optional, only for `zig build run-uefi`
+* OVMF — optional, only for `mise run run-uefi`
 
 ### macOS
 
@@ -33,7 +33,7 @@ mise install
 eval "$(mise activate zsh)"   # add to ~/.zshrc to persist
 ```
 
-For UEFI boot testing (`zig build run-uefi`), copy OVMF firmware into the project (one-time):
+For UEFI boot testing (`mise run run-uefi`), copy OVMF firmware into the project (one-time):
 
 ```bash
 mkdir -p ovmf
@@ -49,10 +49,10 @@ mise install
 eval "$(mise activate bash)"   # add to ~/.bashrc to persist
 ```
 
-If Limine is not available from your distro, `zig build iso` downloads the official
+If Limine is not available from your distro, `mise run iso` downloads the official
 `limine-binary` release (v12.3.3) automatically.
 
-For UEFI boot testing (`zig build run-uefi`), copy OVMF firmware into the project (one-time):
+For UEFI boot testing (`mise run run-uefi`), copy OVMF firmware into the project (one-time):
 
 ```bash
 mkdir -p ovmf
@@ -62,34 +62,45 @@ cp /usr/share/OVMF/OVMF_VARS_4M.fd ovmf/
 
 ## 💻 Building & Running
 
+This project uses [mise](https://mise.jdx.dev) tasks for build, ISO, disk, and QEMU workflows.
+Run `mise tasks` to list everything.
+
 Build the kernel:
 
 ```bash
-zig build
+mise run build
+# or: zig build
 ```
 
 Build a bootable ISO (uses Homebrew Limine when installed, otherwise downloads it):
 
 ```bash
-zig build iso
+mise run iso
 ```
 
-Build the ISO and run in QEMU (SeaBIOS, default):
+Create the FAT32 test disk and run in QEMU (SeaBIOS, default):
 
 ```bash
-zig build run
+mise run run
 ```
 
 Run under OVMF/UEFI instead (requires OVMF firmware in `ovmf/`):
 
 ```bash
-zig build run-uefi
+mise run run-uefi
 ```
 
-Run unit tests:
+Run host unit tests:
 
 ```bash
-zig build test
+mise run test
+# or: zig build test
+```
+
+Integration smoke test (serial shell + virtio disk):
+
+```bash
+mise run test-shell
 ```
 
 ## 📝 Roadmap
