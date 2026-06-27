@@ -7,6 +7,7 @@ dependencies = []
 [project.scripts]
 build-iso = "scripts.build_iso:main"
 create-disk = "scripts.create_disk:main"
+run-qemu = "scripts.qemu:main"
 
 [dependency-groups]
 build = [
@@ -16,6 +17,7 @@ build = [
 dev = [
     "pexpect>=4.9.0",
     "pytest>=9.1.1",
+    "qemu-qmp>=0.0.6",
 ]
 
 [build-system]

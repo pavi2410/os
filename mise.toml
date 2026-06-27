@@ -1,6 +1,5 @@
 [tools]
 zig = "latest"
-shellcheck = "latest"
 python = "latest"
 uv = "latest"
 
@@ -10,9 +9,14 @@ sources = ["build.zig", "build.zig.zon", "kernel/**/*", "userspace/**/*"]
 outputs = ["zig-out/bin/kernel", "zig-out/userspace/bin/hello", "zig-out/userspace/bin/shell"]
 run = "zig build"
 
+[tasks."uv-sync"]
+description = "Install Python dependencies (all groups)"
+sources = ["pyproject.toml", "uv.lock"]
+run = "uv sync --all-groups"
+
 [tasks.iso]
 description = "Build a bootable Limine ISO"
-depends = ["build"]
+depends = ["build", "uv-sync"]
 sources = [
   "build.zig",
   "build.zig.zon",
@@ -27,11 +31,11 @@ sources = [
   "uv.lock",
 ]
 outputs = ["zig-out/os.iso"]
-run = "uv sync --group build && uv run build-iso"
+run = "uv run build-iso"
 
 [tasks.disk]
 description = "Create the FAT32 virtio test disk (README.TXT, /BIN/* user programs)"
-depends = ["build"]
+depends = ["build", "uv-sync"]
 sources = [
   "scripts/create_disk.py",
   "scripts/common.py",
@@ -42,28 +46,23 @@ sources = [
   "zig-out/userspace/bin/**",
 ]
 outputs = ["zig-out/disk.img"]
-run = "uv sync --group build && uv run create-disk"
+run = "uv run create-disk"
 
 [tasks.boot]
 description = "Build ISO + disk, then boot in QEMU (SeaBIOS)"
 depends = ["iso", "disk"]
 raw = true
-run = "sh scripts/run-qemu.sh"
+run = "uv run run-qemu"
 
 [tasks."boot-uefi"]
 description = "Build ISO + disk, then boot in QEMU (OVMF/UEFI)"
 depends = ["iso", "disk"]
 raw = true
-run = "sh scripts/run-qemu.sh --uefi"
+run = "uv run run-qemu --uefi"
 
 [tasks.test]
 description = "Run host-side unit tests"
 run = "zig build test"
-
-[tasks.shellcheck]
-description = "Lint shell scripts with shellcheck"
-sources = ["scripts/**/*.sh", ".shellcheckrc"]
-run = "shellcheck scripts/*.sh"
 
 [tasks."test-shell"]
 description = "Boot the OS and smoke-test the serial shell (pytest + pexpect)"
@@ -72,14 +71,17 @@ sources = [
   "pyproject.toml",
   "uv.lock",
   "test/integration/**/*",
-  "scripts/run-qemu.sh",
+  "config/qemu.ini",
+  "config/qemu-uefi.ini",
+  "scripts/qemu.py",
   "scripts/create_disk.py",
 ]
-run = "uv sync --group dev --group build && uv run pytest test/integration -v"
+run = "uv run pytest test/integration -v"
 
 [tasks."kill-qemu"]
 description = "Stop any QEMU instance booting this project's ISO"
-run = "pkill -f 'qemu-system-x86_64.*os.iso' 2>/dev/null || true"
+depends = ["uv-sync"]
+run = "uv run python -c \"from scripts.qemu import stop_qemu; stop_qemu()\""
 
 [tasks.clean]
 description = "Remove build artifacts and Zig cache"

@@ -7,6 +7,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from scripts.qemu import build_qemu_argv, prepare_qmp_socket, qmp_quit, stop_qemu
+
 
 @dataclass
 class _LogWriter:
@@ -39,8 +41,11 @@ class QemuShell:
         if self._proc is not None:
             raise RuntimeError("session already started")
         self._log_writer = _LogWriter()
+        prepare_qmp_socket()
+        argv = build_qemu_argv(display_none=True)
         self._proc = pexpect.spawn(
-            "sh scripts/run-qemu.sh -display none",
+            argv[0],
+            argv[1:],
             cwd=str(self.root),
             encoding="utf-8",
             timeout=self.boot_timeout,
@@ -76,29 +81,21 @@ class QemuShell:
                     pass
         finally:
             if self._proc.isalive():
-                self._proc.terminate(force=True)
+                qmp_quit()
+                if self._proc.isalive():
+                    self._proc.terminate(force=True)
             self._proc.close(force=True)
             self._proc = None
-            kill_qemu(self.root)
+            stop_qemu()
 
     def assert_no_faults(self) -> None:
         if "Fault" in self.log:
             raise AssertionError("serial log contains Fault")
 
 
-def kill_qemu(root: Path) -> None:
-    subprocess.run(
-        ["pkill", "-f", "qemu-system-x86_64.*os.iso"],
-        cwd=root,
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-
-
 def sync_disk(root: Path) -> None:
     subprocess.run(
-        ["uv", "run", "--group", "build", "create-disk"],
+        ["uv", "run", "create-disk"],
         cwd=root,
         check=True,
     )

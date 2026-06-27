@@ -1,2 +1,0 @@
-# CDPATH= cd is intentional (avoids CDPATH side effects when resolving script paths).
-disable=SC1007

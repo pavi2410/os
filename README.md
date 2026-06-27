@@ -101,7 +101,6 @@ This project uses mise tasks for build, ISO, disk, and QEMU workflows. Run `mise
 | `mise run boot-uefi` | Same, under OVMF/UEFI |
 | `mise run test` | Host-side kernel unit tests (`test/kernel/`, no QEMU) |
 | `mise run test-shell` | Serial shell integration test (pytest + pexpect, turn-by-turn) |
-| `mise run shellcheck` | Lint `scripts/*.sh` |
 | `mise run kill-qemu` | Stop a stuck QEMU instance |
 | `mise run clean` | Remove `zig-out/` and `.zig-cache/` |
 | `mise run clean-disk` | Delete `disk.img` to force a full reformat on next boot |
@@ -139,7 +138,7 @@ Serial shell integration test (boots QEMU twice — smoke cases, then disk persi
 
 ```bash
 mise run test-shell
-# or: uv sync --group dev && uv run pytest test/integration -v
+# or: uv sync --all-groups && uv run pytest test/integration -v
 ```
 
 The integration harness drives the shell turn-by-turn (sync on the `os> ` prompt) via `test/integration/`. First run creates `.venv/` through `uv sync`.
