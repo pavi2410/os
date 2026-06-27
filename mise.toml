@@ -1,2 +1,46 @@
 [tools]
 zig = "latest"
+
+[tasks.build]
+description = "Build kernel and userspace binaries"
+run = "zig build"
+
+[tasks.iso]
+description = "Build a bootable Limine ISO"
+depends = ["build"]
+run = "zig build iso"
+
+[tasks.disk]
+description = "Create the FAT32 virtio test disk (README.TXT)"
+run = "sh scripts/create-disk.sh"
+
+[tasks.run]
+description = "Build ISO + disk, then boot in QEMU (SeaBIOS)"
+depends = ["iso", "disk"]
+run = "zig build run"
+
+[tasks."run-uefi"]
+description = "Build ISO + disk, then boot in QEMU (OVMF/UEFI)"
+depends = ["iso", "disk"]
+run = "zig build run-uefi"
+
+[tasks.test]
+description = "Run host-side unit tests"
+run = "zig build test"
+
+[tasks."test-shell"]
+description = "Boot the OS and smoke-test the serial shell (host-driven)"
+depends = ["iso", "disk"]
+run = "sh scripts/test-shell.sh"
+
+[tasks."kill-qemu"]
+description = "Stop any QEMU instance booting this project's ISO"
+run = "pkill -f 'qemu-system-x86_64.*os.iso' 2>/dev/null || true"
+
+[tasks.clean]
+description = "Remove build artifacts and Zig cache"
+run = "rm -rf zig-out .zig-cache"
+
+[tasks."clean-disk"]
+description = "Remove the virtio disk image (forces recreation on next run)"
+run = "rm -f zig-out/disk.img"
