@@ -31,8 +31,6 @@ if [ ! -f "$disk" ]; then
     exit 1
 fi
 
-set -- qemu-system-x86_64 -M q35
-
 if [ "$mode" = uefi ]; then
     code="$root/ovmf/OVMF_CODE_4M.fd"
     vars="$root/ovmf/OVMF_VARS_4M.fd"
@@ -40,12 +38,19 @@ if [ "$mode" = uefi ]; then
         echo "error: OVMF firmware missing in ovmf/ (see README)" >&2
         exit 1
     fi
-    set -- "$@" \
+    exec qemu-system-x86_64 -M q35 \
         -drive "if=pflash,format=raw,readonly=on,file=$code" \
-        -drive "if=pflash,format=raw,file=$vars"
+        -drive "if=pflash,format=raw,file=$vars" \
+        -cdrom "$iso" \
+        -boot d \
+        -drive "file=$disk,if=none,format=raw,id=disk0" \
+        -device virtio-blk-pci,drive=disk0,disable-legacy=on \
+        -serial stdio \
+        -no-reboot \
+        "$@"
 fi
 
-set -- "$@" \
+exec qemu-system-x86_64 -M q35 \
     -cdrom "$iso" \
     -boot d \
     -drive "file=$disk,if=none,format=raw,id=disk0" \
@@ -53,5 +58,3 @@ set -- "$@" \
     -serial stdio \
     -no-reboot \
     "$@"
-
-exec "$@"

@@ -25,16 +25,7 @@ rm -f "$out"
     sleep 2
     printf 'exit\r'
     sleep 2
-} | qemu-system-x86_64 \
-    -M q35 \
-    -cdrom zig-out/os.iso \
-    -boot d \
-    -drive file=zig-out/disk.img,if=none,format=raw,id=disk0 \
-    -device virtio-blk-pci,drive=disk0,disable-legacy=on \
-    -serial stdio \
-    -display none \
-    -no-reboot \
-    >"$out" 2>&1 &
+} | sh scripts/run-qemu.sh -display none >"$out" 2>&1 &
 
 qpid=$!
 sleep 18
