@@ -24,14 +24,7 @@ var ioapic_storage: [max_ioapics]IoApic = undefined;
 
 /// `rsdp_virt` is the HHDM virtual pointer from Limine (base revision >= 4).
 pub fn parse(rsdp_virt: u64) ParseError!Info {
-    const rsdp = access.virtBytes(rsdp_virt);
-    if (!access.sigEq8At(rsdp, 0, "RSD PTR ")) return ParseError.InvalidRsdp;
-
-    const revision = rsdp[15];
-    const root_phys: u64 = if (revision >= 2)
-        access.readU64(rsdp, 24)
-    else
-        access.readU32(rsdp, 16);
+    const root_phys = access.rootTablePhys(rsdp_virt) orelse return ParseError.InvalidRsdp;
 
     const madt_phys = access.findTablePhys(root_phys, .{ 'A', 'P', 'I', 'C' }) orelse return ParseError.MadtNotFound;
     const madt = access.physBytes(madt_phys);
@@ -49,7 +42,10 @@ pub fn parse(rsdp_virt: u64) ParseError!Info {
 
         switch (entry_type) {
             1 => {
-                if (entry_len < 12) break;
+                if (entry_len < 12) {
+                    offset += entry_len;
+                    continue;
+                }
                 if (ioapic_count >= max_ioapics) return ParseError.TooManyIoApics;
                 ioapic_storage[ioapic_count] = .{
                     .id = madt[offset + 2],
@@ -59,7 +55,10 @@ pub fn parse(rsdp_virt: u64) ParseError!Info {
                 ioapic_count += 1;
             },
             5 => {
-                if (entry_len < 12) break;
+                if (entry_len < 12) {
+                    offset += entry_len;
+                    continue;
+                }
                 local_apic_address = access.readU64(madt, offset + 4);
             },
             else => {},

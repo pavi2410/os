@@ -286,14 +286,7 @@ fn enumerateBus(segment: u16, bus: u8) PciError!void {
 }
 
 fn findMcfg(rsdp_virt: u64) ?[*]const u8 {
-    const rsdp = acpi_access.virtBytes(rsdp_virt);
-    if (!acpi_access.sigEq8At(rsdp, 0, "RSD PTR ")) return null;
-
-    const revision = rsdp[15];
-    const root_phys: u64 = if (revision >= 2)
-        acpi_access.readU64(rsdp, 24)
-    else
-        acpi_access.readU32(rsdp, 16);
+    const root_phys = acpi_access.rootTablePhys(rsdp_virt) orelse return null;
 
     const mcfg_phys = acpi_access.findTablePhys(root_phys, .{ 'M', 'C', 'F', 'G' }) orelse return null;
     return acpi_access.physBytes(mcfg_phys);

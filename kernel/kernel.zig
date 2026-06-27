@@ -124,8 +124,8 @@ fn initPci(rsdp_virt: u64) void {
 
 fn initApic(rsdp_virt: u64) void {
     serial.writeString("\r\n--- APIC ---\r\n");
-    apic.init(rsdp_virt) catch {
-        serial.writeString("APIC init failed\r\n");
+    apic.init(rsdp_virt) catch |err| {
+        serial.printf("APIC init failed: {s}\r\n", .{@errorName(err)});
         cpu.haltForever();
     };
     serial.printf("LAPIC ID: {d}\r\n", .{apic.lapicId()});

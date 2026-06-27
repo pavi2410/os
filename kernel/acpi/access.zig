@@ -40,6 +40,22 @@ pub fn sigEq8At(bytes: [*]const u8, off: usize, expected: []const u8) bool {
 
 pub const sdt_header_size = 36;
 
+/// Resolve the XSDT (preferred) or RSDT physical address from a Limine HHDM RSDP pointer.
+pub fn rootTablePhys(rsdp_virt: u64) ?u64 {
+    const rsdp = virtBytes(rsdp_virt);
+    if (!sigEq8At(rsdp, 0, "RSD PTR ")) return null;
+
+    const revision = rsdp[15];
+    if (revision >= 2) {
+        const xsdt = readU64(rsdp, 24);
+        if (xsdt != 0) return xsdt;
+    }
+
+    const rsdt = readU32(rsdp, 16);
+    if (rsdt != 0) return rsdt;
+    return null;
+}
+
 pub fn findTablePhys(root_phys: u64, signature: [4]u8) ?u64 {
     if (root_phys == 0) return null;
     const root = physBytes(root_phys);
@@ -52,7 +68,7 @@ pub fn findTablePhys(root_phys: u64, signature: [4]u8) ?u64 {
         var i: usize = 0;
         while (i < entry_count) : (i += 1) {
             const table_phys = readU64(root, sdt_header_size + i * 8);
-            if (table_phys == 0 or table_phys >= 0x1_0000_0000) continue;
+            if (table_phys == 0) continue;
             const table = physBytes(table_phys);
             if (sigEq4At(table, 0, signature)) return table_phys;
         }
@@ -65,7 +81,7 @@ pub fn findTablePhys(root_phys: u64, signature: [4]u8) ?u64 {
         var i: usize = 0;
         while (i < entry_count) : (i += 1) {
             const table_phys = @as(u64, readU32(root, sdt_header_size + i * 4));
-            if (table_phys == 0 or table_phys >= 0x1_0000_0000) continue;
+            if (table_phys == 0) continue;
             const table = physBytes(table_phys);
             if (sigEq4At(table, 0, signature)) return table_phys;
         }

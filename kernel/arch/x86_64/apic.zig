@@ -1,6 +1,5 @@
 const acpi_madt = @import("../../acpi/madt.zig");
 const cpu = @import("cpu.zig");
-const paging = @import("paging.zig");
 const virtual = @import("../../mm/virtual.zig");
 
 pub const ApicError = error{
@@ -14,10 +13,6 @@ pub const ApicError = error{
 pub const irq_vector_base: u8 = 32;
 
 const IA32_APIC_BASE: u32 = 0x1B;
-
-/// Kernel-owned MMIO window beside the kernel heap mapping (same PD as heap).
-const mmio_map_base: u64 = 0xFFFFFFFF80110000;
-const mmio_map_limit: u64 = mmio_map_base + (4 * 1024 * 1024);
 
 const lapic_reg = struct {
     pub const id: u32 = 0x20;
@@ -52,7 +47,6 @@ var lapic_mmio: u64 = 0;
 var boot_lapic_id: u8 = 0;
 var ioapics: [max_ioapics]IoApicState = undefined;
 var ioapic_count: usize = 0;
-var next_mmio_map: u64 = mmio_map_base;
 
 pub fn init(rsdp_virt: u64) ApicError!void {
     disableLegacyPic();
@@ -72,8 +66,6 @@ pub fn init(rsdp_virt: u64) ApicError!void {
         maskAllPins(ioapic_count);
         ioapic_count += 1;
     }
-
-    virtual.reserveAddressRange(next_mmio_map);
 }
 
 pub fn lapicId() u8 {
@@ -128,15 +120,7 @@ pub fn startLapicTimer(vector: u8, ticks_per_irq: u32) void {
 }
 
 fn mapMmio(phys: u64) ApicError!u64 {
-    const page_phys = phys & ~@as(u64, paging.page_size - 1);
-    const page_off = phys & (paging.page_size - 1);
-
-    const virt_page = next_mmio_map;
-    if (virt_page + paging.page_size > mmio_map_limit) return ApicError.MmioMapFailed;
-    next_mmio_map += paging.page_size;
-
-    paging.mapPage(virt_page, page_phys, paging.Flags.mmio) catch return ApicError.MmioMapFailed;
-    return virt_page + page_off;
+    return virtual.mapMmio(phys) catch ApicError.MmioMapFailed;
 }
 
 fn disableLegacyPic() void {
