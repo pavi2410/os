@@ -2,6 +2,25 @@
 
 **A hobby operating system** in Zig, targeting x86-64 with [Limine](https://github.com/Limine-Bootloader/Limine), aiming for Linux ABI compatibility, multicore support, filesystems, networking, and eventually a GUI.
 
+## Current status
+
+The kernel boots under QEMU, runs a serial shell in userspace, reads files from a VirtIO FAT32 disk, and can spawn embedded ELF programs.
+
+**Working today**
+
+* Higher-half kernel with page tables, physical/virtual/heap allocators
+* APIC (LAPIC + IOAPIC), LAPIC timer, round-robin scheduler, `syscall`/`sysret`
+* ELF64 user program loader, ring-3 execution, serial TTY (canonical mode + basic ANSI)
+* Syscalls: `read`, `write`, `open`, `close`, `lseek`, `stat`, `brk`, `getpid`, `exit`/`exit_group`, and OS-specific `spawn`
+* PCI enumeration (legacy I/O ports on QEMU q35), VirtIO-blk, FAT32 read-only VFS
+* Userspace `shell` and `hello` (embedded in the kernel image at build time)
+* [mise](https://mise.jdx.dev) tasks for build, ISO, disk, QEMU boot, and integration tests
+
+**Next up** (see [docs/roadmap/](docs/roadmap/))
+
+* FAT32 write/create, userspace binaries on the disk image
+* VirtIO-net and a minimal TCP/IP stack
+
 ## 🚀 Goals
 
 * x86-64 architecture
@@ -9,7 +28,7 @@
 * Modern 64-bit higher-half kernel
 * Linux-compatible syscall interface
 * Multicore threading (SMP)
-* ext2 or FAT32 filesystem
+* FAT32 filesystem (ext2 possible later)
 * BSD-style sockets and TCP/IP networking
 * Simple terminal with ANSI parsing
 * GUI with basic window manager (future)
@@ -17,6 +36,7 @@
 
 ## 🛠 Toolchain
 
+* [mise](https://mise.jdx.dev) — pins Zig and defines project tasks (`mise.toml`)
 * Zig (v0.16+ recommended)
 * [Limine](https://github.com/Limine-Bootloader/Limine) — bootloader and ISO tooling
 * `xorriso` — builds the bootable ISO
@@ -25,7 +45,7 @@
 
 ### macOS
 
-Install [Homebrew](https://brew.sh) and [mise](https://mise.jdx.dev), then:
+Install [Homebrew](https://brew.sh) and mise, then:
 
 ```bash
 brew install limine xorriso qemu
@@ -62,61 +82,64 @@ cp /usr/share/OVMF/OVMF_VARS_4M.fd ovmf/
 
 ## 💻 Building & Running
 
-This project uses [mise](https://mise.jdx.dev) tasks for build, ISO, disk, and QEMU workflows.
-Run `mise tasks` to list everything.
+This project uses mise tasks for build, ISO, disk, and QEMU workflows. Run `mise tasks` to list everything.
 
-Build the kernel:
+| Task | Description |
+|------|-------------|
+| `mise run build` | Build kernel and userspace binaries (`zig-out/bin/`) |
+| `mise run iso` | Build bootable Limine ISO (`zig-out/os.iso`) |
+| `mise run disk` | Create FAT32 VirtIO test disk (`zig-out/disk.img`) |
+| `mise run boot` | ISO + disk + QEMU (SeaBIOS, interactive serial) |
+| `mise run boot-uefi` | Same, under OVMF/UEFI |
+| `mise run test` | Host-side unit tests |
+| `mise run test-shell` | End-to-end smoke test (shell, `cat`, `hello`) |
+| `mise run kill-qemu` | Stop a stuck QEMU instance |
+| `mise run clean` | Remove `zig-out/` and `.zig-cache/` |
 
-```bash
-mise run build
-# or: zig build
-```
-
-Build a bootable ISO (uses Homebrew Limine when installed, otherwise downloads it):
-
-```bash
-mise run iso
-```
-
-Create the FAT32 test disk and run in QEMU (SeaBIOS, default):
+Quick start:
 
 ```bash
 mise run boot
 ```
 
-Run under OVMF/UEFI instead (requires OVMF firmware in `ovmf/`):
+At the `os>` prompt, try `help`, `cat /README.TXT`, and `hello`.
 
-```bash
-mise run boot-uefi
-```
-
-Run host unit tests:
+Host unit tests (no QEMU):
 
 ```bash
 mise run test
-# or: zig build test
+# or: zig build
 ```
 
-Integration smoke test (serial shell + virtio disk):
+Integration smoke test:
 
 ```bash
 mise run test-shell
 ```
 
+QEMU uses a VirtIO block device backed by `zig-out/disk.img`. If VFS behaves oddly after a failed disk setup, recreate the image with `mise run clean-disk` then `mise run disk`.
+
 ## 📝 Roadmap
 
-* [x] Hello kernel in Zig
-* [ ] Page tables and higher-half kernel
-* [ ] Memory allocator (physical/virtual)
-* [ ] ELF loader for user programs
-* [ ] Initial Linux-compatible syscalls
-* [ ] Filesystem driver (ext2 or FAT32)
-* [ ] Network driver (virtio-net or e1000)
-* [ ] Simple TCP/IP stack
-* [ ] Terminal + TTY driver
-* [ ] Shell + user programs
-* [ ] SMP multicore support
-* [ ] GUI with framebuffer / window manager
+Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
+
+| Phase | Status | Summary |
+|-------|--------|---------|
+| 0 — Foundation | Done | Memory map, GDT/IDT, kernel stack |
+| 1 — Page tables | Done | Higher-half kernel |
+| 2 — Memory | Done | Physical, virtual, and heap allocators |
+| 3 — Kernel runtime | Done | APIC, timer, threads, scheduler, syscalls |
+| 4 — Userspace | Done | ELF loader, TTY, shell, embedded programs |
+| 5 — I/O stack | In progress | VirtIO-blk + FAT32 read done; networking next |
+| 6 — SMP and GUI | Planned | Multicore, framebuffer, window manager |
+
+**Phase 5 remaining**
+
+* [ ] FAT32 write and file creation
+* [ ] Install user programs on the FAT disk (instead of only `@embedFile`)
+* [ ] VirtIO-net (or e1000) driver
+* [ ] ARP, IPv4, UDP, minimal TCP
+* [ ] Socket syscalls
 
 ## 🔗 Links
 
