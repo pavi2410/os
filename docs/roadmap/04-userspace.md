@@ -32,6 +32,7 @@
   - [x] Install binaries into the FAT image (`/BIN/*` from `zig-out/userspace/bin/`)
 - [x] Add minimal libc or freestanding syscall wrappers for user programs
 - [x] Shell reads input and executes programs (built-in `exit`/`help` OK)
+- [ ] Linux `fork` / `execve` / `wait4` (replacing OS-specific `spawn`)
 
 ---
 

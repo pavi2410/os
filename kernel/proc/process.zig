@@ -9,6 +9,8 @@ const user_entry = @import("user_entry.zig");
 
 pub const ProcessError = error{
     OutOfMemory,
+    NotImplemented,
+    TooManyZombies,
 };
 
 pub const State = enum {
@@ -17,6 +19,9 @@ pub const State = enum {
     zombie,
     dead,
 };
+
+/// `parent_id` uses 0 when a process has no parent (init shell).
+pub const no_parent: usize = 0;
 
 /// Linux-style user virtual layout constants for later ELF loading.
 pub const user_stack_top = user_loader.user_stack_top;
@@ -87,6 +92,7 @@ pub const AddressSpace = struct {
 
 pub const Process = struct {
     id: usize,
+    parent_id: usize,
     address_space: AddressSpace,
     fds: FdTable,
     exit_status: ?u32,
@@ -99,6 +105,17 @@ pub const Process = struct {
         heap.kfree(@ptrCast(self)) catch {};
     }
 };
+
+/// Exit status retained until the parent reaps via `wait4` (commit 4).
+pub const Zombie = struct {
+    pid: usize = 0,
+    parent_id: usize = no_parent,
+    status: u32 = 0,
+    in_use: bool = false,
+};
+
+const max_zombies = 16;
+var zombies: [max_zombies]Zombie = .{.{}} ** max_zombies;
 
 var boot_cr3: u64 = 0;
 var next_id: usize = 1;
@@ -121,10 +138,15 @@ pub fn setCurrent(proc: ?*Process) void {
 }
 
 pub fn create() ProcessError!*Process {
+    return createWithParent(no_parent);
+}
+
+pub fn createWithParent(parent_id: usize) ProcessError!*Process {
     const mem = heap.kmalloc(@sizeOf(Process)) catch return ProcessError.OutOfMemory;
     const proc: *Process = @ptrCast(@alignCast(mem));
     proc.* = .{
         .id = next_id,
+        .parent_id = parent_id,
         .address_space = try AddressSpace.create(),
         .fds = FdTable.init(),
         .exit_status = null,
@@ -133,6 +155,61 @@ pub fn create() ProcessError!*Process {
     };
     next_id += 1;
     return proc;
+}
+
+/// Duplicate `parent` into a new child process (Linux `fork`). Implemented in commit 2.
+pub fn forkChild(parent: *Process) ProcessError!*Process {
+    _ = parent;
+    return ProcessError.NotImplemented;
+}
+
+pub fn lookup(pid: usize) ?*Process {
+    // Live processes are tracked via `current` only today; commit 2 adds a proc table.
+    if (current) |proc| {
+        if (proc.id == pid) return proc;
+    }
+    return null;
+}
+
+pub fn enqueueZombie(pid: usize, parent_id: usize, status: u32) ProcessError!void {
+    for (&zombies) |*slot| {
+        if (slot.in_use) continue;
+        slot.* = .{
+            .pid = pid,
+            .parent_id = parent_id,
+            .status = status,
+            .in_use = true,
+        };
+        return;
+    }
+    return ProcessError.TooManyZombies;
+}
+
+pub fn reapZombie(parent_id: usize, pid: usize) ?Zombie {
+    for (&zombies) |*slot| {
+        if (!slot.in_use) continue;
+        if (slot.parent_id != parent_id) continue;
+        if (slot.pid != pid) continue;
+
+        const copy = slot.*;
+        slot.in_use = false;
+        return copy;
+    }
+    return null;
+}
+
+/// `pid == -1` waits for any child of `parent_id`; otherwise match a specific pid.
+pub fn reapZombieAny(parent_id: usize, pid: isize) ?Zombie {
+    for (&zombies) |*slot| {
+        if (!slot.in_use) continue;
+        if (slot.parent_id != parent_id) continue;
+        if (pid >= 0 and @as(usize, @intCast(pid)) != slot.pid) continue;
+
+        const copy = slot.*;
+        slot.in_use = false;
+        return copy;
+    }
+    return null;
 }
 
 pub fn destroy(proc: *Process) void {
