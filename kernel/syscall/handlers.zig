@@ -107,6 +107,7 @@ fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
     const O_WRONLY: u64 = 0o1;
     const O_CREAT: u64 = 0o100;
     const O_TRUNC: u64 = 0o1000;
+    const O_APPEND: u64 = 0o2000;
 
     const accmode = flags & O_ACCMODE;
     const open_flags: vfs.OpenFlags = .{
@@ -114,6 +115,7 @@ fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
         .write = accmode != 0, // O_RDONLY=0, O_WRONLY=1, O_RDWR=2
         .create = flags & O_CREAT != 0,
         .truncate = flags & O_TRUNC != 0,
+        .append = flags & O_APPEND != 0,
     };
 
     const handle = vfs.open(path, open_flags) catch |err| return errnoFromVfsErr(err);

@@ -31,6 +31,12 @@ rm -f "$out"
     sleep 1
     printf 'write /TEST.TXT persisted on disk!\r'
     sleep 2
+    printf 'write -a /APPEND.TXT first\r'
+    sleep 2
+    printf 'write -a /APPEND.TXT second\r'
+    sleep 2
+    printf 'cat /APPEND.TXT\r'
+    sleep 1
     printf 'cat /TEST.TXT\r'
     sleep 1
     printf 'hello\r'
@@ -64,6 +70,7 @@ for needle in \
     "4880 HELLO" \
     "write: ok" \
     "yoman" \
+    "firstsecond" \
     "persisted on disk!" \
     "Hello from FAT on virtio-blk" \
     "Hello from userspace!"

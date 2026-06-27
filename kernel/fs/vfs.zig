@@ -19,6 +19,7 @@ pub const OpenFlags = struct {
     write: bool = false,
     create: bool = false,
     truncate: bool = false,
+    append: bool = false,
 };
 
 pub const Stat = extern struct {
@@ -83,7 +84,7 @@ pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
     handles[slot] = .{
         .in_use = true,
         .open = opened,
-        .offset = 0,
+        .offset = if (flags.append) opened.entry.size else 0,
         .writable = flags.write,
     };
     return slot;

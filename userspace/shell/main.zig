@@ -122,8 +122,9 @@ fn catFile(path: []const u8) void {
 const O_WRONLY: u32 = 1;
 const O_CREAT: u32 = 0o100;
 const O_TRUNC: u32 = 0o1000;
+const O_APPEND: u32 = 0o2000;
 
-fn writeFile(path: []const u8, content: []const u8) void {
+fn writeFile(path: []const u8, content: []const u8, append: bool) void {
     var pathbuf: [128]u8 = undefined;
     if (path.len + 1 > pathbuf.len) {
         writeStr("write: path too long\n");
@@ -132,7 +133,14 @@ fn writeFile(path: []const u8, content: []const u8) void {
     @memcpy(pathbuf[0..path.len], path);
     pathbuf[path.len] = 0;
 
-    const fd = libc.syscall.open(@ptrCast(&pathbuf), O_WRONLY | O_CREAT | O_TRUNC, 0);
+    var open_flags: u32 = O_WRONLY | O_CREAT;
+    if (append) {
+        open_flags |= O_APPEND;
+    } else {
+        open_flags |= O_TRUNC;
+    }
+
+    const fd = libc.syscall.open(@ptrCast(&pathbuf), open_flags, 0);
     if (fd < 0) {
         writeStr("write: open failed\n");
         return;
@@ -148,6 +156,43 @@ fn writeFile(path: []const u8, content: []const u8) void {
     }
     _ = libc.syscall.close(@intCast(fd));
     writeStr("write: ok\n");
+}
+
+fn writeCommand(args: []const u8) void {
+    var append = false;
+    var i: usize = 0;
+
+    while (i < args.len) {
+        while (i < args.len and args[i] == ' ') i += 1;
+        if (i >= args.len) break;
+
+        if (args[i] == '-') {
+            i += 1;
+            if (i >= args.len) break;
+            if (args[i] == 'a') {
+                append = true;
+                i += 1;
+            } else {
+                writeStr("write: usage: write [-a] /path text...\n");
+                return;
+            }
+            continue;
+        }
+
+        const path_start = i;
+        while (i < args.len and args[i] != ' ') i += 1;
+        if (i == path_start) {
+            writeStr("write: usage: write [-a] /path text...\n");
+            return;
+        }
+        const path = args[path_start..i];
+        while (i < args.len and args[i] == ' ') i += 1;
+        const content = args[i..args.len];
+        writeFile(path, content, append);
+        return;
+    }
+
+    writeStr("write: usage: write [-a] /path text...\n");
 }
 
 const S_IFDIR: u32 = 0o040000;
@@ -295,7 +340,7 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
             writeStr("Built-ins: help, exit, pid, echo, cat, ls, write\n");
             writeStr("  echo [text...]  print a line\n");
             writeStr("  ls [-l] [path]  list directory ( -l = type + size )\n");
-            writeStr("  write /path text...  create or replace a file\n");
+            writeStr("  write [-a] /path text...  create, replace (-a append)\n");
             writeStr("Programs in /BIN: hello, ...\n");
             writeStr("Use full paths with cat, e.g. cat /README.TXT\n");
         } else if (eql(cmd, "pid")) {
@@ -309,19 +354,7 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
         } else if (startsWith(cmd, "ls ")) {
             lsCommand(cmd[3..len]);
         } else if (startsWith(cmd, "write ")) {
-            const args = cmd[6..len];
-            var i: usize = 0;
-            while (i < args.len and args[i] == ' ') i += 1;
-            const path_start = i;
-            while (i < args.len and args[i] != ' ') i += 1;
-            if (i == path_start) {
-                writeStr("write: usage: write /path text...\n");
-                continue;
-            }
-            const path = args[path_start..i];
-            while (i < args.len and args[i] == ' ') i += 1;
-            const content = args[i..len];
-            writeFile(path, content);
+            writeCommand(cmd[6..len]);
         } else if (startsWith(cmd, "cat ")) {
             catFile(cmd[4..len]);
         } else if (startsWith(cmd, "/")) {
