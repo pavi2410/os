@@ -86,7 +86,12 @@ pub const Tty = struct {
 
     fn handleGround(self: *Tty, ch: u8) TtyError!void {
         switch (ch) {
-            0x03 => return TtyError.WouldBlock, // Ctrl-C
+            0x03 => {
+                if (self.echo) serial.writeString("^C\r\n");
+                self.line_len = 0;
+                self.line_ready = false;
+                return TtyError.WouldBlock;
+            },
             '\r', '\n' => {
                 if (!self.line_ready) try self.finishLine();
             },

@@ -32,11 +32,13 @@ run = "sh scripts/create-disk.sh"
 [tasks.boot]
 description = "Build ISO + disk, then boot in QEMU (SeaBIOS)"
 depends = ["iso", "disk"]
+raw = true
 run = "sh scripts/run-qemu.sh"
 
 [tasks."boot-uefi"]
 description = "Build ISO + disk, then boot in QEMU (OVMF/UEFI)"
 depends = ["iso", "disk"]
+raw = true
 run = "sh scripts/run-qemu.sh --uefi"
 
 [tasks.test]
