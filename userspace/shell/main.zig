@@ -1,3 +1,4 @@
+const argv = @import("argv.zig");
 const libc = @import("libc");
 
 const prompt = "os> ";
@@ -13,17 +14,6 @@ fn eql(a: []const u8, b: []const u8) bool {
         if (x != y) return false;
     }
     return true;
-}
-
-fn startsWith(haystack: []const u8, needle: []const u8) bool {
-    if (haystack.len < needle.len) return false;
-    return eql(haystack[0..needle.len], needle);
-}
-
-fn trimNewline(buf: []u8, len: usize) usize {
-    var end = len;
-    while (end > 0 and (buf[end - 1] == '\n' or buf[end - 1] == '\r')) end -= 1;
-    return end;
 }
 
 fn toUpper(ch: u8) u8 {
@@ -158,43 +148,6 @@ fn writeFile(path: []const u8, content: []const u8, append: bool) void {
     writeStr("write: ok\n");
 }
 
-fn writeCommand(args: []const u8) void {
-    var append = false;
-    var i: usize = 0;
-
-    while (i < args.len) {
-        while (i < args.len and args[i] == ' ') i += 1;
-        if (i >= args.len) break;
-
-        if (args[i] == '-') {
-            i += 1;
-            if (i >= args.len) break;
-            if (args[i] == 'a') {
-                append = true;
-                i += 1;
-            } else {
-                writeStr("write: usage: write [-a] /path text...\n");
-                return;
-            }
-            continue;
-        }
-
-        const path_start = i;
-        while (i < args.len and args[i] != ' ') i += 1;
-        if (i == path_start) {
-            writeStr("write: usage: write [-a] /path text...\n");
-            return;
-        }
-        const path = args[path_start..i];
-        while (i < args.len and args[i] == ' ') i += 1;
-        const content = args[i..args.len];
-        writeFile(path, content, append);
-        return;
-    }
-
-    writeStr("write: usage: write [-a] /path text...\n");
-}
-
 const S_IFDIR: u32 = 0o040000;
 
 fn joinPath(dir: []const u8, name: []const u8, out: []u8) bool {
@@ -288,35 +241,13 @@ fn lsDir(path: []const u8, long: bool) void {
     }
 }
 
-fn lsCommand(args: []const u8) void {
-    var long = false;
-    var path: []const u8 = "/";
-    var i: usize = 0;
-
-    while (i < args.len) {
-        while (i < args.len and args[i] == ' ') i += 1;
-        if (i >= args.len) break;
-
-        if (args[i] == '-') {
-            i += 1;
-            while (i < args.len and args[i] != ' ') : (i += 1) {
-                if (args[i] == 'l') long = true;
-            }
-            continue;
-        }
-
-        const start = i;
-        while (i < args.len and args[i] != ' ') i += 1;
-        path = args[start..i];
-    }
-
-    lsDir(path, long);
-}
-
-fn echoArgs(args: []const u8) void {
-    var i: usize = 0;
-    while (i < args.len and args[i] == ' ') i += 1;
-    if (i < args.len) writeStr(args[i..]);
+fn echoCommand(parsed: *const argv.Parsed) void {
+    var buf: [192]u8 = undefined;
+    const text = parsed.joinPositionalsFrom(&buf, 0) catch {
+        writeStr("echo: text too long\n");
+        return;
+    };
+    writeStr(text);
     writeStr("\n");
 }
 
@@ -329,10 +260,14 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
 
         const n = libc.syscall.read(0, &line, line.len);
         if (n <= 0) continue;
-        const len = trimNewline(&line, @intCast(n));
-        const cmd = line[0..len];
 
-        if (cmd.len == 0) continue;
+        const parsed = argv.parse(&line, @intCast(n)) catch {
+            writeStr("too many arguments\n");
+            continue;
+        };
+        if (parsed.argc == 0) continue;
+
+        const cmd = parsed.cmd().?;
 
         if (eql(cmd, "exit")) {
             libc.syscall.exit(0);
@@ -346,18 +281,32 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
         } else if (eql(cmd, "pid")) {
             printPid(libc.syscall.getpid());
         } else if (eql(cmd, "echo")) {
-            writeStr("\n");
-        } else if (startsWith(cmd, "echo ")) {
-            echoArgs(cmd[5..len]);
+            if (parsed.positionalAt(0) == null) {
+                writeStr("\n");
+            } else {
+                echoCommand(&parsed);
+            }
         } else if (eql(cmd, "ls")) {
-            lsCommand("");
-        } else if (startsWith(cmd, "ls ")) {
-            lsCommand(cmd[3..len]);
-        } else if (startsWith(cmd, "write ")) {
-            writeCommand(cmd[6..len]);
-        } else if (startsWith(cmd, "cat ")) {
-            catFile(cmd[4..len]);
-        } else if (startsWith(cmd, "/")) {
+            const path = parsed.positionalAt(0) orelse "/";
+            lsDir(path, parsed.hasFlag('l'));
+        } else if (eql(cmd, "write")) {
+            const path = parsed.positionalAt(0) orelse {
+                writeStr("write: usage: write [-a] /path text...\n");
+                continue;
+            };
+            var content_buf: [192]u8 = undefined;
+            const content = parsed.joinPositionalsFrom(&content_buf, 1) catch {
+                writeStr("write: text too long\n");
+                continue;
+            };
+            writeFile(path, content, parsed.hasFlag('a'));
+        } else if (eql(cmd, "cat")) {
+            const path = parsed.positionalAt(0) orelse {
+                writeStr("cat: usage: cat /path\n");
+                continue;
+            };
+            catFile(path);
+        } else if (cmd.len > 0 and cmd[0] == '/') {
             writeStr("unknown command\n");
         } else {
             spawnProgram(cmd);
