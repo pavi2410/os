@@ -25,8 +25,12 @@ rm -f "$out"
     sleep 1
     printf 'ls -l /BIN\r'
     sleep 1
-    printf 'write /TEST.TXT persisted on disk!\r'
+    printf 'write /yo.txt yoman\r'
+    sleep 2
+    printf 'cat /YO.TXT\r'
     sleep 1
+    printf 'write /TEST.TXT persisted on disk!\r'
+    sleep 2
     printf 'cat /TEST.TXT\r'
     sleep 1
     printf 'hello\r'
@@ -58,6 +62,8 @@ for needle in \
     "README.TXT" \
     "HELLO" \
     "4880 HELLO" \
+    "write: ok" \
+    "yoman" \
     "persisted on disk!" \
     "Hello from FAT on virtio-blk" \
     "Hello from userspace!"
@@ -72,6 +78,49 @@ done
 
 if grep -q "Fault" "$out"; then
     echo "FAULT detected in serial log"
+    fail=1
+fi
+
+if [ "$fail" -ne 0 ]; then
+    echo "shell test FAILED"
+    exit 1
+fi
+
+echo ""
+echo "=== persistence (disk sync + second boot) ==="
+out2="/tmp/os-shell-persist.log"
+rm -f "$out2"
+
+sh scripts/create-disk.sh >/dev/null
+
+{
+    sleep 7
+    printf 'cat /YO.TXT\r'
+    sleep 1
+    printf 'cat /TEST.TXT\r'
+    sleep 1
+    printf 'exit\r'
+    sleep 2
+} | sh scripts/run-qemu.sh -display none >"$out2" 2>&1 &
+
+qpid2=$!
+sleep 18
+kill "$qpid2" 2>/dev/null || true
+pkill -f "qemu-system-x86_64.*os.iso" 2>/dev/null || true
+
+tail -10 "$out2"
+
+for needle in "yoman" "persisted on disk!"; do
+    if grep -qF -- "$needle" "$out2"; then
+        echo "ok (persist): $needle"
+    else
+        echo "MISSING (persist): $needle"
+        fail=1
+    fi
+done
+
+if grep -q "Fault" "$out2"; then
+    echo "FAULT detected in persistence boot log"
     fail=1
 fi
 

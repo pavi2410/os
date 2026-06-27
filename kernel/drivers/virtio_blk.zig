@@ -227,9 +227,10 @@ fn waitUsed() BlkError!void {
     var spins: usize = 0;
     while (used_ring.idx == last_used_idx) {
         device.ackInterrupt();
+        // VirtIO may deliver completions via IRQ; syscall entry clears IF.
+        asm volatile ("sti; pause; cli" ::: .{ .memory = true });
         spins += 1;
         if (spins > 10_000_000) return BlkError.Timeout;
-        asm volatile ("pause");
     }
 
     asm volatile ("" ::: .{ .memory = true });

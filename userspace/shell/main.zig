@@ -108,11 +108,14 @@ fn catFile(path: []const u8) void {
     }
 
     var buf: [512]u8 = undefined;
+    var got_data = false;
     while (true) {
         const n = libc.syscall.read(@intCast(fd), &buf, buf.len);
         if (n <= 0) break;
+        got_data = true;
         _ = libc.syscall.write(1, &buf, @intCast(n));
     }
+    if (!got_data) writeStr("(empty)\n");
     _ = libc.syscall.close(@intCast(fd));
 }
 
@@ -144,6 +147,7 @@ fn writeFile(path: []const u8, content: []const u8) void {
         }
     }
     _ = libc.syscall.close(@intCast(fd));
+    writeStr("write: ok\n");
 }
 
 const S_IFDIR: u32 = 0o040000;

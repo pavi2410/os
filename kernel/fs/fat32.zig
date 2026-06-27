@@ -358,7 +358,9 @@ fn allocCluster() FatError!u32 {
 
 fn freeChain(start: u32) FatError!void {
     var cluster = start;
-    while (cluster >= 2 and cluster < 0x0FFFFFF8) {
+    var hops: u32 = 0;
+    while (cluster >= 2 and cluster < 0x0FFFFFF8) : (hops += 1) {
+        if (hops > 65536) return FatError.IoError;
         const next = getFatEntry(cluster) catch break;
         try setFatEntry(cluster, 0);
         cluster = next;
