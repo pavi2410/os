@@ -182,6 +182,7 @@ fn unregister(proc: *Process) void {
 }
 
 /// Duplicate `parent` into a new child process (Linux `fork`).
+/// Uses eager page copy; see docs/roadmap/04-userspace.md before adding COW.
 pub fn forkChild(parent: *Process) ProcessError!*Process {
     const child = try createWithParent(parent.id);
     errdefer destroy(child);
@@ -254,6 +255,12 @@ pub fn destroy(proc: *Process) void {
 
 pub fn loadElf(proc: *Process, image: []const u8) user_loader.LoadError!user_loader.LoadedImage {
     return user_loader.load(proc.address_space.cr3, image);
+}
+
+/// Drop all user mappings and allocate a fresh address space (for `execve`).
+pub fn resetAddressSpace(proc: *Process) ProcessError!void {
+    proc.address_space.destroy();
+    proc.address_space = try AddressSpace.create();
 }
 
 pub fn enterUser(proc: *Process, image: user_loader.LoadedImage, kernel_stack_top: u64) noreturn {

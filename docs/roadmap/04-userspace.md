@@ -33,6 +33,9 @@
 - [x] Add minimal libc or freestanding syscall wrappers for user programs
 - [x] Shell reads input and executes programs (built-in `exit`/`help` OK)
 - [ ] Linux `fork` / `execve` / `wait4` (replacing OS-specific `spawn`)
+  - [x] `fork` (57) — eager address-space copy (see COW note below)
+  - [x] `execve` (59)
+  - [ ] `wait4` (61)
 
 ---
 
@@ -52,3 +55,4 @@
 - Full Linux ABI compatibility is a long-term goal; document deviations.
 - FAT root (already used for boot) is sufficient for loading the first user binaries.
 - Filesystem abstraction can be thin — open by path from FAT is acceptable for this phase.
+- **`fork` uses eager page copy**, not copy-on-write. That is intentional for now: shell use is `fork` → `execve`, programs are small, and COW needs a page-fault handler plus shared-page refcounts. Revisit COW if fork latency or memory use becomes a problem (see also [`kernel/proc/process.zig`](../../kernel/proc/process.zig) on `forkChild`).

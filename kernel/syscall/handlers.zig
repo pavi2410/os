@@ -5,6 +5,7 @@ const thread = @import("../proc/thread.zig");
 const tty = @import("../drivers/tty.zig");
 const user_spawn = @import("../proc/user_spawn.zig");
 const user_fork = @import("../proc/fork.zig");
+const user_exec = @import("../proc/exec.zig");
 const vfs = @import("../fs/vfs.zig");
 
 /// Matches the stack layout built by `syscall_entry` (r9 pushed first).
@@ -40,6 +41,7 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.brk => sysBrk(frame.arg0),
         numbers.getpid => sysGetpid(),
         numbers.fork => sysFork(frame),
+        numbers.execve => sysExecve(frame.arg0, frame.arg1, frame.arg2),
         numbers.spawn => sysSpawn(frame.arg0),
         numbers.listdir => sysListdir(frame.arg0, frame.arg1, frame.arg2),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
@@ -178,6 +180,26 @@ fn sysFork(frame: *Frame) i64 {
         frame.user_rflags,
         frame.user_rsp,
     );
+}
+
+fn sysExecve(path_ptr: u64, argv_ptr: u64, envp_ptr: u64) i64 {
+    _ = argv_ptr;
+    _ = envp_ptr;
+    const path = userCString(path_ptr) orelse return EFAULT;
+    user_exec.execve(path) catch |err| return errnoFromExecErr(err);
+    unreachable;
+}
+
+fn errnoFromExecErr(err: user_exec.ExecError) i64 {
+    return switch (err) {
+        user_exec.ExecError.NotFound => ENOENT,
+        user_exec.ExecError.NotFile => EINVAL,
+        user_exec.ExecError.PathTooLong => EINVAL,
+        user_exec.ExecError.InvalidElf => ENOENT,
+        user_exec.ExecError.OutOfMemory => -12,
+        user_exec.ExecError.IoError => -5,
+        user_exec.ExecError.NoProcess => -1,
+    };
 }
 
 fn sysSpawn(path_ptr: u64) i64 {

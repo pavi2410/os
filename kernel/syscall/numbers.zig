@@ -8,6 +8,7 @@ pub const lseek = 8;
 pub const brk = 12;
 pub const getpid = 39;
 pub const fork = 57;
+pub const execve = 59;
 pub const exit = 60;
 pub const exit_group = 231;
 /// OS-specific: run an embedded program and wait for it to exit.
