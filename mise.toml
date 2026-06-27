@@ -18,19 +18,23 @@ sources = [
   "build.zig.zon",
   "kernel/**/*",
   "userspace/**/*",
-  "scripts/build-iso.sh",
-  "scripts/get-limine.sh",
+  "scripts/build_iso.py",
+  "scripts/common.py",
+  "scripts/limine.py",
   "limine.conf",
   "limine-binary/**",
+  "pyproject.toml",
+  "uv.lock",
 ]
 outputs = ["zig-out/os.iso"]
-run = "sh scripts/build-iso.sh zig-out/bin/kernel zig-out/os.iso"
+run = "uv sync --group build && uv run build-iso"
 
 [tasks.disk]
 description = "Create the FAT32 virtio test disk (README.TXT, /BIN/* user programs)"
 depends = ["build"]
 sources = [
   "scripts/create_disk.py",
+  "scripts/common.py",
   "pyproject.toml",
   "uv.lock",
   "userspace/**/*",
@@ -38,7 +42,7 @@ sources = [
   "zig-out/userspace/bin/**",
 ]
 outputs = ["zig-out/disk.img"]
-run = "uv sync --group build && uv run python scripts/create_disk.py"
+run = "uv sync --group build && uv run create-disk"
 
 [tasks.boot]
 description = "Build ISO + disk, then boot in QEMU (SeaBIOS)"

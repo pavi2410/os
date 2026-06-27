@@ -46,10 +46,11 @@ wheels = [
 [[package]]
 name = "os-integration-tests"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 
 [package.dev-dependencies]
 build = [
+    { name = "pycdlib" },
     { name = "pyfatfs" },
 ]
 dev = [
@@ -60,7 +61,10 @@ dev = [
 [package.metadata]
 
 [package.metadata.requires-dev]
-build = [{ name = "pyfatfs", specifier = ">=1.1.0" }]
+build = [
+    { name = "pycdlib", specifier = ">=1.16.0" },
+    { name = "pyfatfs", specifier = ">=1.1.0" },
+]
 dev = [
     { name = "pexpect", specifier = ">=4.9.0" },
     { name = "pytest", specifier = ">=9.1.1" },
@@ -103,6 +107,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/20/e5/16ff212c1e452235a90aeb09066144d0c5a6a8c0834397e03f5224495c4e/ptyprocess-0.7.0.tar.gz", hash = "sha256:5c5d0a3b48ceee0b48485e0c26037c0acd7d29765ca3fbb5cb3831d347423220", size = 70762, upload-time = "2020-12-28T15:15:30.155Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/22/a6/858897256d0deac81a172289110f31629fc4cee19b6f01283303e18c8db3/ptyprocess-0.7.0-py2.py3-none-any.whl", hash = "sha256:4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35", size = 13993, upload-time = "2020-12-28T15:15:28.35Z" },
+]
+
+[[package]]
+name = "pycdlib"
+version = "1.16.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/10/38/9d1ab6815f97700cff7b6425675e993d2d7421c0af7f70478617e4bcab4a/pycdlib-1.16.0.tar.gz", hash = "sha256:da02ce3d3a7cc1f879cd84db7bb39427a082cee0dbf0730fec89604039344058", size = 305934, upload-time = "2026-04-29T01:42:54.018Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4d/21/434b2f36cdbeb209dd95866c002b26a467c21f9c0f428d1509b46df27781/pycdlib-1.16.0-py2.py3-none-any.whl", hash = "sha256:17843829c6bf2fd365d3d2e49a94f06da82c999efc313b9f26b0ce59c0070785", size = 214861, upload-time = "2026-04-29T01:42:52.399Z" },
 ]
 
 [[package]]

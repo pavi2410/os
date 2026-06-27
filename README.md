@@ -46,9 +46,8 @@ Then Phase 5 networking: VirtIO-net and a minimal TCP/IP stack.
 
 * [mise](https://mise.jdx.dev) — pins Zig, Python, uv, and defines project tasks (`mise.toml`)
 * Zig (v0.16+ recommended)
-* [uv](https://docs.astral.sh/uv/) — Python tooling: integration tests (`pytest`, `pexpect`) and disk image sync (`pyfatfs`)
+* [uv](https://docs.astral.sh/uv/) — Python tooling: ISO/disk image tasks (`pycdlib`, `pyfatfs`), integration tests (`pytest`, `pexpect`)
 * [Limine](https://github.com/Limine-Bootloader/Limine) — bootloader and ISO tooling
-* `xorriso` — builds the bootable ISO
 * QEMU — `qemu-system-x86_64`
 * OVMF — optional, only for `mise run boot-uefi`
 
@@ -57,7 +56,7 @@ Then Phase 5 networking: VirtIO-net and a minimal TCP/IP stack.
 Install [Homebrew](https://brew.sh) and mise, then:
 
 ```bash
-brew install limine xorriso qemu
+brew install limine qemu
 mise install
 eval "$(mise activate zsh)"   # add to ~/.zshrc to persist
 ```
@@ -73,7 +72,7 @@ dd if=/dev/zero of=ovmf/OVMF_VARS_4M.fd bs=1m count=4
 ### Linux / WSL
 
 ```bash
-sudo apt install qemu-system-x86 ovmf xorriso
+sudo apt install qemu-system-x86 ovmf
 mise install
 eval "$(mise activate bash)"   # add to ~/.bashrc to persist
 ```
@@ -96,7 +95,7 @@ This project uses mise tasks for build, ISO, disk, and QEMU workflows. Run `mise
 | Task | Description |
 |------|-------------|
 | `mise run build` | Build kernel (`zig-out/bin/`) and userspace programs (`zig-out/userspace/bin/`) |
-| `mise run iso` | Build bootable Limine ISO (`zig-out/os.iso`) |
+| `mise run iso` | Build bootable Limine ISO (`zig-out/os.iso`) via Python |
 | `mise run disk` | Create or update FAT32 VirtIO disk (`zig-out/disk.img`) via Python/pyfatfs |
 | `mise run boot` | ISO + disk + QEMU (SeaBIOS, interactive serial) |
 | `mise run boot-uefi` | Same, under OVMF/UEFI |

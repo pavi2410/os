@@ -98,7 +98,7 @@ def kill_qemu(root: Path) -> None:
 
 def sync_disk(root: Path) -> None:
     subprocess.run(
-        ["uv", "run", "--group", "build", "python", "scripts/create_disk.py"],
+        ["uv", "run", "--group", "build", "create-disk"],
         cwd=root,
         check=True,
     )

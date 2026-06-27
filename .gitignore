@@ -9,4 +9,5 @@ iso_root/
 .DS_Store
 .venv/
 .pytest_cache/
-test/integration/__pycache__/
+__pycache__/
+*.py[cod]

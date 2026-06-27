@@ -3,18 +3,19 @@
 
 If zig-out/disk.img already exists, only refresh /README.TXT and /BIN/*.
 User-created files at the volume root are preserved across `mise run boot`.
-Set OS_DISK_FORCE=1 or run `mise run clean-disk` to reformat from scratch.
+Set OS_DISK_FORCE=1 to reformat from scratch (or run `mise run clean-disk`).
 """
 
 from __future__ import annotations
 
 import datetime
 import errno
+import logging
 import os
-import sys
 from copy import copy
 from pathlib import Path
 
+from scripts.common import DISK_PATH, USERSPACE_BIN_DIR
 from pyfatfs.DosDateTime import DosDateTime
 from pyfatfs.EightDotThree import EightDotThree
 from pyfatfs.FATDirectoryEntry import FATDirectoryEntry, make_lfn_entry
@@ -25,9 +26,7 @@ DISK_SIZE = 64 * 1024 * 1024
 README_CONTENT = b"Hello from FAT on virtio-blk\r\n"
 VOLUME_LABEL = "OSDISK"
 
-
-def repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+logger = logging.getLogger(__name__)
 
 
 def fat_name(name: str) -> str:
@@ -47,12 +46,19 @@ def _get_entry(parent: FATDirectoryEntry, name: str) -> FATDirectoryEntry:
         raise
 
 
+def _root_dir(pf: PyFat) -> FATDirectoryEntry:
+    root = pf.root_dir
+    if root is None:
+        raise RuntimeError("FAT filesystem is not open")
+    return root
+
+
 def _write_file(pf: PyFat, path: str, data: bytes) -> None:
     parts = [part for part in path.split("/") if part]
     if not parts:
         raise ValueError(f"invalid path: {path!r}")
 
-    parent = pf.root_dir
+    parent = _root_dir(pf)
     for part in parts[:-1]:
         parent = _get_entry(parent, part)
         if not parent.is_directory():
@@ -93,7 +99,8 @@ def _write_file(pf: PyFat, path: str, data: bytes) -> None:
 
 def _ensure_dir(pf: PyFat, path: str) -> FATDirectoryEntry:
     parts = [part for part in path.split("/") if part]
-    parent = pf.root_dir
+    parent = _root_dir(pf)
+    root = parent
 
     for part in parts:
         try:
@@ -132,7 +139,7 @@ def _ensure_dir(pf: PyFat, path: str) -> FATDirectoryEntry:
             dotdot = copy(parent)
             dotdot.name = dotdot_short
             dotdot.lfn_entry = None
-            if parent == pf.root_dir:
+            if parent == root:
                 dotdot.set_cluster(0)
 
             entry.add_subdirectory(dot)
@@ -176,37 +183,39 @@ def sync_disk(path: Path, readme: bytes, user_bins: dict[str, Path]) -> None:
         pf.close()
 
 
-def collect_user_bins(bin_dir: Path) -> dict[str, Path]:
-    if not bin_dir.is_dir():
-        print(f"error: {bin_dir} not found (run: mise run build)", file=sys.stderr)
+def collect_user_bins() -> dict[str, Path]:
+    if not USERSPACE_BIN_DIR.is_dir():
+        logger.error("%s not found (run: mise run build)", USERSPACE_BIN_DIR)
         raise SystemExit(1)
 
     bins: dict[str, Path] = {}
-    for src in sorted(bin_dir.iterdir()):
+    for src in sorted(USERSPACE_BIN_DIR.iterdir()):
         if src.is_file():
             bins[fat_name(src.name)] = src
 
     if not bins:
-        print(f"error: no user binaries in {bin_dir}", file=sys.stderr)
+        logger.error("no user binaries in %s", USERSPACE_BIN_DIR)
         raise SystemExit(1)
 
     return bins
 
 
-def main() -> None:
-    root = repo_root()
-    disk = root / "zig-out" / "disk.img"
-    bin_dir = root / "zig-out" / "userspace" / "bin"
+def create_disk() -> None:
     force = os.environ.get("OS_DISK_FORCE", "0") == "1"
-    user_bins = collect_user_bins(bin_dir)
+    user_bins = collect_user_bins()
 
-    if disk.is_file() and not force:
-        print(f"disk: updating {disk} (existing files preserved)")
-        sync_disk(disk, README_CONTENT, user_bins)
+    if DISK_PATH.is_file() and not force:
+        logger.info("disk: updating %s (existing files preserved)", DISK_PATH)
+        sync_disk(DISK_PATH, README_CONTENT, user_bins)
     else:
-        print(f"disk: creating {disk}")
-        format_disk(disk)
-        sync_disk(disk, README_CONTENT, user_bins)
+        logger.info("disk: creating %s", DISK_PATH)
+        format_disk(DISK_PATH)
+        sync_disk(DISK_PATH, README_CONTENT, user_bins)
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    create_disk()
 
 
 if __name__ == "__main__":
