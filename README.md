@@ -13,7 +13,7 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads files from 
 * ELF64 user program loader, ring-3 execution, serial TTY (canonical mode + basic ANSI)
 * Syscalls: `read`, `write`, `open`, `close`, `lseek`, `stat`, `brk`, `getpid`, `exit`/`exit_group`, and OS-specific `spawn`
 * PCI enumeration (legacy I/O ports on QEMU q35), VirtIO-blk, FAT32 read-only VFS
-* Userspace `shell` and `hello` (embedded in the kernel image at build time)
+* Userspace programs loaded from `/BIN` on the VirtIO FAT disk (`hello`, `shell`, …)
 * [mise](https://mise.jdx.dev) tasks for build, ISO, disk, QEMU boot, and integration tests
 
 **Next up** (see [docs/roadmap/](docs/roadmap/))
@@ -86,7 +86,7 @@ This project uses mise tasks for build, ISO, disk, and QEMU workflows. Run `mise
 
 | Task | Description |
 |------|-------------|
-| `mise run build` | Build kernel and userspace binaries (`zig-out/bin/`) |
+| `mise run build` | Build kernel (`zig-out/bin/`) and userspace programs (`zig-out/userspace/bin/`) |
 | `mise run iso` | Build bootable Limine ISO (`zig-out/os.iso`) |
 | `mise run disk` | Create FAT32 VirtIO test disk (`zig-out/disk.img`) |
 | `mise run boot` | ISO + disk + QEMU (SeaBIOS, interactive serial) |
@@ -136,7 +136,7 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 **Phase 5 remaining**
 
 * [ ] FAT32 write and file creation
-* [ ] Install user programs on the FAT disk (instead of only `@embedFile`)
+* [x] Install user programs on the FAT disk (instead of only `@embedFile`)
 * [ ] VirtIO-net (or e1000) driver
 * [ ] ARP, IPv4, UDP, minimal TCP
 * [ ] Socket syscalls

@@ -11,6 +11,7 @@ export fn _start() callconv(.naked) noreturn {
 }
 
 const prompt = "os> ";
+const bin_dir = "/BIN/";
 
 fn writeStr(s: []const u8) void {
     _ = libc.syscall.write(1, s.ptr, s.len);
@@ -33,6 +34,44 @@ fn trimNewline(buf: []u8, len: usize) usize {
     var end = len;
     while (end > 0 and (buf[end - 1] == '\n' or buf[end - 1] == '\r')) end -= 1;
     return end;
+}
+
+fn toUpper(ch: u8) u8 {
+    if (ch >= 'a' and ch <= 'z') return ch - 32;
+    return ch;
+}
+
+/// Map a shell command name to `/BIN/NAME` (FAT 8.3 names are uppercase).
+/// There is no PATH yet — programs must live under /BIN on the disk.
+fn formatBinPath(name: []const u8, out: []u8) bool {
+    var i: usize = 0;
+    for (bin_dir) |ch| {
+        if (i >= out.len - 1) return false;
+        out[i] = ch;
+        i += 1;
+    }
+    for (name) |ch| {
+        if (ch == ' ' or ch == '/') return false;
+        if (i >= out.len - 1) return false;
+        out[i] = toUpper(ch);
+        i += 1;
+    }
+    if (i == bin_dir.len) return false;
+    out[i] = 0;
+    return true;
+}
+
+fn spawnProgram(name: []const u8) void {
+    var pathbuf: [128]u8 = undefined;
+    if (!formatBinPath(name, &pathbuf)) {
+        writeStr("spawn failed\n");
+        return;
+    }
+
+    const rc = libc.syscall.spawn(@ptrCast(&pathbuf));
+    if (rc < 0) {
+        writeStr("spawn failed\n");
+    }
 }
 
 fn printPid(pid: isize) void {
@@ -103,21 +142,18 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
 
         if (eql(cmd, "exit")) {
             libc.syscall.exit(0);
-        } else         if (eql(cmd, "help")) {
+        } else if (eql(cmd, "help")) {
             writeStr("Built-ins: help, exit, pid, cat\n");
-            writeStr("Programs: hello\n");
+            writeStr("Programs in /BIN: hello, ...\n");
+            writeStr("Use full paths with cat, e.g. cat /README.TXT\n");
         } else if (eql(cmd, "pid")) {
             printPid(libc.syscall.getpid());
         } else if (startsWith(cmd, "cat ")) {
             catFile(cmd[4..len]);
-        } else if (startsWith(cmd, "hello")) {
-            const path = "/hello";
-            const rc = libc.syscall.spawn(path);
-            if (rc < 0) {
-                writeStr("spawn failed\n");
-            }
-        } else {
+        } else if (startsWith(cmd, "/")) {
             writeStr("unknown command\n");
+        } else {
+            spawnProgram(cmd);
         }
     }
 }

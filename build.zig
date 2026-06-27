@@ -49,18 +49,15 @@ pub fn build(b: *std.Build) void {
     shell.setLinkerScript(b.path("userspace/linker.ld"));
     shell.root_module.addImport("libc", user_libc);
 
-    const install_hello = b.addInstallArtifact(hello, .{});
-    const install_shell = b.addInstallArtifact(shell, .{});
+    const user_bin_dir: std.Build.InstallDir = .{ .custom = "userspace/bin" };
+    const user_install = std.Build.Step.InstallArtifact.Options{
+        .dest_dir = .{ .override = user_bin_dir },
+    };
+
+    const install_hello = b.addInstallArtifact(hello, user_install);
+    const install_shell = b.addInstallArtifact(shell, user_install);
     b.getInstallStep().dependOn(&install_hello.step);
     b.getInstallStep().dependOn(&install_shell.step);
-
-    const sync_bins = b.addSystemCommand(&.{
-        "sh",
-        "-c",
-        "mkdir -p kernel/proc/bins && cp zig-out/bin/hello zig-out/bin/shell kernel/proc/bins/",
-    });
-    sync_bins.step.dependOn(&install_hello.step);
-    sync_bins.step.dependOn(&install_shell.step);
 
     const limine_kernel_mod = b.createModule(.{
         .root_source_file = b.path("kernel/boot/limine.zig"),
@@ -83,9 +80,6 @@ pub fn build(b: *std.Build) void {
     kernel.use_llvm = true;
     kernel.link_function_sections = true;
     kernel.setLinkerScript(b.path("kernel/linker.ld"));
-    kernel.step.dependOn(&install_hello.step);
-    kernel.step.dependOn(&install_shell.step);
-    kernel.step.dependOn(&sync_bins.step);
 
     const install_kernel = b.addInstallArtifact(kernel, .{});
     b.getInstallStep().dependOn(&install_kernel.step);

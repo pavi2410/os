@@ -1,10 +1,8 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
-const gdt = @import("../arch/x86_64/gdt.zig");
 const process = @import("process.zig");
 const programs = @import("programs.zig");
 const scheduler = @import("scheduler.zig");
 const thread = @import("thread.zig");
-const user_entry = @import("user_entry.zig");
 const user_loader = @import("../mm/user_loader.zig");
 
 var spawn_status: i64 = 0;
@@ -20,10 +18,14 @@ var pending_image: ?user_loader.LoadedImage = null;
 
 pub fn spawn(path: []const u8) i64 {
     const parent = process.currentProcess();
-    const image = programs.get(path) orelse return -2;
+
+    const image_buf = programs.load(path) catch {
+        return -2;
+    };
+    defer programs.free(image_buf);
 
     const child = process.create() catch return -12;
-    const loaded = process.loadElf(child, image) catch return -12;
+    const loaded = process.loadElf(child, image_buf) catch return -12;
 
     spawn_done = false;
     waiting_thread = thread.currentThread();

@@ -41,7 +41,7 @@ fail=0
 for needle in \
     "Simple shell ready" \
     "Built-ins: help, exit, pid, cat" \
-    "Programs: hello" \
+    "Programs in /BIN: hello" \
     "Hello from FAT on virtio-blk" \
     "Hello from userspace!"
 do

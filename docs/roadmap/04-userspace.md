@@ -29,7 +29,7 @@
   - [x] Backed by serial or VGA text for now
 - [x] Add userspace build in [`build.zig`](../../build.zig)
   - [x] Cross-compile static user programs (e.g. `hello`, `shell`)
-  - [ ] Install binaries into the FAT image (`zig-out/`)
+  - [x] Install binaries into the FAT image (`/BIN/*` from `zig-out/userspace/bin/`)
 - [x] Add minimal libc or freestanding syscall wrappers for user programs
 - [x] Shell reads input and executes programs (built-in `exit`/`help` OK)
 

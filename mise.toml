@@ -4,7 +4,7 @@ zig = "latest"
 [tasks.build]
 description = "Build kernel and userspace binaries"
 sources = ["build.zig", "build.zig.zon", "kernel/**", "userspace/**"]
-outputs = ["zig-out/bin/kernel", "zig-out/bin/hello", "zig-out/bin/shell"]
+outputs = ["zig-out/bin/kernel", "zig-out/userspace/bin/hello", "zig-out/userspace/bin/shell"]
 run = "zig build"
 
 [tasks.iso]
@@ -24,8 +24,9 @@ outputs = ["zig-out/os.iso"]
 run = "sh scripts/build-iso.sh zig-out/bin/kernel zig-out/os.iso"
 
 [tasks.disk]
-description = "Create the FAT32 virtio test disk (README.TXT)"
-sources = ["scripts/create-disk.sh"]
+description = "Create the FAT32 virtio test disk (README.TXT, /BIN/* user programs)"
+depends = ["build"]
+sources = ["scripts/create-disk.sh", "zig-out/userspace/bin/**"]
 outputs = ["zig-out/disk.img"]
 run = "sh scripts/create-disk.sh"
 
