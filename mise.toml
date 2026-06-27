@@ -1,5 +1,6 @@
 [tools]
 zig = "latest"
+shellcheck = "latest"
 
 [tasks.build]
 description = "Build kernel and userspace binaries"
@@ -45,6 +46,11 @@ run = "sh scripts/run-qemu.sh --uefi"
 [tasks.test]
 description = "Run host-side unit tests"
 run = "zig build test"
+
+[tasks.shellcheck]
+description = "Lint shell scripts with shellcheck"
+sources = ["scripts/**/*.sh", ".shellcheckrc"]
+run = "shellcheck scripts/*.sh"
 
 [tasks."test-shell"]
 description = "Boot the OS and smoke-test the serial shell (host-driven)"

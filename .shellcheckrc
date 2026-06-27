@@ -1,0 +1,3 @@
+# CDPATH= cd is intentional (avoids CDPATH side effects when resolving script paths).
+# finish/fail in get-limine.sh use return||exit for source vs execute.
+disable=SC1007,SC2317
