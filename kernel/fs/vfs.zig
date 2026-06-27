@@ -5,12 +5,20 @@ pub const VfsError = fat32.FatError || error{
     TooManyOpenFiles,
     BadHandle,
     InvalidWhence,
+    ReadOnly,
 };
 
 pub const Whence = enum(u32) {
     set = 0,
     cur = 1,
     end = 2,
+};
+
+pub const OpenFlags = struct {
+    read: bool = true,
+    write: bool = false,
+    create: bool = false,
+    truncate: bool = false,
 };
 
 pub const Stat = extern struct {
@@ -39,8 +47,12 @@ const max_handles = 16;
 
 const Handle = struct {
     in_use: bool = false,
-    entry: fat32.Entry = .{ .start_cluster = 0, .size = 0, .attr = 0 },
+    open: fat32.OpenResult = .{
+        .entry = .{ .start_cluster = 0, .size = 0, .attr = 0 },
+        .loc = .{ .cluster = 0, .offset = 0 },
+    },
     offset: u64 = 0,
+    writable: bool = false,
 };
 
 var handles: [max_handles]Handle = undefined;
@@ -53,15 +65,26 @@ pub fn isReady() bool {
     return fat32.isMounted();
 }
 
-pub fn open(path: []const u8) VfsError!u32 {
-    const entry = try fat32.lookup(path);
-    if (entry.attr & 0x10 != 0) return VfsError.IsDirectory;
+pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
+    const opened: fat32.OpenResult = blk: {
+        if (fat32.lookup(path)) |entry| {
+            if (entry.attr & 0x10 != 0) return VfsError.IsDirectory;
+            break :blk try fat32.openFile(path, flags.truncate);
+        } else |_| {
+            if (!flags.create) return VfsError.NotFound;
+            break :blk try fat32.createFile(path);
+        }
+    };
+
+    if (!flags.read and !flags.write) return VfsError.InvalidWhence;
+    if (flags.truncate and !flags.write) return VfsError.ReadOnly;
 
     const slot = allocHandle() orelse return VfsError.TooManyOpenFiles;
     handles[slot] = .{
         .in_use = true,
-        .entry = entry,
+        .open = opened,
         .offset = 0,
+        .writable = flags.write,
     };
     return slot;
 }
@@ -73,14 +96,22 @@ pub fn close(handle: u32) void {
 
 pub fn read(handle: u32, buf: []u8) VfsError!usize {
     const h = try getHandle(handle);
-    const n = try fat32.read(h.entry, h.offset, buf);
+    const n = try fat32.read(h.open.entry, h.offset, buf);
+    h.offset += n;
+    return n;
+}
+
+pub fn write(handle: u32, buf: []const u8) VfsError!usize {
+    const h = try getHandle(handle);
+    if (!h.writable) return VfsError.ReadOnly;
+    const n = try fat32.writeAt(&h.open, h.offset, buf);
     h.offset += n;
     return n;
 }
 
 pub fn lseek(handle: u32, offset: i64, whence: Whence) VfsError!u64 {
     const h = try getHandle(handle);
-    const size: u64 = h.entry.size;
+    const size: u64 = h.open.entry.size;
     const new_off: u64 = switch (whence) {
         .set => {
             if (offset < 0) return VfsError.InvalidWhence;
@@ -124,7 +155,7 @@ pub fn logStatus() void {
         serial.writeString("FAT32 not mounted\r\n");
         return;
     }
-    serial.writeString("FAT32 mounted\r\n");
+    serial.writeString("FAT32 mounted (read/write)\r\n");
 }
 
 pub fn selfTest() void {

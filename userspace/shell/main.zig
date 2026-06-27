@@ -116,6 +116,36 @@ fn catFile(path: []const u8) void {
     _ = libc.syscall.close(@intCast(fd));
 }
 
+const O_WRONLY: u32 = 1;
+const O_CREAT: u32 = 0o100;
+const O_TRUNC: u32 = 0o1000;
+
+fn writeFile(path: []const u8, content: []const u8) void {
+    var pathbuf: [128]u8 = undefined;
+    if (path.len + 1 > pathbuf.len) {
+        writeStr("write: path too long\n");
+        return;
+    }
+    @memcpy(pathbuf[0..path.len], path);
+    pathbuf[path.len] = 0;
+
+    const fd = libc.syscall.open(@ptrCast(&pathbuf), O_WRONLY | O_CREAT | O_TRUNC, 0);
+    if (fd < 0) {
+        writeStr("write: open failed\n");
+        return;
+    }
+
+    if (content.len > 0) {
+        const n = libc.syscall.write(@intCast(fd), content.ptr, content.len);
+        if (n < 0) {
+            writeStr("write: I/O failed\n");
+            _ = libc.syscall.close(@intCast(fd));
+            return;
+        }
+    }
+    _ = libc.syscall.close(@intCast(fd));
+}
+
 const S_IFDIR: u32 = 0o040000;
 
 fn joinPath(dir: []const u8, name: []const u8, out: []u8) bool {
@@ -234,6 +264,13 @@ fn lsCommand(args: []const u8) void {
     lsDir(path, long);
 }
 
+fn echoArgs(args: []const u8) void {
+    var i: usize = 0;
+    while (i < args.len and args[i] == ' ') i += 1;
+    if (i < args.len) writeStr(args[i..]);
+    writeStr("\n");
+}
+
 export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
     writeStr("Simple shell ready. Type 'help'.\n");
 
@@ -251,16 +288,36 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
         if (eql(cmd, "exit")) {
             libc.syscall.exit(0);
         } else if (eql(cmd, "help")) {
-            writeStr("Built-ins: help, exit, pid, cat, ls\n");
+            writeStr("Built-ins: help, exit, pid, echo, cat, ls, write\n");
+            writeStr("  echo [text...]  print a line\n");
             writeStr("  ls [-l] [path]  list directory ( -l = type + size )\n");
+            writeStr("  write /path text...  create or replace a file\n");
             writeStr("Programs in /BIN: hello, ...\n");
             writeStr("Use full paths with cat, e.g. cat /README.TXT\n");
         } else if (eql(cmd, "pid")) {
             printPid(libc.syscall.getpid());
+        } else if (eql(cmd, "echo")) {
+            writeStr("\n");
+        } else if (startsWith(cmd, "echo ")) {
+            echoArgs(cmd[5..len]);
         } else if (eql(cmd, "ls")) {
             lsCommand("");
         } else if (startsWith(cmd, "ls ")) {
             lsCommand(cmd[3..len]);
+        } else if (startsWith(cmd, "write ")) {
+            const args = cmd[6..len];
+            var i: usize = 0;
+            while (i < args.len and args[i] == ' ') i += 1;
+            const path_start = i;
+            while (i < args.len and args[i] != ' ') i += 1;
+            if (i == path_start) {
+                writeStr("write: usage: write /path text...\n");
+                continue;
+            }
+            const path = args[path_start..i];
+            while (i < args.len and args[i] == ' ') i += 1;
+            const content = args[i..len];
+            writeFile(path, content);
         } else if (startsWith(cmd, "cat ")) {
             catFile(cmd[4..len]);
         } else if (startsWith(cmd, "/")) {

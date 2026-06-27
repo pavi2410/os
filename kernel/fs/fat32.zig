@@ -11,12 +11,25 @@ pub const FatError = error{
     NameTooLong,
     PathTooLong,
     BufferTooSmall,
+    Exists,
+    NoSpace,
 };
 
 pub const Entry = struct {
     start_cluster: u32,
     size: u32,
     attr: u8,
+};
+
+/// Location of a directory entry on disk (for updating size/cluster after writes).
+pub const DirLoc = struct {
+    cluster: u32,
+    offset: u32,
+};
+
+pub const OpenResult = struct {
+    entry: Entry,
+    loc: DirLoc,
 };
 
 const Mount = struct {
@@ -34,6 +47,7 @@ const Mount = struct {
 var mounted = false;
 var fs: Mount = undefined;
 var cluster_buf: [32768]u8 align(512) = undefined;
+var next_free_hint: u32 = 2;
 
 pub fn mount() FatError!void {
     if (!virtio_blk.isReady()) return FatError.NotReady;
@@ -71,6 +85,7 @@ pub fn mount() FatError!void {
         .data_start_sector = reserved_sectors + @as(u32, num_fats) * sectors_per_fat,
         .cluster_bytes = cluster_bytes,
     };
+    next_free_hint = loadNextFreeHint(&boot) orelse 2;
     mounted = true;
 }
 
@@ -137,6 +152,298 @@ pub fn read(entry: Entry, offset: u64, buf: []u8) FatError!usize {
     }
 
     return copied;
+}
+
+/// Open an existing file for read/write, optionally truncating it.
+pub fn openFile(path: []const u8, truncate: bool) FatError!OpenResult {
+    if (!mounted) return FatError.NotReady;
+
+    var norm: [256]u8 = undefined;
+    const clean = try normalizePath(path, &norm);
+    if (clean.len == 0) return FatError.IsDirectory;
+
+    const parent_cluster = try lookupParentCluster(clean);
+    const name = parentName(clean);
+    var result = try findInDirectoryWithLoc(parent_cluster, name);
+
+    if (result.entry.attr & 0x10 != 0) return FatError.IsDirectory;
+    if (truncate) try truncateFile(&result.entry, result.loc);
+    return result;
+}
+
+/// Create a new file (fails if it already exists).
+pub fn createFile(path: []const u8) FatError!OpenResult {
+    if (!mounted) return FatError.NotReady;
+
+    var norm: [256]u8 = undefined;
+    const clean = try normalizePath(path, &norm);
+    if (clean.len == 0) return FatError.IsDirectory;
+
+    const parent_cluster = try lookupParentCluster(clean);
+    const name = parentName(clean);
+
+    if (findInDirectoryWithLoc(parent_cluster, name)) |_| return FatError.Exists else |_| {}
+
+    var name83: [11]u8 = undefined;
+    try toShortName(name, &name83);
+
+    const loc = try findFreeDentSlot(parent_cluster);
+    const cluster = try allocCluster();
+
+    const entry: Entry = .{
+        .start_cluster = cluster,
+        .size = 0,
+        .attr = 0x20, // archive
+    };
+    try writeDirEntry(loc, &name83, entry);
+
+    return .{ .entry = entry, .loc = loc };
+}
+
+pub fn writeAt(result: *OpenResult, offset: u64, buf: []const u8) FatError!usize {
+    if (!mounted) return FatError.NotReady;
+    if (result.entry.attr & 0x10 != 0) return FatError.IsDirectory;
+
+    const n = try writeEntryData(&result.entry, offset, buf);
+    try patchDirEntry(result.loc, result.entry);
+    return n;
+}
+
+fn truncateFile(entry: *Entry, loc: DirLoc) FatError!void {
+    if (entry.start_cluster >= 2) try freeChain(entry.start_cluster);
+    entry.start_cluster = try allocCluster();
+    entry.size = 0;
+    try patchDirEntry(loc, entry.*);
+}
+
+fn writeEntryData(entry: *Entry, offset: u64, buf: []const u8) FatError!usize {
+    if (buf.len == 0) return 0;
+
+    var written: usize = 0;
+    var file_off: u32 = @truncate(offset);
+    var cluster = entry.start_cluster;
+
+    if (file_off > 0) {
+        const skip_clusters = file_off / fs.cluster_bytes;
+        var i: u32 = 0;
+        while (i < skip_clusters) : (i += 1) {
+            cluster = try nextCluster(cluster);
+        }
+        file_off %= fs.cluster_bytes;
+    }
+
+    while (written < buf.len) {
+        try readCluster(cluster, cluster_buf[0..fs.cluster_bytes]);
+        const chunk_start = file_off;
+        const chunk_len = @min(buf.len - written, fs.cluster_bytes - chunk_start);
+        @memcpy(cluster_buf[chunk_start .. chunk_start + chunk_len], buf[written .. written + chunk_len]);
+        try writeCluster(cluster, cluster_buf[0..fs.cluster_bytes]);
+
+        written += chunk_len;
+        file_off = 0;
+
+        if (written < buf.len) {
+            cluster = try nextClusterOrExtend(cluster);
+        }
+    }
+
+    const end_off = offset + written;
+    if (end_off > entry.size) entry.size = @truncate(end_off);
+    return written;
+}
+
+fn nextClusterOrExtend(cluster: u32) FatError!u32 {
+    const next = getFatEntry(cluster) catch return FatError.IoError;
+    if (next >= 2 and next < 0x0FFFFFF8) return next;
+
+    const new_cluster = try allocCluster();
+    try setFatEntry(cluster, new_cluster);
+    return new_cluster;
+}
+
+fn patchDirEntry(loc: DirLoc, entry: Entry) FatError!void {
+    try readCluster(loc.cluster, cluster_buf[0..fs.cluster_bytes]);
+    const off: usize = @intCast(loc.offset);
+    if (off + 32 > fs.cluster_bytes) return FatError.IoError;
+
+    const hi: u16 = @truncate(entry.start_cluster >> 16);
+    const lo: u16 = @truncate(entry.start_cluster & 0xFFFF);
+    writeU16Le(cluster_buf[off..], 20, hi);
+    writeU16Le(cluster_buf[off..], 26, lo);
+    writeU32Le(cluster_buf[off..], 28, entry.size);
+    cluster_buf[off + 11] = entry.attr;
+    try writeCluster(loc.cluster, cluster_buf[0..fs.cluster_bytes]);
+}
+
+fn writeDirEntry(loc: DirLoc, name83: *const [11]u8, entry: Entry) FatError!void {
+    try readCluster(loc.cluster, cluster_buf[0..fs.cluster_bytes]);
+    const off: usize = @intCast(loc.offset);
+    if (off + 32 > fs.cluster_bytes) return FatError.IoError;
+
+    @memset(cluster_buf[off .. off + 32], 0);
+    @memcpy(cluster_buf[off .. off + 11], name83);
+    cluster_buf[off + 11] = entry.attr;
+    const hi: u16 = @truncate(entry.start_cluster >> 16);
+    const lo: u16 = @truncate(entry.start_cluster & 0xFFFF);
+    writeU16Le(cluster_buf[off..], 20, hi);
+    writeU16Le(cluster_buf[off..], 26, lo);
+    writeU32Le(cluster_buf[off..], 28, entry.size);
+    try writeCluster(loc.cluster, cluster_buf[0..fs.cluster_bytes]);
+}
+
+fn findFreeDentSlot(dir_cluster: u32) FatError!DirLoc {
+    var cluster = dir_cluster;
+    var last_cluster = dir_cluster;
+
+    while (cluster >= 2 and cluster < 0x0FFFFFF8) {
+        last_cluster = cluster;
+        try readCluster(cluster, cluster_buf[0..fs.cluster_bytes]);
+        var off: usize = 0;
+        while (off + 32 <= fs.cluster_bytes) {
+            const entry = cluster_buf[off .. off + 32];
+            if (entry[0] == 0x00 or entry[0] == 0xE5) {
+                return .{ .cluster = cluster, .offset = @intCast(off) };
+            }
+            off += 32;
+        }
+        cluster = getFatEntry(cluster) catch return FatError.IoError;
+        if (cluster >= 2 and cluster < 0x0FFFFFF8) continue;
+        break;
+    }
+
+    const new_cluster = try allocCluster();
+    try setFatEntry(last_cluster, new_cluster);
+    @memset(cluster_buf[0..fs.cluster_bytes], 0);
+    try writeCluster(new_cluster, cluster_buf[0..fs.cluster_bytes]);
+    return .{ .cluster = new_cluster, .offset = 0 };
+}
+
+fn loadNextFreeHint(boot: *const [512]u8) ?u32 {
+    const fsinfo_sector = acpi_access.readU16(boot, 0x42);
+    if (fsinfo_sector == 0) return null;
+
+    var sector: [512]u8 = undefined;
+    readSector(fsinfo_sector, &sector) catch return null;
+    if (acpi_access.readU32(&sector, 0) != 0x4161_5252) return null;
+    if (acpi_access.readU32(&sector, 0x1E4) != 0x6141_7272) return null;
+
+    const next = acpi_access.readU32(&sector, 0x1EC);
+    if (next < 2 or next >= 0x0FFF_FFF0) return null;
+    return next;
+}
+
+fn maxDataCluster() u32 {
+    const cap = virtio_blk.capacity();
+    if (cap <= fs.data_start_sector) return 2;
+    const data_sectors = cap - fs.data_start_sector;
+    const clusters = data_sectors / fs.sectors_per_cluster;
+    return @intCast(@min(clusters + 2, 0x0FFF_FFF0));
+}
+
+fn allocCluster() FatError!u32 {
+    const limit = maxDataCluster();
+    var cluster = if (next_free_hint >= 2 and next_free_hint < limit) next_free_hint else 2;
+    while (cluster < limit) : (cluster += 1) {
+        const value = getFatEntry(cluster) catch continue;
+        if (value == 0) {
+            try setFatEntry(cluster, 0x0FFF_FFF8);
+            @memset(cluster_buf[0..fs.cluster_bytes], 0);
+            try writeCluster(cluster, cluster_buf[0..fs.cluster_bytes]);
+            next_free_hint = cluster + 1;
+            return cluster;
+        }
+    }
+    return FatError.NoSpace;
+}
+
+fn freeChain(start: u32) FatError!void {
+    var cluster = start;
+    while (cluster >= 2 and cluster < 0x0FFFFFF8) {
+        const next = getFatEntry(cluster) catch break;
+        try setFatEntry(cluster, 0);
+        cluster = next;
+    }
+}
+
+fn getFatEntry(cluster: u32) FatError!u32 {
+    const fat_offset = @as(u64, cluster) * 4;
+    const fat_sector = fs.fat_start_sector + @as(u32, @truncate(fat_offset / fs.bytes_per_sector));
+    const fat_off = @as(usize, @truncate(fat_offset % fs.bytes_per_sector));
+
+    var sector: [512]u8 = undefined;
+    try readSector(fat_sector, &sector);
+    return acpi_access.readU32(&sector, fat_off) & 0x0FFF_FFFF;
+}
+
+fn setFatEntry(cluster: u32, value: u32) FatError!void {
+    const fat_offset = @as(u64, cluster) * 4;
+    const fat_sector_base = fs.fat_start_sector + @as(u32, @truncate(fat_offset / fs.bytes_per_sector));
+    const fat_off = @as(usize, @truncate(fat_offset % fs.bytes_per_sector));
+
+    var fat_idx: u32 = 0;
+    while (fat_idx < fs.num_fats) : (fat_idx += 1) {
+        const fat_sector = fat_sector_base + fat_idx * fs.sectors_per_fat;
+        var sector: [512]u8 = undefined;
+        try readSector(fat_sector, &sector);
+        const existing = acpi_access.readU32(&sector, fat_off);
+        const merged = (existing & 0xF000_0000) | (value & 0x0FFF_FFFF);
+        writeU32Le(&sector, fat_off, merged);
+        try writeSector(fat_sector, &sector);
+    }
+}
+
+fn lookupParentCluster(clean: []const u8) FatError!u32 {
+    if (lastIndexOf(clean, '/')) |slash| {
+        if (slash == 0) return fs.root_cluster;
+        const parent = try lookup(clean[0..slash]);
+        if (parent.attr & 0x10 == 0) return FatError.NotFound;
+        return parent.start_cluster;
+    }
+    return fs.root_cluster;
+}
+
+fn parentName(clean: []const u8) []const u8 {
+    if (lastIndexOf(clean, '/')) |slash| return clean[slash + 1 ..];
+    return clean;
+}
+
+fn findInDirectoryWithLoc(dir_cluster: u32, name: []const u8) FatError!OpenResult {
+    var name83: [11]u8 = undefined;
+    try toShortName(name, &name83);
+
+    var cluster = dir_cluster;
+    while (cluster >= 2 and cluster < 0x0FFFFFF8) {
+        try readCluster(cluster, cluster_buf[0..fs.cluster_bytes]);
+        var off: usize = 0;
+        while (off + 32 <= fs.cluster_bytes) {
+            const entry = cluster_buf[off .. off + 32];
+            if (entry[0] == 0) return FatError.NotFound;
+            if (entry[0] == 0xE5 or entry[0] == 0x2E) {
+                off += 32;
+                continue;
+            }
+            if (entry[11] == 0x0F) {
+                off += 32;
+                continue;
+            }
+            if (stdEq(entry[0..11], &name83)) {
+                const hi = acpi_access.readU16(entry.ptr, 20);
+                const lo = acpi_access.readU16(entry.ptr, 26);
+                const start = (@as(u32, hi) << 16) | lo;
+                return .{
+                    .entry = .{
+                        .start_cluster = start,
+                        .size = acpi_access.readU32(entry.ptr, 28),
+                        .attr = entry[11],
+                    },
+                    .loc = .{ .cluster = cluster, .offset = @intCast(off) },
+                };
+            }
+            off += 32;
+        }
+        cluster = nextCluster(cluster) catch return FatError.NotFound;
+    }
+    return FatError.NotFound;
 }
 
 /// List directory entries at `path`, writing newline-separated names into `out`.
@@ -243,21 +550,24 @@ fn findInDirectory(dir_cluster: u32, name: []const u8) FatError!Entry {
             }
             off += 32;
         }
-        cluster = try nextCluster(cluster);
+        cluster = nextCluster(cluster) catch return FatError.NotFound;
     }
     return FatError.NotFound;
 }
 
 fn nextCluster(cluster: u32) FatError!u32 {
-    const fat_offset = @as(u64, cluster) * 4;
-    const fat_sector = fs.fat_start_sector + @as(u32, @truncate(fat_offset / fs.bytes_per_sector));
-    const fat_off = @as(usize, @truncate(fat_offset % fs.bytes_per_sector));
-
-    var sector: [512]u8 = undefined;
-    try readSector(fat_sector, &sector);
-    const next = acpi_access.readU32(&sector, fat_off) & 0x0FFF_FFFF;
+    const next = getFatEntry(cluster) catch return FatError.IoError;
     if (next < 2 or next >= 0x0FFF_FFF8) return FatError.IoError;
     return next;
+}
+
+fn writeCluster(cluster: u32, buf: []const u8) FatError!void {
+    const first_sector = fs.data_start_sector + (cluster - 2) * fs.sectors_per_cluster;
+    var i: u32 = 0;
+    while (i < fs.sectors_per_cluster) : (i += 1) {
+        const sector_buf = buf[@as(usize, i) * fs.bytes_per_sector ..][0..fs.bytes_per_sector];
+        try writeSector(first_sector + i, sector_buf);
+    }
 }
 
 fn readCluster(cluster: u32, buf: []u8) FatError!void {
@@ -271,6 +581,30 @@ fn readCluster(cluster: u32, buf: []u8) FatError!void {
 
 fn readSector(lba: u64, buf: []u8) FatError!void {
     virtio_blk.readSectors(lba, buf) catch return FatError.IoError;
+}
+
+fn writeSector(lba: u64, buf: []const u8) FatError!void {
+    virtio_blk.writeSectors(lba, buf) catch return FatError.IoError;
+}
+
+fn writeU16Le(buf: []u8, off: usize, value: u16) void {
+    buf[off] = @truncate(value);
+    buf[off + 1] = @truncate(value >> 8);
+}
+
+fn writeU32Le(buf: []u8, off: usize, value: u32) void {
+    buf[off] = @truncate(value);
+    buf[off + 1] = @truncate(value >> 8);
+    buf[off + 2] = @truncate(value >> 16);
+    buf[off + 3] = @truncate(value >> 24);
+}
+
+fn lastIndexOf(hay: []const u8, needle: u8) ?usize {
+    var i = hay.len;
+    while (i > 0) : (i -= 1) {
+        if (hay[i - 1] == needle) return i - 1;
+    }
+    return null;
 }
 
 fn normalizePath(path: []const u8, out: []u8) FatError![]const u8 {

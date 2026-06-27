@@ -213,6 +213,7 @@ fn transferOne(dir: TransferDir, lba: u64, data: []u8) BlkError!void {
     const slot = avail_idx % queue_size;
     avail_ring.ring[slot] = 0;
     avail_idx +%= 1;
+    asm volatile ("" ::: .{ .memory = true });
     avail_ring.idx = avail_idx;
 
     device.notifyQueue(0);
@@ -225,11 +226,13 @@ fn transferOne(dir: TransferDir, lba: u64, data: []u8) BlkError!void {
 fn waitUsed() BlkError!void {
     var spins: usize = 0;
     while (used_ring.idx == last_used_idx) {
+        device.ackInterrupt();
         spins += 1;
         if (spins > 10_000_000) return BlkError.Timeout;
         asm volatile ("pause");
     }
 
+    asm volatile ("" ::: .{ .memory = true });
     _ = used_ring.ring[last_used_idx % queue_size];
     last_used_idx +%= 1;
     device.ackInterrupt();

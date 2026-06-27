@@ -71,24 +71,52 @@ fn sysRead(fd: u64, buf_ptr: u64, count: u64) i64 {
     };
 }
 
+const EACCES: i64 = -13;
+
 fn sysWrite(fd: u64, buf_ptr: u64, count: u64) i64 {
-    if (fd != 1 and fd != 2) return EBADF;
     if (count == 0) return 0;
 
     const max_len: usize = 4096;
     const len: usize = @intCast(@min(count, max_len));
     const buf: [*]const u8 = @ptrFromInt(buf_ptr);
-    const written = tty.get().write(buf[0..len]);
-    return @intCast(written);
+
+    if (fd == 1 or fd == 2) {
+        const written = tty.get().write(buf[0..len]);
+        return @intCast(written);
+    }
+
+    const proc = process.currentProcess() orelse return EBADF;
+    if (fd >= process.max_fds) return EBADF;
+    const slot = &proc.fds.fds[@intCast(fd)];
+
+    return switch (slot.kind) {
+        .file => {
+            const n = vfs.write(slot.vfs_handle, buf[0..len]) catch |err| return errnoFromVfsErr(err);
+            return @intCast(n);
+        },
+        .console, .none => EBADF,
+    };
 }
 
 fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
-    _ = flags;
     _ = mode;
     const path = userCString(path_ptr) orelse return EFAULT;
     const proc = process.currentProcess() orelse return EBADF;
 
-    const handle = vfs.open(path) catch |err| return errnoFromVfsErr(err);
+    const O_ACCMODE: u64 = 0o3;
+    const O_WRONLY: u64 = 0o1;
+    const O_CREAT: u64 = 0o100;
+    const O_TRUNC: u64 = 0o1000;
+
+    const accmode = flags & O_ACCMODE;
+    const open_flags: vfs.OpenFlags = .{
+        .read = accmode != O_WRONLY,
+        .write = accmode != 0, // O_RDONLY=0, O_WRONLY=1, O_RDWR=2
+        .create = flags & O_CREAT != 0,
+        .truncate = flags & O_TRUNC != 0,
+    };
+
+    const handle = vfs.open(path, open_flags) catch |err| return errnoFromVfsErr(err);
     const fd = proc.fds.allocFd() orelse {
         vfs.close(handle);
         return EMFILE;
@@ -179,6 +207,9 @@ fn errnoFromVfsErr(err: vfs.VfsError) i64 {
         vfs.VfsError.NotFile => EINVAL,
         vfs.VfsError.NameTooLong, vfs.VfsError.PathTooLong => EINVAL,
         vfs.VfsError.BufferTooSmall => EINVAL,
+        vfs.VfsError.Exists => -17, // EEXIST
+        vfs.VfsError.NoSpace => -28, // ENOSPC
+        vfs.VfsError.ReadOnly => EACCES,
     };
 }
 
