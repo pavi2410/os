@@ -4,6 +4,7 @@ const serial = @import("../arch/x86_64/serial.zig");
 const thread = @import("../proc/thread.zig");
 const tty = @import("../drivers/tty.zig");
 const user_spawn = @import("../proc/user_spawn.zig");
+const user_fork = @import("../proc/fork.zig");
 const vfs = @import("../fs/vfs.zig");
 
 /// Matches the stack layout built by `syscall_entry` (r9 pushed first).
@@ -38,6 +39,7 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.lseek => sysLseek(frame.arg0, @bitCast(@as(i64, @intCast(frame.arg1))), @truncate(frame.arg2)),
         numbers.brk => sysBrk(frame.arg0),
         numbers.getpid => sysGetpid(),
+        numbers.fork => sysFork(frame),
         numbers.spawn => sysSpawn(frame.arg0),
         numbers.listdir => sysListdir(frame.arg0, frame.arg1, frame.arg2),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
@@ -162,6 +164,20 @@ fn sysBrk(addr: u64) i64 {
 fn sysGetpid() i64 {
     const proc = process.currentProcess() orelse return 1;
     return @intCast(proc.id);
+}
+
+fn sysFork(frame: *Frame) i64 {
+    return user_fork.forkFromSyscall(
+        frame.arg0,
+        frame.arg1,
+        frame.arg2,
+        frame.arg3,
+        frame.arg4,
+        frame.arg5,
+        frame.user_rip,
+        frame.user_rflags,
+        frame.user_rsp,
+    );
 }
 
 fn sysSpawn(path_ptr: u64) i64 {

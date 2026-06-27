@@ -11,6 +11,7 @@ pub const ProcessError = error{
     OutOfMemory,
     NotImplemented,
     TooManyZombies,
+    TooManyProcesses,
 };
 
 pub const State = enum {
@@ -117,6 +118,9 @@ pub const Zombie = struct {
 const max_zombies = 16;
 var zombies: [max_zombies]Zombie = .{.{}} ** max_zombies;
 
+const max_processes = 16;
+var live: [max_processes]?*Process = .{null} ** max_processes;
+
 var boot_cr3: u64 = 0;
 var next_id: usize = 1;
 var current: ?*Process = null;
@@ -154,19 +158,49 @@ pub fn createWithParent(parent_id: usize) ProcessError!*Process {
         .brk = user_brk_base,
     };
     next_id += 1;
+    try register(proc);
     return proc;
 }
 
-/// Duplicate `parent` into a new child process (Linux `fork`). Implemented in commit 2.
+fn register(proc: *Process) ProcessError!void {
+    for (&live) |*slot| {
+        if (slot.* == null) {
+            slot.* = proc;
+            return;
+        }
+    }
+    return ProcessError.TooManyProcesses;
+}
+
+fn unregister(proc: *Process) void {
+    for (&live) |*slot| {
+        if (slot.* == proc) {
+            slot.* = null;
+            return;
+        }
+    }
+}
+
+/// Duplicate `parent` into a new child process (Linux `fork`).
 pub fn forkChild(parent: *Process) ProcessError!*Process {
-    _ = parent;
-    return ProcessError.NotImplemented;
+    const child = try createWithParent(parent.id);
+    errdefer destroy(child);
+
+    paging.cloneUserAddressSpace(parent.address_space.cr3, child.address_space.cr3) catch {
+        return ProcessError.OutOfMemory;
+    };
+
+    child.brk = parent.brk;
+    child.fds = parent.fds;
+    child.state = .created;
+    return child;
 }
 
 pub fn lookup(pid: usize) ?*Process {
-    // Live processes are tracked via `current` only today; commit 2 adds a proc table.
-    if (current) |proc| {
-        if (proc.id == pid) return proc;
+    for (live) |slot| {
+        if (slot) |proc| {
+            if (proc.id == pid) return proc;
+        }
     }
     return null;
 }
@@ -214,6 +248,7 @@ pub fn reapZombieAny(parent_id: usize, pid: isize) ?Zombie {
 
 pub fn destroy(proc: *Process) void {
     if (current == proc) current = null;
+    unregister(proc);
     proc.destroy();
 }
 

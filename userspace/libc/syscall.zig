@@ -51,6 +51,10 @@ pub fn getpid() isize {
     return syscall6(39, 0, 0, 0, 0, 0, 0);
 }
 
+pub fn fork() isize {
+    return syscall6(57, 0, 0, 0, 0, 0, 0);
+}
+
 pub fn brk(addr: usize) isize {
     return syscall6(12, addr, 0, 0, 0, 0, 0);
 }

@@ -268,6 +268,57 @@ pub fn getPhys(virt: u64) ?u64 {
 /// First PML4 index that maps the kernel higher half.
 const kernel_pml4_start: usize = 256;
 
+fn virtFromIndices(pml4_idx: usize, pdpt_idx: usize, pd_idx: usize, pt_idx: usize) u64 {
+    return (@as(u64, pml4_idx) << 39) |
+        (@as(u64, pdpt_idx) << 30) |
+        (@as(u64, pd_idx) << 21) |
+        (@as(u64, pt_idx) << 12);
+}
+
+/// Eagerly copy all mapped user pages from `src_cr3` into `dst_cr3` (new physical pages).
+pub fn cloneUserAddressSpace(src_cr3: u64, dst_cr3: u64) MapError!void {
+    const src_pml4 = tableFromPhys(src_cr3);
+
+    var pml4_idx: usize = 0;
+    while (pml4_idx < kernel_pml4_start) : (pml4_idx += 1) {
+        const pdpt_entry = src_pml4[pml4_idx];
+        if (!isPresent(pdpt_entry) or isHuge(pdpt_entry)) continue;
+
+        const src_pdpt = tableFromPhys(physAddr(pdpt_entry));
+        var pdpt_idx: usize = 0;
+        while (pdpt_idx < entries_per_table) : (pdpt_idx += 1) {
+            const pd_entry = src_pdpt[pdpt_idx];
+            if (!isPresent(pd_entry) or isHuge(pd_entry)) continue;
+
+            const src_pd = tableFromPhys(physAddr(pd_entry));
+            var pd_idx: usize = 0;
+            while (pd_idx < entries_per_table) : (pd_idx += 1) {
+                const pt_entry = src_pd[pd_idx];
+                if (!isPresent(pt_entry) or isHuge(pt_entry)) continue;
+
+                const src_pt = tableFromPhys(physAddr(pt_entry));
+                var pt_idx: usize = 0;
+                while (pt_idx < entries_per_table) : (pt_idx += 1) {
+                    const leaf = src_pt[pt_idx];
+                    if (!isPresent(leaf) or isHuge(leaf)) continue;
+                    if (leaf & Flags.user == 0) continue;
+
+                    const virt = virtFromIndices(pml4_idx, pdpt_idx, pd_idx, pt_idx);
+                    const src_phys = physAddr(leaf);
+                    const flags = leaf & 0x8000000000000fff;
+
+                    const dst_phys = physical.allocPage() catch return MapError.OutOfTables;
+                    const src_ptr = @as([*]u8, @ptrFromInt(address.physToVirt(src_phys)));
+                    const dst_ptr = @as([*]u8, @ptrFromInt(address.physToVirt(dst_phys)));
+                    @memcpy(dst_ptr[0..page_size], src_ptr[0..page_size]);
+
+                    mapUserPageIn(dst_cr3, virt, dst_phys, flags) catch |err| return err;
+                }
+            }
+        }
+    }
+}
+
 /// Allocate a fresh PML4 with the kernel higher-half entries shared from the boot tables.
 pub fn createUserAddressSpace() MapError!u64 {
     const pml4 = try allocTablePhys();
