@@ -4,22 +4,30 @@
 
 ## Current status
 
-The kernel boots under QEMU, runs a serial shell in userspace, reads files from a VirtIO FAT32 disk, and can spawn embedded ELF programs.
+The kernel boots under QEMU, runs a serial shell in userspace, reads and writes files on a VirtIO FAT32 disk, and spawns ELF programs from `/BIN`.
 
 **Working today**
 
 * Higher-half kernel with page tables, physical/virtual/heap allocators
 * APIC (LAPIC + IOAPIC), LAPIC timer, round-robin scheduler, `syscall`/`sysret`
 * ELF64 user program loader, ring-3 execution, serial TTY (canonical mode + basic ANSI)
-* Syscalls: `read`, `write`, `open`, `close`, `lseek`, `stat`, `brk`, `getpid`, `exit`/`exit_group`, and OS-specific `spawn`
-* PCI enumeration (legacy I/O ports on QEMU q35), VirtIO-blk, FAT32 read-only VFS
-* Userspace programs loaded from `/BIN` on the VirtIO FAT disk (`hello`, `shell`, …)
+* Syscalls: `read`, `write`, `open` (`O_CREAT`, `O_TRUNC`, `O_APPEND`), `close`, `lseek`, `stat`, `brk`, `getpid`, `exit`/`exit_group`, OS-specific `spawn` (548) and `listdir` (549)
+* PCI enumeration (legacy I/O ports on QEMU q35), VirtIO-blk read/write, FAT32 VFS (read/write/create/truncate/append)
+* Userspace programs on the VirtIO FAT disk (`/README.TXT`, `/BIN/hello`, `/BIN/shell`, …)
+* Serial shell with modular builtins: `help`, `exit`, `pid`, `echo`, `cat`, `ls`, `write`
+* Disk image sync preserves user-created files across `mise run boot` (see [disk notes](#virtio-disk))
 * [mise](https://mise.jdx.dev) tasks for build, ISO, disk, QEMU boot, and integration tests
 
 **Next up** (see [docs/roadmap/](docs/roadmap/))
 
-* FAT32 write/create, userspace binaries on the disk image
-* VirtIO-net and a minimal TCP/IP stack
+Near-term file/shell polish:
+
+* `rm` and `mkdir` (delete files, create directories on FAT32)
+* Linux `getdents64` (replace custom `listdir` syscall)
+* Working directory (`cd`, `pwd`)
+* `wait`/`waitpid` after `spawn`
+
+Then Phase 5 networking: VirtIO-net and a minimal TCP/IP stack.
 
 ## 🚀 Goals
 
@@ -88,13 +96,14 @@ This project uses mise tasks for build, ISO, disk, and QEMU workflows. Run `mise
 |------|-------------|
 | `mise run build` | Build kernel (`zig-out/bin/`) and userspace programs (`zig-out/userspace/bin/`) |
 | `mise run iso` | Build bootable Limine ISO (`zig-out/os.iso`) |
-| `mise run disk` | Create FAT32 VirtIO test disk (`zig-out/disk.img`) |
+| `mise run disk` | Create or update FAT32 VirtIO disk (`zig-out/disk.img`) |
 | `mise run boot` | ISO + disk + QEMU (SeaBIOS, interactive serial) |
 | `mise run boot-uefi` | Same, under OVMF/UEFI |
 | `mise run test` | Host-side unit tests |
-| `mise run test-shell` | End-to-end smoke test (shell, `cat`, `hello`) |
+| `mise run test-shell` | End-to-end smoke test (shell, `write`, persistence) |
 | `mise run kill-qemu` | Stop a stuck QEMU instance |
 | `mise run clean` | Remove `zig-out/` and `.zig-cache/` |
+| `mise run clean-disk` | Delete `disk.img` to force a full reformat on next boot |
 
 Quick start:
 
@@ -102,13 +111,25 @@ Quick start:
 mise run boot
 ```
 
-At the `os>` prompt, try `help`, `cat /README.TXT`, and `hello`.
+At the `os>` prompt, try:
+
+```text
+help
+cat /README.TXT
+ls -l /
+write /NOTES.TXT hello
+write -a /NOTES.TXT world
+cat /NOTES.TXT
+hello
+```
+
+Use full paths for file builtins (`cat`, `ls`, `write`). Programs in `/BIN` can be launched by name (e.g. `hello`).
 
 Host unit tests (no QEMU):
 
 ```bash
 mise run test
-# or: zig build
+# or: zig build test
 ```
 
 Integration smoke test:
@@ -117,7 +138,13 @@ Integration smoke test:
 mise run test-shell
 ```
 
-QEMU uses a VirtIO block device backed by `zig-out/disk.img`. If VFS behaves oddly after a failed disk setup, recreate the image with `mise run clean-disk` then `mise run disk`.
+### VirtIO disk
+
+QEMU uses a VirtIO block device backed by `zig-out/disk.img`.
+
+* If `disk.img` **already exists**, `mise run disk` only refreshes `/README.TXT` and `/BIN/*` — files you create at the volume root (e.g. with `write`) are **kept** across reboots.
+* Run `mise run clean-disk` (or set `OS_DISK_FORCE=1`) to wipe the image and start fresh.
+* If VFS behaves oddly after a failed setup, recreate with `clean-disk` then `mise run boot`.
 
 ## 📝 Roadmap
 
@@ -129,14 +156,21 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 | 1 — Page tables | Done | Higher-half kernel |
 | 2 — Memory | Done | Physical, virtual, and heap allocators |
 | 3 — Kernel runtime | Done | APIC, timer, threads, scheduler, syscalls |
-| 4 — Userspace | Done | ELF loader, TTY, shell, embedded programs |
-| 5 — I/O stack | In progress | VirtIO-blk + FAT32 read done; networking next |
+| 4 — Userspace | Done | ELF loader, TTY, shell, programs on FAT disk |
+| 5 — I/O stack | In progress | VirtIO-blk + FAT32 read/write done; networking next |
 | 6 — SMP and GUI | Planned | Multicore, framebuffer, window manager |
 
-**Phase 5 remaining**
+**Phase 5 — done**
 
-* [ ] FAT32 write and file creation
-* [x] Install user programs on the FAT disk (instead of only `@embedFile`)
+* [x] VirtIO-blk read/write
+* [x] FAT32 read/write, create, truncate, append
+* [x] Install user programs on the FAT disk (`/BIN/*`)
+* [x] Shell file builtins with persistence across reboot
+
+**Phase 5 — next**
+
+* [ ] `rm` / `mkdir` and related VFS ops
+* [ ] `getdents64`, `cd`/`pwd`, `waitpid`
 * [ ] VirtIO-net (or e1000) driver
 * [ ] ARP, IPv4, UDP, minimal TCP
 * [ ] Socket syscalls

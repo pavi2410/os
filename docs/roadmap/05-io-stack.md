@@ -21,6 +21,8 @@
   - [x] FAT32 first (aligns with boot volume), **or** ext2
   - [x] `open`, `read`, `close` via VFS
 - [x] Extend syscalls: `open`, `close`, `lseek`, `stat` (minimal subset)
+- [x] FAT32 write/create/truncate/append; files persist across reboot (same `disk.img`)
+- [x] Shell builtins: `cat`, `ls`, `write` (with `-a` append)
 - [ ] Add network device driver
   - [ ] VirtIO-net **or** e1000
   - [ ] TX/RX ring handling
