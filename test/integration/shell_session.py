@@ -106,3 +106,26 @@ def assert_contains(window: str, needle: str, case: str) -> None:
         raise AssertionError(
             f"{case}: expected {needle!r} in output window:\n{window}"
         )
+
+
+def cat_body(window: str, path: str) -> str:
+    text = window.replace("\r", "")
+    needle = f"cat {path}"
+    idx = text.lower().find(needle.lower())
+    if idx < 0:
+        raise ValueError(f"{needle} not in output window")
+    rest = text[idx + len(needle) :]
+    if rest.startswith("\n"):
+        rest = rest[1:]
+    return rest.rstrip("\n")
+
+
+def assert_cat_exact(window: str, path: str, expected: str, case: str) -> None:
+    try:
+        body = cat_body(window, path)
+    except ValueError as exc:
+        raise AssertionError(f"{case}: {exc}\n{window}") from exc
+    if body != expected:
+        raise AssertionError(
+            f"{case}: expected cat of {path} to be {expected!r}, got {body!r}\n{window}"
+        )

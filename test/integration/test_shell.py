@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from shell_session import QemuShell, assert_contains, sync_disk
+from shell_session import QemuShell, assert_cat_exact, assert_contains, sync_disk
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -61,9 +61,11 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
             "write: ok",
             case="write persist",
         )
-        run_case(shell, "write -a /APPEND.TXT first", "write: ok", case="append 1")
-        run_case(shell, "write -a /APPEND.TXT second", "write: ok", case="append 2")
-        run_case(shell, "cat /APPEND.TXT", "firstsecond", case="cat append")
+        append_path = "/SMKAPP.TXT"
+        run_case(shell, f"write {append_path} first", "write: ok", case="append truncate")
+        run_case(shell, f"write -a {append_path} second", "write: ok", case="append 2")
+        append_out = run_case(shell, f"cat {append_path}", case="cat append")
+        assert_cat_exact(append_out, append_path, "firstsecond", "cat append")
         run_case(
             shell,
             "cat /TEST.TXT",

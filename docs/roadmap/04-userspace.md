@@ -32,11 +32,12 @@
   - [x] Install binaries into the FAT image (`/BIN/*` from `zig-out/userspace/bin/`)
 - [x] Add minimal libc or freestanding syscall wrappers for user programs
 - [x] Shell reads input and executes programs (built-in `exit`/`help` OK)
-- [x] Linux `fork` / `execve` / `wait4` (replacing OS-specific `spawn`)
+- [x] Linux `fork` / `execve` / `wait4` (replaced OS-specific `spawn` / syscall 548)
   - [x] `fork` (57) — eager address-space copy (see COW note below)
   - [x] `execve` (59)
   - [x] `wait4` (61)
   - [x] Shell runs `/BIN/*` via fork + execve + waitpid
+  - [x] Removed `spawn` (548) from kernel and libc
 
 ---
 
@@ -45,7 +46,7 @@
 1. **User ELF loads and runs** — `hello` prints a message from ring 3.
 2. **Syscalls work from userspace** — `write` to TTY/serial without kernel panics.
 3. **Process exit** reclaims address space and returns to shell or init.
-4. **Shell launches a child process** and waits for completion (or simple fork-less `exec` model documented).
+4. **Shell launches a child process** via `fork` + `execve` and reaps it with `wait4`.
 5. **User crash (e.g. page fault in ring 3)** is handled — kernel survives, child is terminated cleanly.
 6. **End-to-end demo:** boot → shell prompt → run user program → output → return to prompt.
 
@@ -57,3 +58,4 @@
 - FAT root (already used for boot) is sufficient for loading the first user binaries.
 - Filesystem abstraction can be thin — open by path from FAT is acceptable for this phase.
 - **`fork` uses eager page copy**, not copy-on-write. That is intentional for now: shell use is `fork` → `execve`, programs are small, and COW needs a page-fault handler plus shared-page refcounts. Revisit COW if fork latency or memory use becomes a problem (see also [`kernel/proc/process.zig`](../../kernel/proc/process.zig) on `forkChild`).
+- **Process launch** uses Linux `fork` / `execve` / `wait4`. The old `spawn` syscall (548) was removed once the shell migrated.
