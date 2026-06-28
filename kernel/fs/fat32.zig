@@ -569,17 +569,39 @@ fn findInDirectoryWithLoc(dir_cluster: u32, name: []const u8) FatError!OpenResul
     return FatError.NotFound;
 }
 
-/// List directory entries at `path`, writing newline-separated names into `out`.
-pub fn listDir(path: []const u8, out: []u8) FatError!usize {
+/// Open an existing directory for read-only iteration via getDents64.
+pub fn openDirectory(path: []const u8) FatError!OpenResult {
     if (!mounted) return FatError.NotReady;
 
-    const dir = try lookup(path);
-    if (dir.attr & 0x10 == 0) return FatError.NotFile;
-    return listInDirectory(dir.start_cluster, out);
+    const entry = try lookup(path);
+    if (entry.attr & 0x10 == 0) return FatError.NotFile;
+    return .{ .entry = entry, .loc = .{ .cluster = 0, .offset = 0 } };
 }
 
-fn listInDirectory(dir_cluster: u32, out: []u8) FatError!usize {
-    var pos: usize = 0;
+const Dirent64Hdr = extern struct {
+    d_ino: u64,
+    d_off: i64,
+    d_reclen: u16,
+    d_type: u8,
+};
+
+const dirent_name_off: usize = 19;
+const DT_DIR: u8 = 4;
+const DT_REG: u8 = 8;
+
+fn direntReclen(name_len: usize) usize {
+    const raw = dirent_name_off + name_len + 1;
+    return (raw + 7) & ~@as(usize, 7);
+}
+
+/// Fill `out` with linux_dirent64 records from `dir_cluster`, skipping the first `skip` entries.
+pub fn getDents64(dir_cluster: u32, skip: *usize, out: []u8) FatError!usize {
+    if (!mounted) return FatError.NotReady;
+    if (out.len < dirent_name_off + 2) return FatError.BufferTooSmall;
+
+    var written: usize = 0;
+    var index: usize = 0;
+    var next_off: i64 = 0;
     var cluster = dir_cluster;
     var name_buf: [13]u8 = undefined;
 
@@ -588,7 +610,10 @@ fn listInDirectory(dir_cluster: u32, out: []u8) FatError!usize {
         var off: usize = 0;
         while (off + 32 <= fs.cluster_bytes) {
             const entry = cluster_buf[off .. off + 32];
-            if (entry[0] == 0) return pos;
+            if (entry[0] == 0) {
+                skip.* = index;
+                return written;
+            }
             if (entry[0] == 0xE5 or entry[0] == 0x2E) {
                 off += 32;
                 continue;
@@ -597,7 +622,6 @@ fn listInDirectory(dir_cluster: u32, out: []u8) FatError!usize {
                 off += 32;
                 continue;
             }
-            // Skip volume label, hidden, and system entries (e.g. macOS metadata).
             if (entry[11] & 0x0E != 0) {
                 off += 32;
                 continue;
@@ -610,17 +634,41 @@ fn listInDirectory(dir_cluster: u32, out: []u8) FatError!usize {
                 off += 32;
                 continue;
             }
-            if (pos + name.len + 1 > out.len) return FatError.BufferTooSmall;
 
-            @memcpy(out[pos .. pos + name.len], name);
-            pos += name.len;
-            out[pos] = '\n';
-            pos += 1;
+            if (index < skip.*) {
+                index += 1;
+                off += 32;
+                continue;
+            }
+
+            const reclen = direntReclen(name.len);
+            if (written + reclen > out.len) {
+                if (written == 0) return FatError.BufferTooSmall;
+                skip.* = index;
+                return written;
+            }
+
+            const rec = out[written .. written + reclen];
+            @memset(rec, 0);
+
+            const hdr: *Dirent64Hdr = @ptrCast(@alignCast(rec.ptr));
+            hdr.d_ino = (@as(u64, cluster) << 16) | @as(u64, off);
+            hdr.d_off = next_off;
+            hdr.d_reclen = @intCast(reclen);
+            hdr.d_type = if (entry[11] & 0x10 != 0) DT_DIR else DT_REG;
+
+            @memcpy(rec[dirent_name_off .. dirent_name_off + name.len], name);
+            rec[dirent_name_off + name.len] = 0;
+
+            written += reclen;
+            next_off += 1;
+            index += 1;
             off += 32;
         }
         cluster = try nextCluster(cluster);
     }
-    return pos;
+    skip.* = index;
+    return written;
 }
 
 fn formatShortName(short: *const [11]u8, out: *[13]u8) []const u8 {

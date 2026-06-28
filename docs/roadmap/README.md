@@ -12,6 +12,6 @@ Phased plan for kernel development after the UEFI bootloader. Complete phases in
 | 5 | [05-io-stack.md](05-io-stack.md) | I/O stack — filesystem and networking |
 | 6 | [06-smp-and-gui.md](06-smp-and-gui.md) | SMP and GUI |
 
-**Current focus:** Phase 5 — file I/O polish (`rm`/`mkdir`, `getdents64`, `cd`/`pwd`, `waitpid`), then VirtIO-net and TCP/IP.
+**Current focus:** Phase 5 — file I/O polish (`cd`/`pwd`), then VirtIO-net and TCP/IP.
 
 See also the high-level checklist in the [project README](../../README.md#-roadmap).

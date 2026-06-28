@@ -59,8 +59,8 @@ pub fn brk(addr: usize) isize {
     return syscall6(12, addr, 0, 0, 0, 0, 0);
 }
 
-pub fn listdir(path: [*:0]const u8, buf: [*]u8, count: usize) isize {
-    return syscall6(549, @intFromPtr(path), @intFromPtr(buf), count, 0, 0, 0);
+pub fn getdents64(fd: u32, buf: [*]u8, count: usize) isize {
+    return syscall6(217, fd, @intFromPtr(buf), count, 0, 0, 0);
 }
 
 pub fn execve(path: [*:0]const u8, argv: [*:null]?[*:0]const u8, envp: [*:null]?[*:0]const u8) isize {

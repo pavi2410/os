@@ -14,6 +14,5 @@ pub const wait4 = 61;
 pub const unlink = 87;
 pub const mkdir = 83;
 pub const rmdir = 84;
+pub const getdents64 = 217;
 pub const exit_group = 231;
-/// OS-specific: list directory entries (newline-separated) into a user buffer.
-pub const listdir = 549;

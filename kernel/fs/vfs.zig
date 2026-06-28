@@ -54,6 +54,8 @@ const Handle = struct {
     },
     offset: u64 = 0,
     writable: bool = false,
+    is_directory: bool = false,
+    dir_skip: usize = 0,
 };
 
 var handles: [max_handles]Handle = undefined;
@@ -69,7 +71,11 @@ pub fn isReady() bool {
 pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
     const opened: fat32.OpenResult = blk: {
         if (fat32.lookup(path)) |entry| {
-            if (entry.attr & 0x10 != 0) return VfsError.IsDirectory;
+            if (entry.attr & 0x10 != 0) {
+                if (flags.write or flags.create or flags.truncate) return VfsError.IsDirectory;
+                if (!flags.read) return VfsError.IsDirectory;
+                break :blk try fat32.openDirectory(path);
+            }
             break :blk try fat32.openFile(path, flags.truncate);
         } else |_| {
             if (!flags.create) return VfsError.NotFound;
@@ -80,12 +86,15 @@ pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
     if (!flags.read and !flags.write) return VfsError.InvalidWhence;
     if (flags.truncate and !flags.write) return VfsError.ReadOnly;
 
+    const is_directory = opened.entry.attr & 0x10 != 0;
     const slot = allocHandle() orelse return VfsError.TooManyOpenFiles;
     handles[slot] = .{
         .in_use = true,
         .open = opened,
-        .offset = if (flags.append) opened.entry.size else 0,
-        .writable = flags.write,
+        .offset = if (flags.append and !is_directory) opened.entry.size else 0,
+        .writable = flags.write and !is_directory,
+        .is_directory = is_directory,
+        .dir_skip = 0,
     };
     return slot;
 }
@@ -97,6 +106,7 @@ pub fn close(handle: u32) void {
 
 pub fn read(handle: u32, buf: []u8) VfsError!usize {
     const h = try getHandle(handle);
+    if (h.is_directory) return VfsError.NotFile;
     const n = try fat32.read(h.open.entry, h.offset, buf);
     h.offset += n;
     return n;
@@ -104,6 +114,7 @@ pub fn read(handle: u32, buf: []u8) VfsError!usize {
 
 pub fn write(handle: u32, buf: []const u8) VfsError!usize {
     const h = try getHandle(handle);
+    if (h.is_directory) return VfsError.IsDirectory;
     if (!h.writable) return VfsError.ReadOnly;
     const n = try fat32.writeAt(&h.open, h.offset, buf);
     h.offset += n;
@@ -146,8 +157,10 @@ pub fn stat(path: []const u8, out: *Stat) VfsError!void {
     out.st_size = @intCast(entry.size);
 }
 
-pub fn listDir(path: []const u8, out: []u8) VfsError!usize {
-    return fat32.listDir(path, out);
+pub fn getdents64(handle: u32, buf: []u8) VfsError!usize {
+    const h = try getHandle(handle);
+    if (!h.is_directory) return VfsError.NotFile;
+    return fat32.getDents64(h.open.entry.start_cluster, &h.dir_skip, buf);
 }
 
 pub fn unlink(path: []const u8) VfsError!void {

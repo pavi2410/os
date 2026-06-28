@@ -52,7 +52,7 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.unlink => sysUnlink(frame.arg0),
         numbers.mkdir => sysMkdir(frame.arg0, frame.arg1),
         numbers.rmdir => sysRmdir(frame.arg0),
-        numbers.listdir => sysListdir(frame.arg0, frame.arg1, frame.arg2),
+        numbers.getdents64 => sysGetdents64(frame.arg0, frame.arg1, frame.arg2),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
         else => ENOSYS,
     };
@@ -227,15 +227,19 @@ fn sysRmdir(path_ptr: u64) i64 {
     return 0;
 }
 
-fn sysListdir(path_ptr: u64, buf_ptr: u64, cap: u64) i64 {
-    const path = userCString(path_ptr) orelse return EFAULT;
-    if (buf_ptr == 0 or cap == 0) return EINVAL;
+fn sysGetdents64(fd: u64, buf_ptr: u64, count: u64) i64 {
+    if (buf_ptr == 0 or count == 0) return EINVAL;
 
-    const max_cap: usize = 4096;
-    const cap_len: usize = @intCast(@min(cap, max_cap));
+    const proc = process.currentProcess() orelse return EBADF;
+    if (fd >= process.max_fds) return EBADF;
+    const slot = &proc.fds.fds[@intCast(fd)];
+    if (slot.kind != .file) return EBADF;
+
+    const max_len: usize = 4096;
+    const cap_len: usize = @intCast(@min(count, max_len));
 
     var kbuf: [4096]u8 = undefined;
-    const n = vfs.listDir(path, kbuf[0..cap_len]) catch |err| return errnoFromVfsErr(err);
+    const n = vfs.getdents64(slot.vfs_handle, kbuf[0..cap_len]) catch |err| return errnoFromVfsErr(err);
 
     const user_buf: [*]u8 = @ptrFromInt(buf_ptr);
     @memcpy(user_buf[0..n], kbuf[0..n]);
