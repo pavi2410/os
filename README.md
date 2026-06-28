@@ -104,7 +104,7 @@ Quick start:
 mise run boot
 ```
 
-At the `os>` prompt, try:
+At the shell prompt (`/> ` at root, `/path> ` after `cd`), try:
 
 ```text
 help
@@ -134,7 +134,7 @@ mise run test-shell
 # or: uv sync --all-groups && uv run pytest test/integration -v
 ```
 
-The integration harness drives the shell turn-by-turn (sync on the `os> ` prompt) via `test/integration/`. First run creates `.venv/` through `uv sync`.
+The integration harness drives the shell turn-by-turn (sync on the `path> ` prompt) via `test/integration/`. First run creates `.venv/` through `uv sync`.
 
 ### VirtIO disk
 

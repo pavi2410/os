@@ -1,4 +1,5 @@
 const argv = @import("argv.zig");
+const cwd = @import("cwd.zig");
 const io = @import("io.zig");
 const libc = @import("libc");
 
@@ -16,14 +17,18 @@ const cmd_rmdir = @import("cmd/rmdir.zig");
 const cmd_run = @import("cmd/run.zig");
 const cmd_write = @import("cmd/write.zig");
 
-const prompt = "os> ";
+fn writePrompt() void {
+    io.writeNewline();
+    io.writeStr(cwd.get());
+    io.writeStr("> ");
+}
 
 export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
     io.writeStr("Simple shell ready. Type 'help'.\n");
 
     var line: [256]u8 = undefined;
     while (true) {
-        io.writeStr(prompt);
+        writePrompt();
 
         const n = libc.syscall.read(0, &line, line.len);
         if (n <= 0) continue;

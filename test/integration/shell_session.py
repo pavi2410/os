@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pexpect
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,7 +31,7 @@ class QemuShell:
     _proc: pexpect.spawn | None = field(default=None, init=False, repr=False)
     _log_writer: _LogWriter = field(default_factory=_LogWriter, init=False, repr=False)
 
-    PROMPT = "os> "
+    PROMPT = re.compile(r"/[^\r\n>]*> $", re.MULTILINE)
     READY = "Simple shell ready"
 
     @property
