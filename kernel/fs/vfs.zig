@@ -155,6 +155,10 @@ pub fn unlink(path: []const u8) VfsError!void {
     invalidateHandlesAt(loc);
 }
 
+pub fn mkdir(path: []const u8) VfsError!void {
+    try fat32.createDirectory(path);
+}
+
 fn invalidateHandlesAt(loc: fat32.DirLoc) void {
     var i: u32 = 0;
     while (i < max_handles) : (i += 1) {

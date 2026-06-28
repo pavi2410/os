@@ -40,7 +40,7 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         run_case(
             shell,
             "help",
-            "Built-ins: help, exit, pid, echo, cat, ls, write, rm",
+            "Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir",
             case="help",
         )
         run_case(shell, "echo hello from echo", "hello from echo", case="echo")
@@ -52,6 +52,12 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         )
         run_case(shell, "ls", "README.TXT", case="ls root")
         run_case(shell, "ls /BIN", "HELLO", case="ls /BIN")
+        mkdir_out = shell.run("mkdir /TDIR")
+        if "mkdir: ok" not in mkdir_out and "mkdir: failed" not in mkdir_out:
+            raise AssertionError(f"mkdir: unexpected output:\n{mkdir_out}")
+        run_case(shell, "ls -l /", "dir         0 TDIR", case="ls -l tdir")
+        run_case(shell, "write /TDIR/NOTE.TXT nested", "write: ok", case="write in dir")
+        run_case(shell, "cat /TDIR/NOTE.TXT", "nested", case="cat in dir")
         run_case(shell, "ls -l /BIN", "4880 HELLO", case="ls -l /BIN")
         run_case(shell, "write /yo.txt yoman", "write: ok", case="write yo")
         run_case(shell, "cat /YO.TXT", "yoman", case="cat yo")

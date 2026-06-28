@@ -200,6 +200,56 @@ pub fn createFile(path: []const u8) FatError!OpenResult {
     return .{ .entry = entry, .loc = loc };
 }
 
+/// Create a new directory (fails if it already exists).
+pub fn createDirectory(path: []const u8) FatError!void {
+    if (!mounted) return FatError.NotReady;
+
+    var norm: [256]u8 = undefined;
+    const clean = try normalizePath(path, &norm);
+    if (clean.len == 0) return FatError.Exists;
+
+    const parent_cluster = try lookupParentCluster(clean);
+    const name = parentName(clean);
+
+    if (findInDirectoryWithLoc(parent_cluster, name)) |_| return FatError.Exists else |_| {}
+
+    var name83: [11]u8 = undefined;
+    try toShortName(name, &name83);
+
+    const loc = try findFreeDentSlot(parent_cluster);
+    const cluster = try allocCluster();
+    try initDirectoryCluster(cluster, parent_cluster);
+
+    const entry: Entry = .{
+        .start_cluster = cluster,
+        .size = 0,
+        .attr = 0x10,
+    };
+    try writeDirEntry(loc, &name83, entry);
+}
+
+fn initDirectoryCluster(cluster: u32, parent_cluster: u32) FatError!void {
+    @memset(cluster_buf[0..fs.cluster_bytes], 0);
+    writeDotEntry(0, cluster);
+    writeDotEntry(32, parent_cluster);
+    try writeCluster(cluster, cluster_buf[0..fs.cluster_bytes]);
+}
+
+fn writeDotEntry(off: usize, target_cluster: u32) void {
+    if (off + 32 > fs.cluster_bytes) return;
+    if (off == 0) {
+        cluster_buf[off] = '.';
+    } else {
+        cluster_buf[off] = '.';
+        cluster_buf[off + 1] = '.';
+    }
+    cluster_buf[off + 11] = 0x10;
+    const hi: u16 = @truncate(target_cluster >> 16);
+    const lo: u16 = @truncate(target_cluster & 0xFFFF);
+    writeU16Le(cluster_buf[off..], 20, hi);
+    writeU16Le(cluster_buf[off..], 26, lo);
+}
+
 pub fn writeAt(result: *OpenResult, offset: u64, buf: []const u8) FatError!usize {
     if (!mounted) return FatError.NotReady;
     if (result.entry.attr & 0x10 != 0) return FatError.IsDirectory;

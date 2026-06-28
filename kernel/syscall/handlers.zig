@@ -50,6 +50,7 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.execve => sysExecve(frame.arg0, frame.arg1, frame.arg2),
         numbers.wait4 => sysWait4(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
         numbers.unlink => sysUnlink(frame.arg0),
+        numbers.mkdir => sysMkdir(frame.arg0, frame.arg1),
         numbers.listdir => sysListdir(frame.arg0, frame.arg1, frame.arg2),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
         else => ENOSYS,
@@ -209,6 +210,13 @@ fn sysWait4(pid: u64, status_ptr: u64, options: u64, rusage_ptr: u64) i64 {
 fn sysUnlink(path_ptr: u64) i64 {
     const path = userCString(path_ptr) orelse return EFAULT;
     vfs.unlink(path) catch |err| return errnoFromVfsErr(err);
+    return 0;
+}
+
+fn sysMkdir(path_ptr: u64, mode: u64) i64 {
+    _ = mode;
+    const path = userCString(path_ptr) orelse return EFAULT;
+    vfs.mkdir(path) catch |err| return errnoFromVfsErr(err);
     return 0;
 }
 
