@@ -10,14 +10,14 @@ var exec_envp: [1]?[*:0]const u8 = .{null};
 
 pub fn run(name: []const u8) void {
     if (!formatBinPath(name, &exec_path)) {
-        io.writeStr("spawn failed\n");
+        io.writeStr("run failed\n");
         return;
     }
 
     const my_pid = libc.syscall.getpid();
     const child = libc.syscall.fork();
     if (child < 0) {
-        io.writeStr("spawn failed\n");
+        io.writeStr("run failed\n");
         return;
     }
 
@@ -32,7 +32,7 @@ pub fn run(name: []const u8) void {
 
     var status: u32 = 0;
     if (libc.syscall.waitpid(child, &status, 0) < 0) {
-        io.writeStr("spawn failed\n");
+        io.writeStr("run failed\n");
     }
 }
 

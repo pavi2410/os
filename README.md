@@ -4,14 +4,14 @@
 
 ## Current status
 
-The kernel boots under QEMU, runs a serial shell in userspace, reads and writes files on a VirtIO FAT32 disk, and spawns ELF programs from `/BIN`.
+The kernel boots under QEMU, runs a serial shell in userspace, reads and writes files on a VirtIO FAT32 disk, and runs ELF programs from `/BIN` via `fork`/`execve`.
 
 **Working today**
 
 * Higher-half kernel with page tables, physical/virtual/heap allocators
 * APIC (LAPIC + IOAPIC), LAPIC timer, round-robin scheduler, `syscall`/`sysret`
 * ELF64 user program loader, ring-3 execution, serial TTY (canonical mode + basic ANSI)
-* Syscalls: `read`, `write`, `open` (`O_CREAT`, `O_TRUNC`, `O_APPEND`), `close`, `lseek`, `stat`, `brk`, `getpid`, `exit`/`exit_group`, OS-specific `spawn` (548) and `listdir` (549)
+* Syscalls: `read`, `write`, `open` (`O_CREAT`, `O_TRUNC`, `O_APPEND`), `close`, `lseek`, `stat`, `brk`, `getpid`, `fork`, `execve`, `wait4`, `exit`/`exit_group`, OS-specific `listdir` (549)
 * PCI enumeration (legacy I/O ports on QEMU q35), VirtIO-blk read/write, FAT32 VFS (read/write/create/truncate/append)
 * Userspace programs on the VirtIO FAT disk (`/README.TXT`, `/BIN/hello`, `/BIN/shell`, …)
 * Serial shell with modular builtins: `help`, `exit`, `pid`, `echo`, `cat`, `ls`, `write`
@@ -23,9 +23,8 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 Near-term file/shell polish:
 
 * `rm` and `mkdir` (delete files, create directories on FAT32)
-* Linux `getdents64` (replace custom `listdir` syscall)
+* `getdents64` (replace custom `listdir` syscall)
 * Working directory (`cd`, `pwd`)
-* `wait`/`waitpid` after `spawn`
 
 Then Phase 5 networking: VirtIO-net and a minimal TCP/IP stack.
 
@@ -175,7 +174,7 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 **Phase 5 — next**
 
 * [ ] `rm` / `mkdir` and related VFS ops
-* [ ] `getdents64`, `cd`/`pwd`, `waitpid`
+* [ ] `getdents64`, `cd`/`pwd`
 * [ ] VirtIO-net (or e1000) driver
 * [ ] ARP, IPv4, UDP, minimal TCP
 * [ ] Socket syscalls

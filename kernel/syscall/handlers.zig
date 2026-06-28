@@ -2,7 +2,6 @@ const numbers = @import("numbers.zig");
 const process = @import("../proc/process.zig");
 const thread = @import("../proc/thread.zig");
 const tty = @import("../drivers/tty.zig");
-const user_spawn = @import("../proc/user_spawn.zig");
 const user_fork = @import("../proc/fork.zig");
 const user_fork_ctx = @import("../proc/user_fork.zig");
 const user_exec = @import("../proc/exec.zig");
@@ -50,7 +49,6 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.fork => sysFork(frame),
         numbers.execve => sysExecve(frame.arg0, frame.arg1, frame.arg2),
         numbers.wait4 => sysWait4(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
-        numbers.spawn => sysSpawn(frame.arg0),
         numbers.listdir => sysListdir(frame.arg0, frame.arg1, frame.arg2),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
         else => ENOSYS,
@@ -207,11 +205,6 @@ fn sysWait4(pid: u64, status_ptr: u64, options: u64, rusage_ptr: u64) i64 {
     return user_wait.wait4(parent, @bitCast(pid), status_ptr, @truncate(options));
 }
 
-fn sysSpawn(path_ptr: u64) i64 {
-    const path = userCString(path_ptr) orelse return EFAULT;
-    return user_spawn.spawn(path);
-}
-
 fn sysListdir(path_ptr: u64, buf_ptr: u64, cap: u64) i64 {
     const path = userCString(path_ptr) orelse return EFAULT;
     if (buf_ptr == 0 or cap == 0) return EINVAL;
@@ -228,10 +221,7 @@ fn sysListdir(path_ptr: u64, buf_ptr: u64, cap: u64) i64 {
 }
 
 fn sysExit(status: u64) i64 {
-    if (process.currentProcess()) |proc| {
-        if (proc.parent_id == process.no_parent) {
-            user_spawn.onChildExit(@truncate(status));
-        }
+    if (process.currentProcess() != null) {
         process.terminateCurrent(@truncate(status));
     }
     thread.exit();

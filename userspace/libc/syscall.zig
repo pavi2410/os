@@ -59,10 +59,6 @@ pub fn brk(addr: usize) isize {
     return syscall6(12, addr, 0, 0, 0, 0, 0);
 }
 
-pub fn spawn(path: [*:0]const u8) isize {
-    return syscall6(548, @intFromPtr(path), 0, 0, 0, 0, 0);
-}
-
 pub fn listdir(path: [*:0]const u8, buf: [*]u8, count: usize) isize {
     return syscall6(549, @intFromPtr(path), @intFromPtr(buf), count, 0, 0, 0);
 }
