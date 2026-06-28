@@ -40,10 +40,13 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         run_case(
             shell,
             "help",
-            "Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir, rmdir, cd, pwd",
+            "Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir, rmdir, cd, pwd, date",
             case="help",
         )
         run_case(shell, "pwd", "/", case="pwd root")
+        date_out = run_case(shell, "date", case="date")
+        if "-" not in date_out or ":" not in date_out or "UTC" not in date_out:
+            raise AssertionError(f"date: unexpected output:\n{date_out}")
         run_case(shell, "echo hello from echo", "hello from echo", case="echo")
         run_case(
             shell,

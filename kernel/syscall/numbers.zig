@@ -15,4 +15,5 @@ pub const unlink = 87;
 pub const mkdir = 83;
 pub const rmdir = 84;
 pub const getdents64 = 217;
+pub const clock_gettime = 228;
 pub const exit_group = 231;

@@ -1,7 +1,7 @@
 const io = @import("../io.zig");
 
 pub fn run() void {
-    io.writeStr("Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir, rmdir, cd, pwd\n");
+    io.writeStr("Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir, rmdir, cd, pwd, date\n");
     io.writeStr("  echo [text...]  print a line\n");
     io.writeStr("  ls [-l] [path]  list directory ( -l = type + size )\n");
     io.writeStr("  write [-a] path text...  create, replace (-a append)\n");
@@ -10,6 +10,7 @@ pub fn run() void {
     io.writeStr("  rmdir path  remove an empty directory\n");
     io.writeStr("  cd [path]  change working directory (default /)\n");
     io.writeStr("  pwd  print working directory\n");
+    io.writeStr("  date  print RTC date and time (UTC)\n");
     io.writeStr("Programs in /BIN: hello, ...\n");
     io.writeStr("Paths may be absolute (/foo) or relative to the current directory.\n");
 }

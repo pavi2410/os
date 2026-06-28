@@ -7,6 +7,8 @@ const user_fork_ctx = @import("../proc/user_fork.zig");
 const user_exec = @import("../proc/exec.zig");
 const user_wait = @import("../proc/wait.zig");
 const vfs = @import("../fs/vfs.zig");
+const rtc = @import("../arch/x86_64/rtc.zig");
+const interrupts = @import("../arch/x86_64/interrupts.zig");
 
 /// Matches the stack layout built by `syscall_entry` (callee-saved pushed first).
 pub const Frame = extern struct {
@@ -53,6 +55,7 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.mkdir => sysMkdir(frame.arg0, frame.arg1),
         numbers.rmdir => sysRmdir(frame.arg0),
         numbers.getdents64 => sysGetdents64(frame.arg0, frame.arg1, frame.arg2),
+        numbers.clock_gettime => sysClockGettime(frame.arg0, frame.arg1),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
         else => ENOSYS,
     };
@@ -244,6 +247,33 @@ fn sysGetdents64(fd: u64, buf_ptr: u64, count: u64) i64 {
     const user_buf: [*]u8 = @ptrFromInt(buf_ptr);
     @memcpy(user_buf[0..n], kbuf[0..n]);
     return @intCast(n);
+}
+
+const CLOCK_REALTIME: u64 = 0;
+const CLOCK_MONOTONIC: u64 = 1;
+
+const Timespec = extern struct {
+    tv_sec: i64,
+    tv_nsec: i64,
+};
+
+fn sysClockGettime(clock_id: u64, timespec_ptr: u64) i64 {
+    if (timespec_ptr == 0) return EFAULT;
+    var ts: Timespec = .{ .tv_sec = 0, .tv_nsec = 0 };
+    switch (clock_id) {
+        CLOCK_REALTIME => {
+            ts.tv_sec = rtc.realtimeSeconds();
+        },
+        CLOCK_MONOTONIC => {
+            const ticks = interrupts.timerTickCount();
+            ts.tv_sec = @intCast(@divTrunc(ticks, 100));
+            ts.tv_nsec = @intCast(@mod(ticks, 100) * 10_000_000);
+        },
+        else => return EINVAL,
+    }
+    const user_buf: [*]u8 = @ptrFromInt(timespec_ptr);
+    @memcpy(user_buf[0..@sizeOf(Timespec)], @as([*]const u8, @ptrCast(&ts)));
+    return 0;
 }
 
 fn sysExit(status: u64) i64 {

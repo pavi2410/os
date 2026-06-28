@@ -6,6 +6,7 @@ const heap = @import("mm/heap.zig");
 const idt = @import("arch/x86_64/idt.zig");
 const interrupts = @import("arch/x86_64/interrupts.zig");
 const timer = @import("arch/x86_64/timer.zig");
+const rtc = @import("arch/x86_64/rtc.zig");
 const limine = @import("limine");
 const memory_map = @import("mm/memory_map.zig");
 const paging = @import("arch/x86_64/paging.zig");
@@ -85,6 +86,7 @@ pub fn init(ctx: BootContext) void {
     initPci(ctx.rsdp_virt);
     initBlock();
     initTimer();
+    rtc.init();
     initScheduler();
 
     if (boot_debug.thread_switch_test) {

@@ -5,6 +5,7 @@ const libc = @import("libc");
 
 const cmd_cat = @import("cmd/cat.zig");
 const cmd_cd = @import("cmd/cd.zig");
+const cmd_date = @import("cmd/date.zig");
 const cmd_echo = @import("cmd/echo.zig");
 const cmd_exit = @import("cmd/exit.zig");
 const cmd_help = @import("cmd/help.zig");
@@ -59,6 +60,8 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
             cmd_cd.run(&parsed);
         } else if (io.eql(cmd, "pwd")) {
             cmd_pwd.run();
+        } else if (io.eql(cmd, "date")) {
+            cmd_date.run();
         } else if (io.eql(cmd, "rm")) {
             cmd_rm.run(&parsed);
         } else if (io.eql(cmd, "mkdir")) {

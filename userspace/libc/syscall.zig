@@ -63,6 +63,18 @@ pub fn getdents64(fd: u32, buf: [*]u8, count: usize) isize {
     return syscall6(217, fd, @intFromPtr(buf), count, 0, 0, 0);
 }
 
+pub const CLOCK_REALTIME: u32 = 0;
+pub const CLOCK_MONOTONIC: u32 = 1;
+
+pub const Timespec = extern struct {
+    tv_sec: i64,
+    tv_nsec: i64,
+};
+
+pub fn clock_gettime(clock_id: u32, out: *Timespec) isize {
+    return syscall6(228, clock_id, @intFromPtr(out), 0, 0, 0, 0);
+}
+
 pub fn execve(path: [*:0]const u8, argv: [*:null]?[*:0]const u8, envp: [*:null]?[*:0]const u8) isize {
     return syscall6(59, @intFromPtr(path), @intFromPtr(argv), @intFromPtr(envp), 0, 0, 0);
 }
