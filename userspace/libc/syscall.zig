@@ -72,6 +72,10 @@ pub fn waitpid(pid: isize, status: ?*u32, options: u32) isize {
     return syscall6(61, @bitCast(@as(u64, @intCast(pid))), status_ptr, options, 0, 0, 0);
 }
 
+pub fn unlink(path: [*:0]const u8) isize {
+    return syscall6(87, @intFromPtr(path), 0, 0, 0, 0, 0);
+}
+
 fn syscall6(
     nr: u64,
     arg0: u64,

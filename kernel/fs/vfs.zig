@@ -150,6 +150,22 @@ pub fn listDir(path: []const u8, out: []u8) VfsError!usize {
     return fat32.listDir(path, out);
 }
 
+pub fn unlink(path: []const u8) VfsError!void {
+    const loc = try fat32.unlinkFile(path);
+    invalidateHandlesAt(loc);
+}
+
+fn invalidateHandlesAt(loc: fat32.DirLoc) void {
+    var i: u32 = 0;
+    while (i < max_handles) : (i += 1) {
+        if (!handles[i].in_use) continue;
+        const h = &handles[i];
+        if (h.open.loc.cluster == loc.cluster and h.open.loc.offset == loc.offset) {
+            handles[i] = .{};
+        }
+    }
+}
+
 pub fn logStatus() void {
     serial.writeString("\r\n--- VFS ---\r\n");
     if (!isReady()) {

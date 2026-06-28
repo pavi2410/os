@@ -40,7 +40,7 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         run_case(
             shell,
             "help",
-            "Built-ins: help, exit, pid, echo, cat, ls, write",
+            "Built-ins: help, exit, pid, echo, cat, ls, write, rm",
             case="help",
         )
         run_case(shell, "echo hello from echo", "hello from echo", case="echo")
@@ -66,6 +66,8 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         run_case(shell, f"write -a {append_path} second", "write: ok", case="append 2")
         append_out = run_case(shell, f"cat {append_path}", case="cat append")
         assert_cat_exact(append_out, append_path, "firstsecond", "cat append")
+        run_case(shell, f"rm {append_path}", "rm: ok", case="rm append")
+        run_case(shell, f"cat {append_path}", "cat: open failed", case="cat removed")
         run_case(
             shell,
             "cat /TEST.TXT",

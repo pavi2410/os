@@ -11,6 +11,7 @@ pub const fork = 57;
 pub const execve = 59;
 pub const exit = 60;
 pub const wait4 = 61;
+pub const unlink = 87;
 pub const exit_group = 231;
 /// OS-specific: list directory entries (newline-separated) into a user buffer.
 pub const listdir = 549;

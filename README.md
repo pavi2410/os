@@ -11,10 +11,10 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 * Higher-half kernel with page tables, physical/virtual/heap allocators
 * APIC (LAPIC + IOAPIC), LAPIC timer, round-robin scheduler, `syscall`/`sysret`
 * ELF64 user program loader, ring-3 execution, serial TTY (canonical mode + basic ANSI)
-* Syscalls: `read`, `write`, `open` (`O_CREAT`, `O_TRUNC`, `O_APPEND`), `close`, `lseek`, `stat`, `brk`, `getpid`, `fork`, `execve`, `wait4`, `exit`/`exit_group`, OS-specific `listdir` (549)
+* Syscalls: `read`, `write`, `open` (`O_CREAT`, `O_TRUNC`, `O_APPEND`), `close`, `lseek`, `stat`, `brk`, `getpid`, `fork`, `execve`, `wait4`, `unlink`, `exit`/`exit_group`, OS-specific `listdir` (549)
 * PCI enumeration (legacy I/O ports on QEMU q35), VirtIO-blk read/write, FAT32 VFS (read/write/create/truncate/append)
 * Userspace programs on the VirtIO FAT disk (`/README.TXT`, `/BIN/hello`, `/BIN/shell`, …)
-* Serial shell with modular builtins: `help`, `exit`, `pid`, `echo`, `cat`, `ls`, `write`
+* Serial shell with modular builtins: `help`, `exit`, `pid`, `echo`, `cat`, `ls`, `write`, `rm`
 * Disk image sync preserves user-created files across `mise run boot` (see [disk notes](#virtio-disk))
 * [mise](https://mise.jdx.dev) tasks for build, ISO, disk, QEMU boot, and integration tests
 
@@ -22,7 +22,7 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 
 Near-term file/shell polish:
 
-* `rm` and `mkdir` (delete files, create directories on FAT32)
+* `mkdir` (create directories on FAT32)
 * `getdents64` (replace custom `listdir` syscall)
 * Working directory (`cd`, `pwd`)
 
@@ -173,7 +173,7 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 
 **Phase 5 — next**
 
-* [ ] `rm` / `mkdir` and related VFS ops
+* [ ] `mkdir` and related VFS ops
 * [ ] `getdents64`, `cd`/`pwd`
 * [ ] VirtIO-net (or e1000) driver
 * [ ] ARP, IPv4, UDP, minimal TCP

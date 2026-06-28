@@ -209,6 +209,29 @@ pub fn writeAt(result: *OpenResult, offset: u64, buf: []const u8) FatError!usize
     return n;
 }
 
+/// Delete a regular file: free its clusters and mark the directory entry deleted.
+pub fn unlinkFile(path: []const u8) FatError!DirLoc {
+    if (!mounted) return FatError.NotReady;
+
+    var norm: [256]u8 = undefined;
+    const clean = try normalizePath(path, &norm);
+    if (clean.len == 0) return FatError.IsDirectory;
+
+    const parent_cluster = try lookupParentCluster(clean);
+    const name = parentName(clean);
+    const result = try findInDirectoryWithLoc(parent_cluster, name);
+
+    if (result.entry.attr & 0x10 != 0) return FatError.IsDirectory;
+    if (result.entry.start_cluster >= 2) try freeChain(result.entry.start_cluster);
+
+    try readCluster(result.loc.cluster, cluster_buf[0..fs.cluster_bytes]);
+    const off: usize = @intCast(result.loc.offset);
+    if (off + 32 > fs.cluster_bytes) return FatError.IoError;
+    cluster_buf[off] = 0xE5;
+    try writeCluster(result.loc.cluster, cluster_buf[0..fs.cluster_bytes]);
+    return result.loc;
+}
+
 fn truncateFile(entry: *Entry, loc: DirLoc) FatError!void {
     if (entry.start_cluster >= 2) try freeChain(entry.start_cluster);
     entry.start_cluster = try allocCluster();
