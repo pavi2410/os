@@ -1,16 +1,22 @@
 const numbers = @import("numbers.zig");
 const process = @import("../proc/process.zig");
-const serial = @import("../arch/x86_64/serial.zig");
 const thread = @import("../proc/thread.zig");
 const tty = @import("../drivers/tty.zig");
 const user_spawn = @import("../proc/user_spawn.zig");
 const user_fork = @import("../proc/fork.zig");
+const user_fork_ctx = @import("../proc/user_fork.zig");
 const user_exec = @import("../proc/exec.zig");
 const user_wait = @import("../proc/wait.zig");
 const vfs = @import("../fs/vfs.zig");
 
-/// Matches the stack layout built by `syscall_entry` (r9 pushed first).
+/// Matches the stack layout built by `syscall_entry` (callee-saved pushed first).
 pub const Frame = extern struct {
+    r15: u64,
+    r14: u64,
+    r13: u64,
+    r12: u64,
+    rbp: u64,
+    rbx: u64,
     arg5: u64,
     arg4: u64,
     arg3: u64,
@@ -171,17 +177,8 @@ fn sysGetpid() i64 {
 }
 
 fn sysFork(frame: *Frame) i64 {
-    return user_fork.forkFromSyscall(
-        frame.arg0,
-        frame.arg1,
-        frame.arg2,
-        frame.arg3,
-        frame.arg4,
-        frame.arg5,
-        frame.user_rip,
-        frame.user_rflags,
-        frame.user_rsp,
-    );
+    const ctx = user_fork_ctx.ForkUserContext.captureFromFrame(frame.*);
+    return user_fork.forkFromSyscall(ctx);
 }
 
 fn sysExecve(path_ptr: u64, argv_ptr: u64, envp_ptr: u64) i64 {
@@ -237,7 +234,6 @@ fn sysExit(status: u64) i64 {
         }
         process.terminateCurrent(@truncate(status));
     }
-    serial.printf("\r\nsyscall exit({d})\r\n", .{status});
     thread.exit();
 }
 

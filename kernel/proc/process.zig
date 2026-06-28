@@ -78,6 +78,9 @@ pub const AddressSpace = struct {
 
     pub fn destroy(self: *AddressSpace) void {
         if (self.cr3 == 0) return;
+        if (paging.readCr3() == self.cr3) {
+            paging.writeCr3(boot_cr3);
+        }
         paging.destroyUserAddressSpace(self.cr3) catch {};
         self.cr3 = 0;
     }
@@ -123,10 +126,19 @@ var live: [max_processes]?*Process = .{null} ** max_processes;
 
 var boot_cr3: u64 = 0;
 var next_id: usize = 1;
-var current: ?*Process = null;
 
 pub fn init() void {
     boot_cr3 = paging.readCr3();
+    thread.setActivateCr3Hook(activateForThread);
+}
+
+fn activateForThread(raw: ?*anyopaque) void {
+    if (raw) |p| {
+        const proc: *Process = @ptrCast(@alignCast(p));
+        proc.address_space.activate();
+    } else {
+        paging.writeCr3(boot_cr3);
+    }
 }
 
 pub fn kernelAddressSpace() AddressSpace {
@@ -134,11 +146,12 @@ pub fn kernelAddressSpace() AddressSpace {
 }
 
 pub fn currentProcess() ?*Process {
-    return current;
+    const raw = thread.currentProcessPtr() orelse return null;
+    return @ptrCast(@alignCast(raw));
 }
 
 pub fn setCurrent(proc: ?*Process) void {
-    current = proc;
+    thread.setProcess(if (proc) |p| @ptrCast(p) else null);
 }
 
 pub fn create() ProcessError!*Process {
@@ -266,7 +279,7 @@ pub fn hasChild(parent_id: usize, pid: i64) bool {
 }
 
 pub fn destroy(proc: *Process) void {
-    if (current == proc) current = null;
+    if (currentProcess() == proc) setCurrent(null);
     unregister(proc);
     proc.destroy();
 }
@@ -315,7 +328,7 @@ pub fn sysBrk(proc: *Process, addr: u64) i64 {
 
 /// Tear down the current user process after `exit` / `exit_group`.
 pub fn terminateCurrent(status: u32) noreturn {
-    const proc = current orelse {
+    const proc = currentProcess() orelse {
         while (true) cpu.hlt();
     };
 
@@ -328,13 +341,11 @@ pub fn terminateCurrent(status: u32) noreturn {
     }
 
     proc.address_space.destroy();
-    proc.address_space.cr3 = 0;
     proc.state = .dead;
     unregister(proc);
     heap.kfree(@ptrCast(proc)) catch {};
 
     setCurrent(null);
-    paging.writeCr3(kernelAddressSpace().cr3);
 
     thread.exit();
 }

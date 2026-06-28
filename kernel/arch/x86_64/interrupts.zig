@@ -46,6 +46,7 @@ pub fn timerTickCount() u64 {
 
 pub fn dispatchException(frame: *Frame) void {
     switch (frame.vector) {
+        8 => handleDoubleFault(frame),
         13 => handleGeneralProtectionFault(frame),
         14 => handlePageFault(frame),
         else => handleDefaultException(frame),
@@ -63,6 +64,13 @@ pub fn dispatchIrq(frame: *Frame) void {
     }
 
     handleUnhandledIrq(vector);
+}
+
+fn handleDoubleFault(frame: *Frame) void {
+    serial.writeString("\r\n!!! Double Fault !!!\r\n");
+    serial.printf("RIP:  0x{x}\r\n", .{frame.rip});
+    serial.printf("Code: 0x{x}\r\n", .{frame.error_code});
+    haltForever();
 }
 
 fn handlePageFault(frame: *Frame) void {

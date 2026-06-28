@@ -39,12 +39,24 @@ comptime {
         \\  push %r10
         \\  push %r8
         \\  push %r9
+        \\  push %rbx
+        \\  push %rbp
+        \\  push %r12
+        \\  push %r13
+        \\  push %r14
+        \\  push %r15
         \\  mov %rsp, %rdi
         \\  call syscall_dispatch
         \\
-        \\  // rax holds the return value. The Linux syscall ABI preserves every
-        \\  // other register except rcx and r11, so restore the argument
-        \\  // registers (the C dispatcher clobbered them) to their entry values.
+        \\  // rax holds the return value. Restore argument registers from the
+        \\  // frame (the dispatcher clobbered them) and callee-saved registers
+        \\  // from the values saved at syscall entry.
+        \\  pop %r15
+        \\  pop %r14
+        \\  pop %r13
+        \\  pop %r12
+        \\  pop %rbp
+        \\  pop %rbx
         \\  pop %r9
         \\  pop %r8
         \\  pop %r10
@@ -67,11 +79,12 @@ comptime {
 }
 
 comptime {
-    if (@sizeOf(handlers.Frame) != 80) @compileError("syscall Frame must be 80 bytes");
-    if (@offsetOf(handlers.Frame, "nr") != 48) @compileError("syscall Frame layout mismatch");
-    if (@offsetOf(handlers.Frame, "user_rip") != 56) @compileError("syscall Frame layout mismatch");
-    if (@offsetOf(handlers.Frame, "user_rflags") != 64) @compileError("syscall Frame layout mismatch");
-    if (@offsetOf(handlers.Frame, "user_rsp") != 72) @compileError("syscall Frame layout mismatch");
+    if (@sizeOf(handlers.Frame) != 128) @compileError("syscall Frame must be 128 bytes");
+    if (@offsetOf(handlers.Frame, "rbx") != 40) @compileError("syscall Frame layout mismatch");
+    if (@offsetOf(handlers.Frame, "nr") != 96) @compileError("syscall Frame layout mismatch");
+    if (@offsetOf(handlers.Frame, "user_rip") != 104) @compileError("syscall Frame layout mismatch");
+    if (@offsetOf(handlers.Frame, "user_rflags") != 112) @compileError("syscall Frame layout mismatch");
+    if (@offsetOf(handlers.Frame, "user_rsp") != 120) @compileError("syscall Frame layout mismatch");
 }
 
 pub fn init() void {

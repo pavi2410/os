@@ -77,8 +77,18 @@ pub fn init() void {
 }
 
 pub fn spawn(entry: thread.EntryFn, name: []const u8) SchedulerError!void {
+    _ = try spawnWithProcess(entry, name, null);
+}
+
+pub fn spawnWithProcess(
+    entry: thread.EntryFn,
+    name: []const u8,
+    proc: ?*anyopaque,
+) SchedulerError!*thread.Thread {
     const t = thread.create(entry, name, thread.default_stack_size) catch return SchedulerError.OutOfMemory;
+    t.process = proc;
     try ready_queue.push(t);
+    return t;
 }
 
 pub fn onTimerTick() void {

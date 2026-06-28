@@ -70,7 +70,7 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
             "persisted on disk!",
             case="cat persist",
         )
-        run_case(shell, "hello", "Hello from userspace!", case="spawn hello")
+        run_case(shell, "hello", "Hello from userspace!", case="fork/exec hello")
         pid_out = run_case(shell, "pid", case="pid")
         assert any(ch.isdigit() for ch in pid_out), f"pid: no digits in:\n{pid_out}"
         shell.assert_no_faults()

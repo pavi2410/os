@@ -16,56 +16,23 @@ pub const ForkUserContext = struct {
     user_rflags: u64,
     user_rsp: u64,
 
-    pub fn captureFromSyscall(
-        arg0: u64,
-        arg1: u64,
-        arg2: u64,
-        arg3: u64,
-        arg4: u64,
-        arg5: u64,
-        user_rip: u64,
-        user_rflags: u64,
-        user_rsp: u64,
-    ) ForkUserContext {
-        var rbx: u64 = 0;
-        var rbp: u64 = 0;
-        var r12: u64 = 0;
-        var r13: u64 = 0;
-        var r14: u64 = 0;
-        var r15: u64 = 0;
-
-        asm volatile (
-            \\ mov %%rbx, %[rbx]
-            \\ mov %%rbp, %[rbp]
-            \\ mov %%r12, %[r12]
-            \\ mov %%r13, %[r13]
-            \\ mov %%r14, %[r14]
-            \\ mov %%r15, %[r15]
-            : [rbx] "=r" (rbx),
-              [rbp] "=r" (rbp),
-              [r12] "=r" (r12),
-              [r13] "=r" (r13),
-              [r14] "=r" (r14),
-              [r15] "=r" (r15),
-            :
-            : .{ .memory = true });
-
+    pub fn captureFromFrame(frame: anytype) ForkUserContext {
         return .{
-            .rbx = rbx,
-            .rbp = rbp,
-            .r12 = r12,
-            .r13 = r13,
-            .r14 = r14,
-            .r15 = r15,
-            .rdi = arg0,
-            .rsi = arg1,
-            .rdx = arg2,
-            .r10 = arg3,
-            .r8 = arg4,
-            .r9 = arg5,
-            .user_rip = user_rip,
-            .user_rflags = user_rflags,
-            .user_rsp = user_rsp,
+            .rbx = frame.rbx,
+            .rbp = frame.rbp,
+            .r12 = frame.r12,
+            .r13 = frame.r13,
+            .r14 = frame.r14,
+            .r15 = frame.r15,
+            .rdi = frame.arg0,
+            .rsi = frame.arg1,
+            .rdx = frame.arg2,
+            .r10 = frame.arg3,
+            .r8 = frame.arg4,
+            .r9 = frame.arg5,
+            .user_rip = frame.user_rip,
+            .user_rflags = frame.user_rflags,
+            .user_rsp = frame.user_rsp,
         };
     }
 };

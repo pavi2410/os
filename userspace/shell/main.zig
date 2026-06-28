@@ -8,7 +8,7 @@ const cmd_exit = @import("cmd/exit.zig");
 const cmd_help = @import("cmd/help.zig");
 const cmd_ls = @import("cmd/ls.zig");
 const cmd_pid = @import("cmd/pid.zig");
-const cmd_spawn = @import("cmd/spawn.zig");
+const cmd_run = @import("cmd/run.zig");
 const cmd_write = @import("cmd/write.zig");
 
 const prompt = "os> ";
@@ -48,7 +48,7 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
         } else if (cmd.len > 0 and cmd[0] == '/') {
             io.writeStr("unknown command\n");
         } else {
-            cmd_spawn.run(cmd);
+            cmd_run.run(cmd);
         }
     }
 }

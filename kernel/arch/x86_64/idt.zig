@@ -25,6 +25,7 @@ const irq_vector_end: usize = 48;
 
 var idt: [256]IdtEntry = undefined;
 
+extern fn isr_8() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn isr_13() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn isr_14() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn isr_default() callconv(.{ .x86_64_sysv = .{} }) void;
@@ -49,6 +50,14 @@ extern fn isr_47() callconv(.{ .x86_64_sysv = .{} }) void;
 
 comptime {
     asm (
+        \\.global isr_8
+        \\.type isr_8, @function
+        \\isr_8:
+        \\  cli
+        \\  push $0
+        \\  push $8
+        \\  jmp exception_stub
+        \\
         \\.global isr_13
         \\.type isr_13, @function
         \\isr_13:
@@ -163,12 +172,16 @@ export fn irq_dispatch(frame: *ExceptionFrame) callconv(.{ .x86_64_sysv = .{} })
     interrupts.dispatchIrq(frame);
 }
 
-fn setHandler(vector: usize, handler: *const fn () callconv(.{ .x86_64_sysv = .{} }) void) void {
+fn setHandler(
+    vector: usize,
+    handler: *const fn () callconv(.{ .x86_64_sysv = .{} }) void,
+    ist: u8,
+) void {
     const address = @intFromPtr(handler);
     idt[vector] = .{
         .offset_low = @truncate(address),
         .selector = gdt.kernel_code_selector,
-        .ist = 0,
+        .ist = ist,
         .type_attr = 0x8E,
         .offset_mid = @truncate(address >> 16),
         .offset_high = @truncate(address >> 32),
@@ -201,13 +214,15 @@ fn irqHandler(vector: usize) *const fn () callconv(.{ .x86_64_sysv = .{} }) void
 pub fn init() void {
     @memset(std.mem.asBytes(&idt), 0);
     for (0..256) |vector| {
-        setHandler(vector, isr_default);
+        setHandler(vector, isr_default, 0);
     }
-    setHandler(13, isr_13);
-    setHandler(14, isr_14);
+    const ist = gdt.exception_ist;
+    setHandler(8, isr_8, ist);
+    setHandler(13, isr_13, ist);
+    setHandler(14, isr_14, ist);
 
     for (irq_vector_start..irq_vector_end) |vector| {
-        setHandler(vector, irqHandler(vector));
+        setHandler(vector, irqHandler(vector), 0);
     }
 }
 

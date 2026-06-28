@@ -3,6 +3,16 @@ const gdt = @import("../arch/x86_64/gdt.zig");
 const heap = @import("../mm/heap.zig");
 const serial = @import("../arch/x86_64/serial.zig");
 
+const ActivateCr3Fn = *const fn (?*anyopaque) void;
+
+var activate_cr3: ActivateCr3Fn = &noopActivateCr3;
+
+fn noopActivateCr3(_: ?*anyopaque) void {}
+
+pub fn setActivateCr3Hook(hook: ActivateCr3Fn) void {
+    activate_cr3 = hook;
+}
+
 pub const ThreadError = error{
     OutOfMemory,
 };
@@ -35,14 +45,24 @@ pub const Thread = struct {
     stack_size: usize,
     context: SavedContext,
     state: State,
+    /// User process bound to this kernel thread (null for idle/bootstrap).
+    process: ?*anyopaque = null,
 
     pub fn switchTo(self: *Thread, other: *Thread) void {
         const prev_state = self.state;
-        self.state = .ready;
+        if (self.state != .dead) {
+            self.state = .ready;
+        }
         other.state = .running;
         current = other;
         other.activateKernelStack();
+        activate_cr3(other.process);
         switch_context(&self.context, &other.context);
+        if (self.state != .dead) {
+            activate_cr3(self.process);
+        } else {
+            activate_cr3(null);
+        }
         current = self;
         self.state = prev_state;
         self.activateKernelStack();
@@ -109,6 +129,16 @@ pub fn currentThread() ?*Thread {
 
 pub fn setCurrent(t: ?*Thread) void {
     current = t;
+}
+
+pub fn setProcess(proc: ?*anyopaque) void {
+    const t = current orelse return;
+    t.process = proc;
+}
+
+pub fn currentProcessPtr() ?*anyopaque {
+    const t = current orelse return null;
+    return t.process;
 }
 
 pub fn setExitHandler(handler: *const fn () noreturn) void {

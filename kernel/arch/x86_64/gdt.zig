@@ -12,7 +12,14 @@ const GdtPointer = packed struct {
     base: u64,
 };
 
-/// Minimal 64-bit TSS; only `rsp0` is used for ring-0 stack on ring-3 exceptions.
+/// Dedicated stack for IST1 exception handlers (#DF, #GP, #PF).
+const ist_stack_size: usize = 16 * 1024;
+var ist_stack: [ist_stack_size]u8 align(16) = undefined;
+
+/// IST index used by critical exception vectors in the IDT.
+pub const exception_ist: u8 = 1;
+
+/// Minimal 64-bit TSS; `rsp0` for syscalls/interrupts, `ist1` for fault handlers.
 pub const Tss = extern struct {
     reserved0: u32 = 0,
     rsp0: u64 = 0,
@@ -117,6 +124,8 @@ pub fn setKernelStack(stack_top: u64) void {
 
 pub fn init() void {
     installTssDescriptor();
+    const top = (@intFromPtr(&ist_stack) + ist_stack_size) & ~@as(u64, 15);
+    tss.ist1 = top;
 }
 
 pub fn load() void {

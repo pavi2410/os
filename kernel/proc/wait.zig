@@ -9,6 +9,7 @@ pub fn wait4(parent: *process.Process, pid: i64, status_ptr: u64, options: u32) 
     while (true) {
         if (process.reapZombieAny(parent.id, pid)) |zombie| {
             if (status_ptr != 0) {
+                parent.address_space.activate();
                 const wstatus: u32 = zombie.status << 8;
                 const out: *u32 = @ptrFromInt(status_ptr);
                 out.* = wstatus;
