@@ -3,12 +3,14 @@ const io = @import("io.zig");
 const libc = @import("libc");
 
 const cmd_cat = @import("cmd/cat.zig");
+const cmd_cd = @import("cmd/cd.zig");
 const cmd_echo = @import("cmd/echo.zig");
 const cmd_exit = @import("cmd/exit.zig");
 const cmd_help = @import("cmd/help.zig");
 const cmd_ls = @import("cmd/ls.zig");
 const cmd_mkdir = @import("cmd/mkdir.zig");
 const cmd_pid = @import("cmd/pid.zig");
+const cmd_pwd = @import("cmd/pwd.zig");
 const cmd_rm = @import("cmd/rm.zig");
 const cmd_rmdir = @import("cmd/rmdir.zig");
 const cmd_run = @import("cmd/run.zig");
@@ -48,6 +50,10 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
             cmd_write.run(&parsed);
         } else if (io.eql(cmd, "cat")) {
             cmd_cat.run(&parsed);
+        } else if (io.eql(cmd, "cd")) {
+            cmd_cd.run(&parsed);
+        } else if (io.eql(cmd, "pwd")) {
+            cmd_pwd.run();
         } else if (io.eql(cmd, "rm")) {
             cmd_rm.run(&parsed);
         } else if (io.eql(cmd, "mkdir")) {

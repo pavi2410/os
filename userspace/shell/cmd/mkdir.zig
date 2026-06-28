@@ -10,12 +10,12 @@ pub fn run(parsed: *const argv.Parsed) void {
     };
 
     var pathbuf: [128]u8 = undefined;
-    if (!path.copy(dir_path, &pathbuf)) {
+    const resolved = path.resolve(dir_path, &pathbuf) orelse {
         io.writeStr("mkdir: path too long\n");
         return;
-    }
+    };
 
-    if (libc.syscall.mkdir(@ptrCast(&pathbuf), 0o755) < 0) {
+    if (libc.syscall.mkdir(@ptrCast(resolved.ptr), 0o755) < 0) {
         io.writeStr("mkdir: failed\n");
         return;
     }

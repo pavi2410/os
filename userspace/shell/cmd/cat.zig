@@ -13,12 +13,12 @@ pub fn run(parsed: *const argv.Parsed) void {
 
 fn catFile(file_path: []const u8) void {
     var pathbuf: [128]u8 = undefined;
-    if (!path.copy(file_path, &pathbuf)) {
+    const resolved = path.resolve(file_path, &pathbuf) orelse {
         io.writeStr("path too long\n");
         return;
-    }
+    };
 
-    const fd = libc.syscall.open(@ptrCast(&pathbuf), 0, 0);
+    const fd = libc.syscall.open(@ptrCast(resolved.ptr), 0, 0);
     if (fd < 0) {
         io.writeStr("cat: open failed\n");
         return;

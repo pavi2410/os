@@ -14,17 +14,13 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 * Syscalls: `read`, `write`, `open` (`O_CREAT`, `O_TRUNC`, `O_APPEND`), `close`, `lseek`, `stat`, `brk`, `getpid`, `fork`, `execve`, `wait4`, `unlink`, `mkdir`, `rmdir`, `getdents64`, `exit`/`exit_group`
 * PCI enumeration (legacy I/O ports on QEMU q35), VirtIO-blk read/write, FAT32 VFS (read/write/create/truncate/append)
 * Userspace programs on the VirtIO FAT disk (`/README.TXT`, `/BIN/hello`, `/BIN/shell`, …)
-* Serial shell with modular builtins: `help`, `exit`, `pid`, `echo`, `cat`, `ls`, `write`, `rm`, `mkdir`, `rmdir`
+* Serial shell with modular builtins: `help`, `exit`, `pid`, `echo`, `cat`, `ls`, `write`, `rm`, `mkdir`, `rmdir`, `cd`, `pwd`
 * Disk image sync preserves user-created files across `mise run boot` (see [disk notes](#virtio-disk))
 * [mise](https://mise.jdx.dev) tasks for build, ISO, disk, QEMU boot, and integration tests
 
 **Next up** (see [docs/roadmap/](docs/roadmap/))
 
-Near-term file/shell polish:
-
-* Working directory (`cd`, `pwd`)
-
-Then Phase 5 networking: VirtIO-net and a minimal TCP/IP stack.
+Phase 5 networking: VirtIO-net and a minimal TCP/IP stack.
 
 ## 🚀 Goals
 
@@ -171,7 +167,7 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 
 **Phase 5 — next**
 
-* [ ] `cd`/`pwd`
+* [x] `cd`/`pwd`
 * [ ] VirtIO-net (or e1000) driver
 * [ ] ARP, IPv4, UDP, minimal TCP
 * [ ] Socket syscalls

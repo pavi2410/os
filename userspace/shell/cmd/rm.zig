@@ -10,12 +10,12 @@ pub fn run(parsed: *const argv.Parsed) void {
     };
 
     var pathbuf: [128]u8 = undefined;
-    if (!path.copy(file_path, &pathbuf)) {
+    const resolved = path.resolve(file_path, &pathbuf) orelse {
         io.writeStr("rm: path too long\n");
         return;
-    }
+    };
 
-    if (libc.syscall.unlink(@ptrCast(&pathbuf)) < 0) {
+    if (libc.syscall.unlink(@ptrCast(resolved.ptr)) < 0) {
         io.writeStr("rm: failed\n");
         return;
     }

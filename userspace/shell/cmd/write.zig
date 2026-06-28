@@ -25,10 +25,10 @@ pub fn run(parsed: *const argv.Parsed) void {
 
 fn writeFile(file_path: []const u8, content: []const u8, append: bool) void {
     var pathbuf: [128]u8 = undefined;
-    if (!path.copy(file_path, &pathbuf)) {
+    const resolved = path.resolve(file_path, &pathbuf) orelse {
         io.writeStr("write: path too long\n");
         return;
-    }
+    };
 
     var open_flags: u32 = O_WRONLY | O_CREAT;
     if (append) {
@@ -37,7 +37,7 @@ fn writeFile(file_path: []const u8, content: []const u8, append: bool) void {
         open_flags |= O_TRUNC;
     }
 
-    const fd = libc.syscall.open(@ptrCast(&pathbuf), open_flags, 0);
+    const fd = libc.syscall.open(@ptrCast(resolved.ptr), open_flags, 0);
     if (fd < 0) {
         io.writeStr("write: open failed\n");
         return;

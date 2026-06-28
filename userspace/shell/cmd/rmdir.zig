@@ -10,12 +10,12 @@ pub fn run(parsed: *const argv.Parsed) void {
     };
 
     var pathbuf: [128]u8 = undefined;
-    if (!path.copy(dir_path, &pathbuf)) {
+    const resolved = path.resolve(dir_path, &pathbuf) orelse {
         io.writeStr("rmdir: path too long\n");
         return;
-    }
+    };
 
-    if (libc.syscall.rmdir(@ptrCast(&pathbuf)) < 0) {
+    if (libc.syscall.rmdir(@ptrCast(resolved.ptr)) < 0) {
         io.writeStr("rmdir: failed\n");
         return;
     }

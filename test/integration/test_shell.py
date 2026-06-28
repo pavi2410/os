@@ -40,9 +40,10 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         run_case(
             shell,
             "help",
-            "Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir, rmdir",
+            "Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir, rmdir, cd, pwd",
             case="help",
         )
+        run_case(shell, "pwd", "/", case="pwd root")
         run_case(shell, "echo hello from echo", "hello from echo", case="echo")
         run_case(
             shell,
@@ -55,8 +56,12 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         mkdir_out = shell.run("mkdir /TDIR")
         if "mkdir: ok" not in mkdir_out and "mkdir: failed" not in mkdir_out:
             raise AssertionError(f"mkdir: unexpected output:\n{mkdir_out}")
-        run_case(shell, "ls -l /", "dir         0 TDIR", case="ls -l tdir")
-        run_case(shell, "write /TDIR/NOTE.TXT nested", "write: ok", case="write in dir")
+        run_case(shell, "cd /TDIR", case="cd tdir")
+        run_case(shell, "pwd", "/TDIR", case="pwd tdir")
+        run_case(shell, "write NOTE.TXT nested", "write: ok", case="write relative")
+        run_case(shell, "cat NOTE.TXT", "nested", case="cat relative")
+        run_case(shell, "cd ..", case="cd parent")
+        run_case(shell, "pwd", "/", case="pwd after cd ..")
         run_case(shell, "cat /TDIR/NOTE.TXT", "nested", case="cat in dir")
         run_case(shell, "rm /TDIR/NOTE.TXT", "rm: ok", case="rm note in dir")
         run_case(shell, "rmdir /TDIR", "rmdir: ok", case="rmdir tdir")

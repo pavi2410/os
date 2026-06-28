@@ -1,4 +1,5 @@
 const argv = @import("../argv.zig");
+const cwd = @import("../cwd.zig");
 const io = @import("../io.zig");
 const path = @import("../path.zig");
 const libc = @import("libc");
@@ -16,18 +17,19 @@ const Dirent64 = extern struct {
 const dirent_name_off: usize = 19;
 
 pub fn run(parsed: *const argv.Parsed) void {
-    const dir = parsed.positionalAt(0) orelse "/";
-    lsDir(dir, parsed.hasFlag('l'));
+    const dir_arg = parsed.positionalAt(0);
+    lsDir(dir_arg, parsed.hasFlag('l'));
 }
 
-fn lsDir(dir: []const u8, long: bool) void {
+fn lsDir(dir_arg: ?[]const u8, long: bool) void {
     var pathbuf: [128]u8 = undefined;
-    if (!path.copy(dir, &pathbuf)) {
+    const input = dir_arg orelse cwd.get();
+    const dir = path.resolve(input, &pathbuf) orelse {
         io.writeStr("ls: path too long\n");
         return;
-    }
+    };
 
-    const fd = libc.syscall.open(@ptrCast(&pathbuf), O_RDONLY, 0);
+    const fd = libc.syscall.open(@ptrCast(dir.ptr), O_RDONLY, 0);
     if (fd < 0) {
         io.writeStr("ls: failed\n");
         return;
