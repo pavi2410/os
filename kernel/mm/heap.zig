@@ -1,4 +1,5 @@
 const paging = @import("../arch/x86_64/paging.zig");
+const std = @import("std");
 const virtual = @import("virtual.zig");
 
 pub const min_align = 16;
@@ -52,7 +53,7 @@ pub fn init() HeapError!void {
 pub fn kmalloc(size: usize) HeapError![*]u8 {
     if (size == 0) return @ptrCast(@alignCast(@as([*]u8, @ptrFromInt(min_align))));
 
-    const needed = alignUp(size + @sizeOf(BlockHeader), min_align);
+    const needed = std.mem.alignForward(usize, size + @sizeOf(BlockHeader), min_align);
 
     var prev: ?*BlockHeader = null;
     var current = free_head;
@@ -177,8 +178,4 @@ fn coalesceFreeList() void {
         }
         current = block.next;
     }
-}
-
-fn alignUp(value: usize, alignment: usize) usize {
-    return (value + alignment - 1) & ~(alignment - 1);
 }

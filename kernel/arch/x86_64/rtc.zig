@@ -1,5 +1,6 @@
 const cpu = @import("cpu.zig");
 const interrupts = @import("interrupts.zig");
+const time_unix = @import("time_unix");
 
 const cmos_addr: u16 = 0x70;
 const cmos_data: u16 = 0x71;
@@ -26,7 +27,7 @@ var base_unix: i64 = 0;
 
 pub fn init() void {
     const dt = readDateTimeOnce();
-    base_unix = unixFromParts(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+    base_unix = time_unix.unixFromCivil(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
 }
 
 pub fn realtimeSeconds() i64 {
@@ -92,19 +93,4 @@ fn decode(raw: u8, binary: bool) u8 {
 fn cmosRead(reg: u8) u8 {
     cpu.outb(cmos_addr, reg);
     return cpu.inb(cmos_data);
-}
-
-fn unixFromParts(year: i32, month: i32, day: i32, hour: i32, minute: i32, second: i32) i64 {
-    var y = year;
-    var m = month;
-    if (m <= 2) {
-        y -= 1;
-        m += 12;
-    }
-    const era = @divFloor(y, 400);
-    const yoe = y - era * 400;
-    const doy = @divTrunc(153 * (m - 3) + 2, 5) + day - 1;
-    const doe = yoe * 365 + @divTrunc(yoe, 4) - @divTrunc(yoe, 100) + doy;
-    const days = era * 146097 + @as(i64, doe) - 719468;
-    return days * 86400 + @as(i64, hour) * 3600 + @as(i64, minute) * 60 + second;
 }

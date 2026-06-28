@@ -1,3 +1,4 @@
+const std = @import("std");
 const argv = @import("../argv.zig");
 const cwd = @import("../cwd.zig");
 const io = @import("../io.zig");
@@ -111,20 +112,6 @@ fn writeEntryType(mode: u32) void {
 
 fn printSizePadded(value: u64) void {
     var buf: [16]u8 = undefined;
-    var n: usize = 0;
-    var v = value;
-    if (v == 0) {
-        io.writeStr("       0");
-        return;
-    }
-    while (v > 0) : (n += 1) {
-        buf[n] = @truncate('0' + @mod(v, 10));
-        v /= 10;
-    }
-    var pad: usize = 0;
-    if (n < 8) pad = 8 - n;
-    while (pad > 0) : (pad -= 1) io.writeStr(" ");
-    while (n > 0) : (n -= 1) {
-        io.writeChar(buf[n - 1]);
-    }
+    const out = std.fmt.bufPrint(&buf, "{d:>8}", .{value}) catch return;
+    io.writeStr(out);
 }

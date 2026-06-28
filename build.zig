@@ -27,6 +27,18 @@ pub fn build(b: *std.Build) void {
         .optimize = user_optimize,
     });
 
+    const freestanding_std = b.createModule(.{
+        .root_source_file = b.path("userspace/freestanding_std.zig"),
+        .target = user_target,
+        .optimize = user_optimize,
+    });
+
+    const time_unix_user = b.createModule(.{
+        .root_source_file = b.path("common/time_unix.zig"),
+        .target = user_target,
+        .optimize = user_optimize,
+    });
+
     const hello = b.addExecutable(.{
         .name = "hello",
         .root_module = b.createModule(.{
@@ -37,6 +49,7 @@ pub fn build(b: *std.Build) void {
     });
     hello.setLinkerScript(b.path("userspace/linker.ld"));
     hello.root_module.addImport("libc", user_libc);
+    hello.root_module.addImport("freestanding_std", freestanding_std);
 
     const shell = b.addExecutable(.{
         .name = "shell",
@@ -48,6 +61,8 @@ pub fn build(b: *std.Build) void {
     });
     shell.setLinkerScript(b.path("userspace/linker.ld"));
     shell.root_module.addImport("libc", user_libc);
+    shell.root_module.addImport("freestanding_std", freestanding_std);
+    shell.root_module.addImport("time_unix", time_unix_user);
 
     const user_bin_dir: std.Build.InstallDir = .{ .custom = "userspace/bin" };
     const user_install = std.Build.Step.InstallArtifact.Options{
@@ -72,6 +87,13 @@ pub fn build(b: *std.Build) void {
         .code_model = .kernel,
     });
     kernel_mod.addImport("limine", limine_kernel_mod);
+
+    const time_unix_kernel = b.createModule(.{
+        .root_source_file = b.path("common/time_unix.zig"),
+        .target = kernel_target,
+        .optimize = optimize,
+    });
+    kernel_mod.addImport("time_unix", time_unix_kernel);
 
     const kernel = b.addExecutable(.{
         .name = "kernel",

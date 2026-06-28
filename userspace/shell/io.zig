@@ -1,3 +1,4 @@
+const std = @import("std");
 const libc = @import("libc");
 
 pub fn writeStr(s: []const u8) void {
@@ -5,11 +6,7 @@ pub fn writeStr(s: []const u8) void {
 }
 
 pub fn eql(a: []const u8, b: []const u8) bool {
-    if (a.len != b.len) return false;
-    for (a, b) |x, y| {
-        if (x != y) return false;
-    }
-    return true;
+    return std.mem.eql(u8, a, b);
 }
 
 pub fn writeChar(ch: u8) void {

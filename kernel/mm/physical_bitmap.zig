@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const page_size: u64 = 4096;
 
 /// Describes a contiguous physical address range for the bitmap core.
@@ -87,8 +89,8 @@ pub const PageBitmap = struct {
     }
 
     pub fn markRangeUsed(self: *PageBitmap, start: u64, end: u64) void {
-        var addr = alignUp(start, page_size);
-        const end_aligned = alignDown(end, page_size);
+        var addr = std.mem.alignForward(u64, start, page_size);
+        const end_aligned = std.mem.alignBackward(u64, end, page_size);
         while (addr < end_aligned) : (addr += page_size) {
             const pfn: usize = @intCast(addr / page_size);
             if (pfn > self.max_pfn) break;
@@ -100,8 +102,8 @@ pub const PageBitmap = struct {
     }
 
     pub fn markRangeFree(self: *PageBitmap, start: u64, end: u64) void {
-        var addr = alignUp(start, page_size);
-        const end_aligned = alignDown(end, page_size);
+        var addr = std.mem.alignForward(u64, start, page_size);
+        const end_aligned = std.mem.alignBackward(u64, end, page_size);
         while (addr < end_aligned) : (addr += page_size) {
             const pfn: usize = @intCast(addr / page_size);
             if (pfn > self.max_pfn) break;
@@ -135,11 +137,3 @@ pub const PageBitmap = struct {
         }
     }
 };
-
-fn alignUp(value: u64, alignment: u64) u64 {
-    return (value + alignment - 1) & ~(alignment - 1);
-}
-
-fn alignDown(value: u64, alignment: u64) u64 {
-    return value & ~(alignment - 1);
-}

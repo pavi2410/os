@@ -1,6 +1,7 @@
 const address = @import("address.zig");
 const memory_map = @import("memory_map.zig");
 const bitmap = @import("physical_bitmap.zig");
+const std = @import("std");
 
 pub const page_size = bitmap.page_size;
 pub const page_shift: u6 = 12;
@@ -91,7 +92,7 @@ fn findBitmapLocation(regions: []const memory_map.Region, pages_needed: usize) ?
     for (regions) |region| {
         if (!region.allocatable) continue;
 
-        var addr = alignUp(region.start, page_size);
+        var addr = std.mem.alignForward(u64, region.start, page_size);
         if (addr == 0) addr = page_size;
 
         if (addr + needed_bytes <= region.end) {
@@ -100,8 +101,4 @@ fn findBitmapLocation(regions: []const memory_map.Region, pages_needed: usize) ?
     }
 
     return null;
-}
-
-fn alignUp(value: u64, alignment: u64) u64 {
-    return (value + alignment - 1) & ~(alignment - 1);
 }

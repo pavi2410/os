@@ -1,6 +1,10 @@
 const cpu = @import("arch/x86_64/cpu.zig");
+const freestanding_std = @import("freestanding_std.zig");
 const kernel = @import("kernel.zig");
 const limine = @import("limine");
+
+pub const std_options_debug_io = freestanding_std.std_options_debug_io;
+pub const std_options = freestanding_std.std_options;
 
 export var limine_requests_start: [4]u64 linksection(".limine_requests_start") = limine.REQUESTS_START_MARKER;
 

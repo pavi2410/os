@@ -1,4 +1,8 @@
+const freestanding_std = @import("freestanding_std");
 const argv = @import("argv.zig");
+
+pub const std_options_debug_io = freestanding_std.std_options_debug_io;
+pub const std_options = freestanding_std.std_options;
 const cwd = @import("cwd.zig");
 const io = @import("io.zig");
 const libc = @import("libc");

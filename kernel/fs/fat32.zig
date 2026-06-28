@@ -1,3 +1,4 @@
+const std = @import("std");
 const acpi_access = @import("../acpi/access.zig");
 const virtio_blk = @import("../drivers/virtio_blk.zig");
 
@@ -58,7 +59,7 @@ pub fn mount() FatError!void {
 
     if (boot[510] != 0x55 or boot[511] != 0xAA) return FatError.InvalidBpb;
     const fs_type = boot[0x52 .. 0x52 + 8];
-    if (!stdEq(fs_type, "FAT32   ") and !stdEq(fs_type, "FAT16   ") and !stdEq(fs_type, "FAT     ")) {
+    if (!std.mem.eql(u8, fs_type, "FAT32   ") and !std.mem.eql(u8, fs_type, "FAT16   ") and !std.mem.eql(u8, fs_type, "FAT     ")) {
         return FatError.InvalidBpb;
     }
 
@@ -111,7 +112,7 @@ pub fn lookup(path: []const u8) FatError!Entry {
     var cluster = fs.root_cluster;
     var component: []const u8 = clean;
     while (true) {
-        const slash = indexOf(component, '/');
+        const slash = std.mem.indexOfScalar(u8, component, '/');
         const name = if (slash) |s| component[0..s] else component;
         const rest = if (slash) |s| component[s + 1 ..] else "";
 
@@ -549,7 +550,7 @@ fn findInDirectoryWithLoc(dir_cluster: u32, name: []const u8) FatError!OpenResul
                 off += 32;
                 continue;
             }
-            if (stdEq(entry[0..11], &name83)) {
+            if (std.mem.eql(u8, entry[0..11], &name83)) {
                 const hi = acpi_access.readU16(entry.ptr, 20);
                 const lo = acpi_access.readU16(entry.ptr, 26);
                 const start = (@as(u32, hi) << 16) | lo;
@@ -709,7 +710,7 @@ fn findInDirectory(dir_cluster: u32, name: []const u8) FatError!Entry {
                 off += 32;
                 continue;
             }
-            if (stdEq(entry[0..11], &name83)) {
+            if (std.mem.eql(u8, entry[0..11], &name83)) {
                 const hi = acpi_access.readU16(entry.ptr, 20);
                 const lo = acpi_access.readU16(entry.ptr, 26);
                 const start = (@as(u32, hi) << 16) | lo;
@@ -789,7 +790,7 @@ fn normalizePath(path: []const u8, out: []u8) FatError![]const u8 {
         while (i < path.len and path[i] != '/') : (i += 1) {}
         const part = path[start..i];
         if (part.len == 0) continue;
-        if (stdEq(part, ".") or stdEq(part, "..")) return FatError.NotFound;
+        if (std.mem.eql(u8, part, ".") or std.mem.eql(u8, part, "..")) return FatError.NotFound;
         if (len != 0) {
             out[len] = '/';
             len += 1;
@@ -805,7 +806,7 @@ fn normalizePath(path: []const u8, out: []u8) FatError![]const u8 {
 fn toShortName(name: []const u8, out: *[11]u8) FatError!void {
     @memset(out, ' ');
 
-    const dot = indexOf(name, '.');
+    const dot = std.mem.indexOfScalar(u8, name, '.');
     const base = if (dot) |d| name[0..d] else name;
     const ext = if (dot) |d| name[d + 1 ..] else "";
 
@@ -824,19 +825,4 @@ fn toShortName(name: []const u8, out: *[11]u8) FatError!void {
 fn toUpper(c: u8) u8 {
     if (c >= 'a' and c <= 'z') return c - 32;
     return c;
-}
-
-fn indexOf(hay: []const u8, needle: u8) ?usize {
-    for (hay, 0..) |c, i| {
-        if (c == needle) return i;
-    }
-    return null;
-}
-
-fn stdEq(a: []const u8, b: []const u8) bool {
-    if (a.len != b.len) return false;
-    for (a, b) |x, y| {
-        if (x != y) return false;
-    }
-    return true;
 }
