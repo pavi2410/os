@@ -51,6 +51,7 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.wait4 => sysWait4(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
         numbers.unlink => sysUnlink(frame.arg0),
         numbers.mkdir => sysMkdir(frame.arg0, frame.arg1),
+        numbers.rmdir => sysRmdir(frame.arg0),
         numbers.listdir => sysListdir(frame.arg0, frame.arg1, frame.arg2),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
         else => ENOSYS,
@@ -220,6 +221,12 @@ fn sysMkdir(path_ptr: u64, mode: u64) i64 {
     return 0;
 }
 
+fn sysRmdir(path_ptr: u64) i64 {
+    const path = userCString(path_ptr) orelse return EFAULT;
+    vfs.rmdir(path) catch |err| return errnoFromVfsErr(err);
+    return 0;
+}
+
 fn sysListdir(path_ptr: u64, buf_ptr: u64, cap: u64) i64 {
     const path = userCString(path_ptr) orelse return EFAULT;
     if (buf_ptr == 0 or cap == 0) return EINVAL;
@@ -260,6 +267,7 @@ fn errnoFromVfsErr(err: vfs.VfsError) i64 {
         vfs.VfsError.BufferTooSmall => EINVAL,
         vfs.VfsError.Exists => -17, // EEXIST
         vfs.VfsError.NoSpace => -28, // ENOSPC
+        vfs.VfsError.NotEmpty => -39, // ENOTEMPTY
         vfs.VfsError.ReadOnly => EACCES,
     };
 }

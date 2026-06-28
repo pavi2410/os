@@ -10,6 +10,7 @@ const cmd_ls = @import("cmd/ls.zig");
 const cmd_mkdir = @import("cmd/mkdir.zig");
 const cmd_pid = @import("cmd/pid.zig");
 const cmd_rm = @import("cmd/rm.zig");
+const cmd_rmdir = @import("cmd/rmdir.zig");
 const cmd_run = @import("cmd/run.zig");
 const cmd_write = @import("cmd/write.zig");
 
@@ -51,6 +52,8 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
             cmd_rm.run(&parsed);
         } else if (io.eql(cmd, "mkdir")) {
             cmd_mkdir.run(&parsed);
+        } else if (io.eql(cmd, "rmdir")) {
+            cmd_rmdir.run(&parsed);
         } else if (cmd.len > 0 and cmd[0] == '/') {
             io.writeStr("unknown command\n");
         } else {

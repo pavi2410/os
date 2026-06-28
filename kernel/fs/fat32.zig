@@ -13,6 +13,7 @@ pub const FatError = error{
     BufferTooSmall,
     Exists,
     NoSpace,
+    NotEmpty,
 };
 
 pub const Entry = struct {
@@ -226,6 +227,53 @@ pub fn createDirectory(path: []const u8) FatError!void {
         .attr = 0x10,
     };
     try writeDirEntry(loc, &name83, entry);
+}
+
+/// Remove an empty directory: free its clusters and mark the directory entry deleted.
+pub fn removeDirectory(path: []const u8) FatError!DirLoc {
+    if (!mounted) return FatError.NotReady;
+
+    var norm: [256]u8 = undefined;
+    const clean = try normalizePath(path, &norm);
+    if (clean.len == 0) return FatError.IsDirectory;
+
+    const parent_cluster = try lookupParentCluster(clean);
+    const name = parentName(clean);
+    const result = try findInDirectoryWithLoc(parent_cluster, name);
+
+    if (result.entry.attr & 0x10 == 0) return FatError.NotFile;
+    if (!try directoryIsEmpty(result.entry.start_cluster)) return FatError.NotEmpty;
+    if (result.entry.start_cluster >= 2) try freeChain(result.entry.start_cluster);
+
+    try readCluster(result.loc.cluster, cluster_buf[0..fs.cluster_bytes]);
+    const off: usize = @intCast(result.loc.offset);
+    if (off + 32 > fs.cluster_bytes) return FatError.IoError;
+    cluster_buf[off] = 0xE5;
+    try writeCluster(result.loc.cluster, cluster_buf[0..fs.cluster_bytes]);
+    return result.loc;
+}
+
+fn directoryIsEmpty(dir_cluster: u32) FatError!bool {
+    var cluster = dir_cluster;
+    while (cluster >= 2 and cluster < 0x0FFFFFF8) {
+        try readCluster(cluster, cluster_buf[0..fs.cluster_bytes]);
+        var off: usize = 0;
+        while (off + 32 <= fs.cluster_bytes) {
+            const entry = cluster_buf[off .. off + 32];
+            if (entry[0] == 0) return true;
+            if (entry[0] == 0xE5 or entry[0] == 0x2E) {
+                off += 32;
+                continue;
+            }
+            if (entry[11] == 0x0F) {
+                off += 32;
+                continue;
+            }
+            return false;
+        }
+        cluster = nextCluster(cluster) catch return true;
+    }
+    return true;
 }
 
 fn initDirectoryCluster(cluster: u32, parent_cluster: u32) FatError!void {

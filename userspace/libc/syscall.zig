@@ -80,6 +80,10 @@ pub fn mkdir(path: [*:0]const u8, mode: u32) isize {
     return syscall6(83, @intFromPtr(path), mode, 0, 0, 0, 0);
 }
 
+pub fn rmdir(path: [*:0]const u8) isize {
+    return syscall6(84, @intFromPtr(path), 0, 0, 0, 0, 0);
+}
+
 fn syscall6(
     nr: u64,
     arg0: u64,

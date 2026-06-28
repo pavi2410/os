@@ -40,7 +40,7 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         run_case(
             shell,
             "help",
-            "Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir",
+            "Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir, rmdir",
             case="help",
         )
         run_case(shell, "echo hello from echo", "hello from echo", case="echo")
@@ -58,6 +58,8 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         run_case(shell, "ls -l /", "dir         0 TDIR", case="ls -l tdir")
         run_case(shell, "write /TDIR/NOTE.TXT nested", "write: ok", case="write in dir")
         run_case(shell, "cat /TDIR/NOTE.TXT", "nested", case="cat in dir")
+        run_case(shell, "rm /TDIR/NOTE.TXT", "rm: ok", case="rm note in dir")
+        run_case(shell, "rmdir /TDIR", "rmdir: ok", case="rmdir tdir")
         run_case(shell, "ls -l /BIN", "4880 HELLO", case="ls -l /BIN")
         run_case(shell, "write /yo.txt yoman", "write: ok", case="write yo")
         run_case(shell, "cat /YO.TXT", "yoman", case="cat yo")

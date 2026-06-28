@@ -159,6 +159,11 @@ pub fn mkdir(path: []const u8) VfsError!void {
     try fat32.createDirectory(path);
 }
 
+pub fn rmdir(path: []const u8) VfsError!void {
+    const loc = try fat32.removeDirectory(path);
+    invalidateHandlesAt(loc);
+}
+
 fn invalidateHandlesAt(loc: fat32.DirLoc) void {
     var i: u32 = 0;
     while (i < max_handles) : (i += 1) {
