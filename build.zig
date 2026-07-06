@@ -410,6 +410,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("userspace/libc/format.zig"),
         .target = b.graph.host,
     });
+    const time_math_host = b.createModule(.{
+        .root_source_file = b.path("userspace/libc/time_math.zig"),
+        .target = b.graph.host,
+    });
 
     const libc_helpers_test_mod = b.createModule(.{
         .root_source_file = b.path("test/userspace/libc_helpers_test.zig"),
@@ -422,6 +426,17 @@ pub fn build(b: *std.Build) void {
         .root_module = libc_helpers_test_mod,
     });
     const run_libc_helpers_tests = b.addRunArtifact(libc_helpers_tests);
+
+    const time_math_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/userspace/time_math_test.zig"),
+        .target = b.graph.host,
+    });
+    time_math_test_mod.addImport("time_math", time_math_host);
+
+    const time_math_tests = b.addTest(.{
+        .root_module = time_math_test_mod,
+    });
+    const run_time_math_tests = b.addRunArtifact(time_math_tests);
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_memory_map_tests.step);
@@ -436,4 +451,5 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_dns_codec_tests.step);
     test_step.dependOn(&run_abi_tests.step);
     test_step.dependOn(&run_libc_helpers_tests.step);
+    test_step.dependOn(&run_time_math_tests.step);
 }

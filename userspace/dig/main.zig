@@ -18,7 +18,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         if (arg[0] == '@') {
             if (!libc.ip.parseIpv4(arg[1..], &dns_addr)) {
                 writeStr("dig: bad server address\n");
-                libc.syscall.exit(1);
+                libc.process.exit(1);
             }
             continue;
         }
@@ -28,37 +28,36 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
 
     const qname = name orelse {
         writeStr("usage: dig [@server] name\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     };
 
     var query: [256]u8 = undefined;
     const query_len = buildQuery(qname, &query) catch {
         writeStr("dig: bad name\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     };
 
     const fd = libc.net.socket(libc.net.AF_INET, libc.net.SOCK_DGRAM, 0);
     if (fd < 0) {
         writeStr("dig: socket failed\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
     var dest = libc.net.sockaddrIn(dns_addr, dns_port);
 
-    if (libc.syscall.sendto(
+    if (libc.net.sendto(
         @intCast(fd),
         &query,
         query_len,
         0,
         &dest,
-        @sizeOf(libc.net.SockaddrIn),
     ) < 0) {
         writeStr("dig: send failed\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
     var reply: [512]u8 = undefined;
-    const n = libc.syscall.recvfrom(
+    const n = libc.net.recvfrom(
         @intCast(fd),
         &reply,
         reply.len,
@@ -68,11 +67,11 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
     );
     if (n < 12) {
         writeStr("dig: timeout\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
     printResult(qname, reply[0..@intCast(n)]);
-    libc.syscall.exit(0);
+    libc.process.exit(0);
 }
 
 fn buildQuery(name: []const u8, out: []u8) !usize {

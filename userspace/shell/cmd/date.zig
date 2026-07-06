@@ -2,10 +2,10 @@ const io = @import("../io.zig");
 const libc = @import("libc");
 const time_unix = @import("time_unix");
 
-var timespec_storage: libc.syscall.Timespec = .{ .tv_sec = 0, .tv_nsec = 0 };
+var timespec_storage: libc.time.Timespec = .{ .tv_sec = 0, .tv_nsec = 0 };
 
 pub fn run() void {
-    if (libc.syscall.clock_gettime(libc.syscall.CLOCK_REALTIME, &timespec_storage) < 0) {
+    if (!libc.time.realtime(&timespec_storage)) {
         io.writeStr("date: failed\n");
         return;
     }

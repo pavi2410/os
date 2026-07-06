@@ -15,7 +15,7 @@ pub fn run(parsed: *const argv.Parsed) void {
         return;
     };
 
-    if (libc.syscall.mkdir(@ptrCast(resolved.ptr), 0o755) < 0) {
+    if (libc.fs.mkdir(@ptrCast(resolved.ptr), 0o755) < 0) {
         io.writeStr("mkdir: failed\n");
         return;
     }

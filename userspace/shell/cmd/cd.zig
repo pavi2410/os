@@ -4,8 +4,6 @@ const io = @import("../io.zig");
 const path = @import("../path.zig");
 const libc = @import("libc");
 
-const S_IFDIR: u32 = 0o040000;
-
 pub fn run(parsed: *const argv.Parsed) void {
     const target = parsed.positionalAt(0) orelse "/";
 
@@ -15,12 +13,12 @@ pub fn run(parsed: *const argv.Parsed) void {
         return;
     };
 
-    var st: libc.syscall.Stat = .{};
-    if (libc.syscall.stat(@ptrCast(resolved.ptr), &st) < 0) {
+    var st: libc.fs.Stat = .{};
+    if (libc.fs.stat(@ptrCast(resolved.ptr), &st) < 0) {
         io.writeStr("cd: not found\n");
         return;
     }
-    if (st.st_mode & S_IFDIR == 0) {
+    if (!libc.fs.isDir(st.st_mode)) {
         io.writeStr("cd: not a directory\n");
         return;
     }

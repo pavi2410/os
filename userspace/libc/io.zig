@@ -21,6 +21,10 @@ pub fn writeStr(s: []const u8) void {
     _ = syscall.write(1, s.ptr, s.len);
 }
 
+pub fn readStdin(buf: []u8) isize {
+    return syscall.read(0, buf.ptr, buf.len);
+}
+
 pub fn writeChar(ch: u8) void {
     var buf: [1]u8 = .{ch};
     writeStr(&buf);

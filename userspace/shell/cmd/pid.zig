@@ -2,7 +2,7 @@ const io = @import("../io.zig");
 const libc = @import("libc");
 
 pub fn run() void {
-    printPid(libc.syscall.getpid());
+    printPid(libc.process.getpid());
 }
 
 fn printPid(pid: isize) void {

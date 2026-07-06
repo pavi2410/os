@@ -19,28 +19,28 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
             argi += 1;
             if (argi >= argc) {
                 writeStr("usage: ping [-c count] [ip]\n");
-                libc.syscall.exit(1);
+                libc.process.exit(1);
             }
             count = parseCount(libc.io.cstr(argv[argi])) orelse {
                 writeStr("ping: bad count\n");
-                libc.syscall.exit(1);
+                libc.process.exit(1);
             };
             continue;
         }
         if (!libc.ip.parseIpv4(arg, &host)) {
             writeStr("ping: bad address\n");
-            libc.syscall.exit(1);
+            libc.process.exit(1);
         }
     }
 
-    const fd = libc.syscall.socket(
+    const fd = libc.net.socket(
         libc.net.AF_INET,
         libc.net.SOCK_DGRAM,
         libc.net.IPPROTO_ICMP,
     );
     if (fd < 0) {
         writeStr("ping: socket failed\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
     var ip_buf: [16]u8 = undefined;
@@ -61,19 +61,18 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
 
     while (transmitted < count) : (transmitted += 1) {
         const start = monotonicUs();
-        if (libc.syscall.sendto(
+        if (libc.net.sendto(
             @intCast(fd),
             &empty,
             0,
             0,
             &dest,
-            @sizeOf(libc.net.SockaddrIn),
         ) < 0) {
             writeStr("ping: send failed\n");
-            libc.syscall.exit(1);
+            libc.process.exit(1);
         }
 
-        const n = libc.syscall.recvfrom(
+        const n = libc.net.recvfrom(
             @intCast(fd),
             &reply,
             reply.len,
@@ -125,10 +124,10 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         writeStr("/");
         writeMillis(rtt_max_us);
         writeStr(" ms\n");
-        libc.syscall.exit(0);
+        libc.process.exit(0);
     }
 
-    libc.syscall.exit(1);
+    libc.process.exit(1);
 }
 
 fn parseCount(s: []const u8) ?usize {
@@ -175,20 +174,11 @@ fn writeMillis(us: u64) void {
 }
 
 fn monotonicUs() u64 {
-    var ts: libc.syscall.Timespec = undefined;
-    if (libc.syscall.clock_gettime(libc.syscall.CLOCK_MONOTONIC, &ts) < 0) return 0;
-    return timespecUs(ts);
+    return libc.time.monotonicUs();
 }
 
 fn elapsedSinceUs(start: u64) u64 {
-    const now = monotonicUs();
-    if (now < start) return 0;
-    return now - start;
-}
-
-fn timespecUs(ts: libc.syscall.Timespec) u64 {
-    if (ts.tv_sec < 0 or ts.tv_nsec < 0) return 0;
-    return @as(u64, @intCast(ts.tv_sec)) * 1_000_000 + @as(u64, @intCast(ts.tv_nsec)) / 1000;
+    return libc.time.elapsedUs(start, monotonicUs());
 }
 
 fn writeStr(s: []const u8) void {

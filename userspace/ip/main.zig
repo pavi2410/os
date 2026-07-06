@@ -9,7 +9,7 @@ const iface_name = "eth0";
 export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
     if (argc < 2) {
         printUsage();
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
     const sub = libc.io.cstr(argv[1]);
@@ -24,10 +24,10 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         writeStr(sub);
         writeStr("'\n");
         printUsage();
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
-    libc.syscall.exit(0);
+    libc.process.exit(0);
 }
 
 fn printUsage() void {
@@ -38,7 +38,7 @@ fn cmdAddr() void {
     var cfg: libc.net.NetConfig = undefined;
     if (libc.net.getnetconfig(&cfg) < 0) {
         writeStr("ip: getnetconfig failed\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
     writeStr(iface_name);
@@ -58,7 +58,7 @@ fn cmdRoute() void {
     var cfg: libc.net.NetConfig = undefined;
     if (libc.net.getnetconfig(&cfg) < 0) {
         writeStr("ip: getnetconfig failed\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
     writeStr("default via ");
@@ -81,7 +81,7 @@ fn cmdNeigh() void {
     const n = libc.net.getneighbors(&entries, entries.len);
     if (n < 0) {
         writeStr("ip: getneighbors failed\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
     var i: usize = 0;

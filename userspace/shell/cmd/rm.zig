@@ -15,7 +15,7 @@ pub fn run(parsed: *const argv.Parsed) void {
         return;
     };
 
-    if (libc.syscall.unlink(@ptrCast(resolved.ptr)) < 0) {
+    if (libc.fs.unlink(@ptrCast(resolved.ptr)) < 0) {
         io.writeStr("rm: failed\n");
         return;
     }

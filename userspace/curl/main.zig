@@ -17,20 +17,20 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
 noinline fn run(argc: usize, argv: [*][*]u8) void {
     if (argc < 2) {
         writeStr("usage: curl <url|host> [port]\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
     const arg = libc.io.cstr(argv[1]);
     const parsed = target.parse(arg, &norm_buf, &host_buf, &path_buf) catch {
         writeStr("curl: bad url\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     };
 
     var port = parsed.port;
     if (argc >= 3) {
         port = target.parsePort(libc.io.cstr(argv[2])) orelse {
             writeStr("curl: bad port\n");
-            libc.syscall.exit(1);
+            libc.process.exit(1);
         };
     }
 
@@ -39,7 +39,7 @@ noinline fn run(argc: usize, argv: [*][*]u8) void {
         // literal IPv4
     } else if (!resolveName(parsed.host, &host_ip)) {
         writeStr("curl: could not resolve host\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
     httpGet(parsed.host, &host_ip, port, parsed.path);
@@ -57,21 +57,22 @@ noinline fn httpGet(host: []const u8, ip: *const [4]u8, port: u16, path: []const
     );
     if (fd < 0) {
         writeStr("curl: socket failed\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
     var dest = libc.net.sockaddrIn(ip.*, port);
 
     if (libc.net.connect(@intCast(fd), &dest) < 0) {
         writeStr("curl: connect failed\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 
-    sendPart(@intCast(fd), "GET ");
-    sendPart(@intCast(fd), path);
-    sendPart(@intCast(fd), " HTTP/1.0\r\nHost: ");
-    sendPart(@intCast(fd), host);
-    sendPart(@intCast(fd), "\r\n\r\n");
+    var request: [256]u8 = undefined;
+    const request_len = target.buildRequest(host, path, &request) orelse {
+        writeStr("curl: request too large\n");
+        libc.process.exit(1);
+    };
+    sendPart(@intCast(fd), request[0..request_len]);
 
     var got_body = false;
     while (true) {
@@ -79,7 +80,7 @@ noinline fn httpGet(host: []const u8, ip: *const [4]u8, port: u16, path: []const
         if (n == 0) break;
         if (n < 0) {
             writeStr("curl: recv failed\n");
-            libc.syscall.exit(1);
+            libc.process.exit(1);
         }
         const chunk = recv_buf[0..@intCast(n)];
         if (!got_body) {
@@ -93,13 +94,13 @@ noinline fn httpGet(host: []const u8, ip: *const [4]u8, port: u16, path: []const
     }
 
     if (!got_body) writeStr("\n");
-    libc.syscall.exit(0);
+    libc.process.exit(0);
 }
 
 fn sendPart(fd: u32, bytes: []const u8) void {
     if (libc.net.send(fd, bytes.ptr, bytes.len, 0) < 0) {
         writeStr("curl: send failed\n");
-        libc.syscall.exit(1);
+        libc.process.exit(1);
     }
 }
 

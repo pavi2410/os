@@ -1,5 +1,5 @@
 const libc = @import("libc");
 
 pub fn run() void {
-    libc.syscall.exit(0);
+    libc.process.exit(0);
 }

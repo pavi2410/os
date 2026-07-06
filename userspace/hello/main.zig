@@ -8,6 +8,6 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
     _ = argc;
     _ = argv;
     const msg = "Hello from userspace!\n";
-    _ = libc.syscall.write(1, msg.ptr, msg.len);
-    libc.syscall.exit(0);
+    libc.io.writeStr(msg);
+    libc.process.exit(0);
 }

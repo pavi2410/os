@@ -15,7 +15,7 @@ pub fn run(parsed: *const argv.Parsed) void {
         return;
     };
 
-    if (libc.syscall.rmdir(@ptrCast(resolved.ptr)) < 0) {
+    if (libc.fs.rmdir(@ptrCast(resolved.ptr)) < 0) {
         io.writeStr("rmdir: failed\n");
         return;
     }

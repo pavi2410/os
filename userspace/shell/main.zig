@@ -37,7 +37,7 @@ export fn main(argc: usize, raw_argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }
     while (true) {
         writePrompt();
 
-        const n = libc.syscall.read(0, &line, line.len);
+        const n = libc.io.readStdin(&line);
         if (n <= 0) continue;
 
         const parsed = arg.parse(&line, @intCast(n)) catch {

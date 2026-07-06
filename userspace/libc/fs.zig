@@ -43,3 +43,19 @@ pub fn stat(path: [*:0]const u8, out: *Stat) isize {
 pub fn getdents64(fd: u32, buf: [*]u8, count: usize) isize {
     return syscall.getdents64(fd, buf, count);
 }
+
+pub fn unlink(path: [*:0]const u8) isize {
+    return syscall.unlink(path);
+}
+
+pub fn mkdir(path: [*:0]const u8, mode: u32) isize {
+    return syscall.mkdir(path, mode);
+}
+
+pub fn rmdir(path: [*:0]const u8) isize {
+    return syscall.rmdir(path);
+}
+
+pub fn isDir(mode: u32) bool {
+    return mode & S_IFDIR != 0;
+}
