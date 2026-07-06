@@ -27,6 +27,13 @@ pub fn build(b: *std.Build) void {
         .optimize = user_optimize,
     });
 
+    const dns_codec_user = b.createModule(.{
+        .root_source_file = b.path("userspace/net/dns_codec.zig"),
+        .target = user_target,
+        .optimize = user_optimize,
+    });
+    user_libc.addImport("dns_codec", dns_codec_user);
+
     const freestanding_std = b.createModule(.{
         .root_source_file = b.path("userspace/freestanding_std.zig"),
         .target = user_target,
@@ -98,18 +105,23 @@ pub fn build(b: *std.Build) void {
     ping.root_module.addImport("freestanding_std", freestanding_std);
     const install_ping = b.addInstallArtifact(ping, user_install);
 
-    const fetch = b.addExecutable(.{
-        .name = "fetch",
+    const curl = b.addExecutable(.{
+        .name = "curl",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("userspace/fetch/main.zig"),
+            .root_source_file = b.path("userspace/curl/main.zig"),
             .target = user_target,
             .optimize = user_optimize,
         }),
     });
-    fetch.setLinkerScript(b.path("userspace/linker.ld"));
-    fetch.root_module.addImport("libc", user_libc);
-    fetch.root_module.addImport("freestanding_std", freestanding_std);
-    const install_fetch = b.addInstallArtifact(fetch, user_install);
+    curl.setLinkerScript(b.path("userspace/linker.ld"));
+    curl.root_module.addImport("libc", user_libc);
+    curl.root_module.addImport("freestanding_std", freestanding_std);
+    curl.root_module.addImport("target.zig", b.createModule(.{
+        .root_source_file = b.path("userspace/curl/target.zig"),
+        .target = user_target,
+        .optimize = user_optimize,
+    }));
+    const install_curl = b.addInstallArtifact(curl, user_install);
 
     const ip = b.addExecutable(.{
         .name = "ip",
@@ -128,7 +140,7 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_shell.step);
     b.getInstallStep().dependOn(&install_dig.step);
     b.getInstallStep().dependOn(&install_ping.step);
-    b.getInstallStep().dependOn(&install_fetch.step);
+    b.getInstallStep().dependOn(&install_curl.step);
     b.getInstallStep().dependOn(&install_ip.step);
 
     const limine_kernel_mod = b.createModule(.{
@@ -225,9 +237,43 @@ pub fn build(b: *std.Build) void {
     });
     const run_tcp_tests = b.addRunArtifact(tcp_tests);
 
+    const curl_target_mod = b.createModule(.{
+        .root_source_file = b.path("userspace/curl/target.zig"),
+        .target = b.graph.host,
+    });
+
+    const curl_target_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/userspace/curl_target_test.zig"),
+        .target = b.graph.host,
+    });
+    curl_target_test_mod.addImport("curl_target", curl_target_mod);
+
+    const curl_target_tests = b.addTest(.{
+        .root_module = curl_target_test_mod,
+    });
+    const run_curl_target_tests = b.addRunArtifact(curl_target_tests);
+
+    const dns_codec_mod = b.createModule(.{
+        .root_source_file = b.path("userspace/net/dns_codec.zig"),
+        .target = b.graph.host,
+    });
+
+    const dns_codec_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/userspace/dns_codec_test.zig"),
+        .target = b.graph.host,
+    });
+    dns_codec_test_mod.addImport("dns_codec", dns_codec_mod);
+
+    const dns_codec_tests = b.addTest(.{
+        .root_module = dns_codec_test_mod,
+    });
+    const run_dns_codec_tests = b.addRunArtifact(dns_codec_tests);
+
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_memory_map_tests.step);
     test_step.dependOn(&run_physical_tests.step);
     test_step.dependOn(&run_icmp_tests.step);
     test_step.dependOn(&run_tcp_tests.step);
+    test_step.dependOn(&run_curl_target_tests.step);
+    test_step.dependOn(&run_dns_codec_tests.step);
 }

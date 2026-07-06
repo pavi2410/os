@@ -148,7 +148,7 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         shell2.close()
 
 
-def test_tcp_fetch_from_host(repo_root: Path, tmp_path: Path) -> None:
+def test_tcp_curl_from_host(repo_root: Path, tmp_path: Path) -> None:
     (tmp_path / "index.html").write_text("hello from host tcp\n", encoding="utf-8")
     port = free_port()
     server = subprocess.Popen(
@@ -173,9 +173,9 @@ def test_tcp_fetch_from_host(repo_root: Path, tmp_path: Path) -> None:
             shell.wait_ready()
             run_case(
                 shell,
-                f"fetch 10.0.2.2 {port}",
+                f"curl 10.0.2.2 {port}",
                 "hello from host tcp",
-                case="fetch host tcp",
+                case="curl host tcp",
             )
             shell.assert_no_faults()
         finally:
