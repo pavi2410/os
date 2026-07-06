@@ -85,9 +85,23 @@ pub fn build(b: *std.Build) void {
     dig.root_module.addImport("freestanding_std", freestanding_std);
     const install_dig = b.addInstallArtifact(dig, user_install);
 
+    const ping = b.addExecutable(.{
+        .name = "ping",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("userspace/ping/main.zig"),
+            .target = user_target,
+            .optimize = user_optimize,
+        }),
+    });
+    ping.setLinkerScript(b.path("userspace/linker.ld"));
+    ping.root_module.addImport("libc", user_libc);
+    ping.root_module.addImport("freestanding_std", freestanding_std);
+    const install_ping = b.addInstallArtifact(ping, user_install);
+
     b.getInstallStep().dependOn(&install_hello.step);
     b.getInstallStep().dependOn(&install_shell.step);
     b.getInstallStep().dependOn(&install_dig.step);
+    b.getInstallStep().dependOn(&install_ping.step);
 
     const limine_kernel_mod = b.createModule(.{
         .root_source_file = b.path("kernel/boot/limine.zig"),

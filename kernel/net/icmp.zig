@@ -60,26 +60,51 @@ pub fn buildEchoRequest(
     return frame_len;
 }
 
+/// Echo reply for @p id (and optional @p sequence). Returns ICMP payload bytes.
+pub fn matchEchoReply(
+    frame: []const u8,
+    id: u16,
+    sequence: ?u16,
+    src_ip_out: *ipv4.Addr,
+) ?[]const u8 {
+    if (frame.len < ethernet.header_len + ipv4.header_len + header_len) return null;
+
+    const eth: *const ethernet.Header = @ptrCast(@alignCast(frame.ptr));
+    if (ethernet.ethertypeHost(eth) != ethernet.ethertype_ipv4) return null;
+
+    const ip: *const ipv4.Header = @ptrCast(@alignCast(frame[ethernet.header_len..].ptr));
+    if (ip.protocol != ipv4.proto_icmp) return null;
+
+    const ip_total = ipv4.totalLengthHost(ip);
+    if (ip_total < ipv4.header_len + header_len) return null;
+
+    const icmp_off = ethernet.header_len + ipv4.header_len;
+    const icmp: *const Header = @ptrCast(@alignCast(frame[icmp_off..].ptr));
+    if (icmp.type != echo_reply) return null;
+    if (icmp.code != 0) return null;
+    if (identifierHost(icmp) != id) return null;
+    if (sequence) |seq| {
+        if (sequenceHost(icmp) != seq) return null;
+    }
+
+    const icmp_len = ip_total - ipv4.header_len;
+    const payload_off = icmp_off + header_len;
+    const frame_ip_end = ethernet.header_len + ip_total;
+    if (payload_off > frame_ip_end or icmp_len < header_len) return null;
+
+    src_ip_out.* = ip.src;
+    return frame[payload_off..frame_ip_end];
+}
+
 pub fn isEchoReply(
     frame: []const u8,
     expected_src: ipv4.Addr,
     id: u16,
     sequence: u16,
 ) bool {
-    if (frame.len < ethernet.header_len + ipv4.header_len + header_len) return false;
-
-    const eth: *const ethernet.Header = @ptrCast(@alignCast(frame.ptr));
-    if (ethernet.ethertypeHost(eth) != ethernet.ethertype_ipv4) return false;
-
-    const ip: *const ipv4.Header = @ptrCast(@alignCast(frame[ethernet.header_len..].ptr));
-    if (ip.protocol != ipv4.proto_icmp) return false;
-    if (!ipv4.equal(ip.src, expected_src)) return false;
-
-    const ip_total = ipv4.totalLengthHost(ip);
-    if (ip_total < ipv4.header_len + header_len) return false;
-
-    const icmp: *const Header = @ptrCast(@alignCast(frame[ethernet.header_len + ipv4.header_len ..].ptr));
-    if (icmp.type != echo_reply) return false;
-    if (icmp.code != 0) return false;
-    return identifierHost(icmp) == id and sequenceHost(icmp) == sequence;
+    var src: ipv4.Addr = undefined;
+    if (matchEchoReply(frame, id, sequence, &src)) |_| {
+        return ipv4.equal(src, expected_src);
+    }
+    return false;
 }

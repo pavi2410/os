@@ -94,6 +94,7 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         run_case(shell, "hello", "Hello from userspace!", case="fork/exec hello")
         run_case(shell, "dig example.com", "ANSWER SECTION", case="dig example.com")
         run_case(shell, "dig example.com", "IN  A", case="dig A record")
+        run_case(shell, "ping", "ping: 10.0.2.2 reply", case="ping gateway")
         pid_out = run_case(shell, "pid", case="pid")
         assert any(ch.isdigit() for ch in pid_out), f"pid: no digits in:\n{pid_out}"
         shell.assert_no_faults()

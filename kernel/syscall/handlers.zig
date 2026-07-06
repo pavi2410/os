@@ -322,7 +322,6 @@ fn sysBind(sockfd: u64, addr_ptr: u64, addrlen: u64) i64 {
 fn sysSendto(sockfd: u64, buf_ptr: u64, len: u64, flags: u64, dest_ptr: u64, addrlen: u64) i64 {
     _ = flags;
     _ = addrlen;
-    if (len == 0) return 0;
     const proc = process.currentProcess() orelse return EBADF;
     if (sockfd >= process.max_fds) return EBADF;
     const slot = &proc.fds.fds[@intCast(sockfd)];

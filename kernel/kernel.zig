@@ -18,7 +18,6 @@ const tty = @import("drivers/tty.zig");
 const pci = @import("drivers/pci.zig");
 const virtio_blk = @import("drivers/virtio_blk.zig");
 const virtio_net = @import("drivers/virtio_net.zig");
-const ping = @import("net/ping.zig");
 const udp_test = @import("net/udp_test.zig");
 const vfs = @import("fs/vfs.zig");
 const syscall = @import("syscall/entry.zig");
@@ -108,7 +107,6 @@ fn initNetwork() void {
         return;
     };
     virtio_net.logStatus();
-    ping.runSelfTest();
     udp_test.runSelfTest();
 }
 

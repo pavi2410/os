@@ -81,6 +81,8 @@ pub fn execve(path: [*:0]const u8, argv: [*:null]?[*:0]const u8, envp: [*:null]?
 
 pub const AF_INET: u16 = 2;
 pub const SOCK_DGRAM: u16 = 2;
+pub const IPPROTO_ICMP: u32 = 1;
+pub const IPPROTO_UDP: u32 = 17;
 
 pub const SockaddrIn = extern struct {
     family: u16,
