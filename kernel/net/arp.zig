@@ -2,7 +2,6 @@ const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 
 pub const hardware_ethernet: u16 = 1;
-pub const protocol_ipv4: u16 = 0x0800;
 pub const op_request: u16 = 1;
 pub const op_reply: u16 = 2;
 
@@ -37,7 +36,7 @@ pub fn buildRequest(
 
     const arp: *Header = @ptrCast(@alignCast(out[ethernet.header_len..].ptr));
     arp.hw_type_be = @byteSwap(hardware_ethernet);
-    arp.proto_type_be = @byteSwap(protocol_ipv4);
+    arp.proto_type_be = @byteSwap(ethernet.ethertype_ipv4);
     arp.hw_len = ethernet.mac_len;
     arp.proto_len = ipv4.addr_len;
     arp.opcode_be = @byteSwap(op_request);
