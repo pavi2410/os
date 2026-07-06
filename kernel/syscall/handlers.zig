@@ -9,8 +9,7 @@ const user_wait = @import("../proc/wait.zig");
 const vfs = @import("../fs/vfs.zig");
 const socket = @import("../net/socket.zig");
 const net_info = @import("../net/info.zig");
-const rtc = @import("../arch/x86_64/rtc.zig");
-const interrupts = @import("../arch/x86_64/interrupts.zig");
+const hal = @import("../hal.zig");
 const abi_fs = @import("abi_fs");
 const abi_syscall = @import("abi_syscall");
 const errno = @import("errno.zig");
@@ -235,10 +234,10 @@ fn sysClockGettime(clock_id: u64, timespec_ptr: u64) i64 {
     var ts: Timespec = .{ .tv_sec = 0, .tv_nsec = 0 };
     switch (clock_id) {
         abi_syscall.CLOCK_REALTIME => {
-            ts.tv_sec = rtc.realtimeSeconds();
+            ts.tv_sec = hal.clock.realtimeSeconds();
         },
         abi_syscall.CLOCK_MONOTONIC => {
-            const ticks = interrupts.timerTickCount();
+            const ticks = hal.clock.timerTickCount();
             ts.tv_sec = @intCast(@divTrunc(ticks, 100));
             ts.tv_nsec = @intCast(@mod(ticks, 100) * 10_000_000);
         },

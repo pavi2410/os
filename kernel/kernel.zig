@@ -11,7 +11,7 @@ const limine = @import("limine");
 const memory_map = @import("mm/memory_map.zig");
 const paging = @import("arch/x86_64/paging.zig");
 const physical = @import("mm/physical.zig");
-const serial = @import("arch/x86_64/serial.zig");
+const hal = @import("hal.zig");
 const scheduler = @import("proc/scheduler.zig");
 const process = @import("proc/process.zig");
 const tty = @import("drivers/tty.zig");
@@ -50,16 +50,16 @@ pub fn init(ctx: BootContext) void {
     idt.init();
     idt.load();
 
-    serial.init();
+    hal.console.init();
 
-    serial.writeString("\r\n=== Kernel Entry ===\r\n");
+    hal.console.writeString("\r\n=== Kernel Entry ===\r\n");
 
     if (ctx.bootloader_info) |info| {
         if (info.name) |name| {
-            serial.printf("Bootloader: {s}\r\n", .{name});
+            hal.console.printf("Bootloader: {s}\r\n", .{name});
         }
         if (info.version) |version| {
-            serial.printf("Version: {s}\r\n", .{version});
+            hal.console.printf("Version: {s}\r\n", .{version});
         }
     }
 
@@ -80,7 +80,7 @@ pub fn init(ctx: BootContext) void {
         printAllocatorStats();
     }
 
-    serial.writeString("\r\n=== Phase 3 runtime ===\r\n");
+    hal.console.writeString("\r\n=== Phase 3 runtime ===\r\n");
     syscall.init();
     process.init();
     tty.init();
@@ -103,7 +103,7 @@ pub fn init(ctx: BootContext) void {
 
 fn initNetwork() void {
     virtio_net.init() catch {
-        serial.writeString("virtio-net not available\r\n");
+        hal.console.writeString("virtio-net not available\r\n");
         return;
     };
     virtio_net.logStatus();
@@ -112,7 +112,7 @@ fn initNetwork() void {
 
 fn initBlock() void {
     virtio_blk.init() catch {
-        serial.writeString("virtio-blk not available\r\n");
+        hal.console.writeString("virtio-blk not available\r\n");
         return;
     };
     virtio_blk.logStatus();
@@ -121,7 +121,7 @@ fn initBlock() void {
 
 fn initVfs() void {
     vfs.init() catch {
-        serial.writeString("VFS init failed\r\n");
+        hal.console.writeString("VFS init failed\r\n");
         return;
     };
     vfs.logStatus();
@@ -130,31 +130,31 @@ fn initVfs() void {
 
 fn initPci(rsdp_virt: u64) void {
     pci.init(rsdp_virt) catch {
-        serial.writeString("PCI init failed\r\n");
+        hal.console.writeString("PCI init failed\r\n");
         return;
     };
     pci.logDevices();
 }
 
 fn initApic(rsdp_virt: u64) void {
-    serial.writeString("\r\n--- APIC ---\r\n");
+    hal.console.writeString("\r\n--- APIC ---\r\n");
     apic.init(rsdp_virt) catch |err| {
-        serial.printf("APIC init failed: {s}\r\n", .{@errorName(err)});
-        cpu.haltForever();
+        hal.console.printf("APIC init failed: {s}\r\n", .{@errorName(err)});
+        hal.processor.haltForever();
     };
-    serial.printf("LAPIC ID: {d}\r\n", .{apic.lapicId()});
-    serial.printf("IOAPIC count: {d}\r\n", .{apic.ioApicCount()});
-    serial.writeString("Legacy PIC masked, IOAPIC pins masked\r\n");
+    hal.console.printf("LAPIC ID: {d}\r\n", .{apic.lapicId()});
+    hal.console.printf("IOAPIC count: {d}\r\n", .{apic.ioApicCount()});
+    hal.console.writeString("Legacy PIC masked, IOAPIC pins masked\r\n");
 }
 
 fn initTimer() void {
-    serial.writeString("\r\n--- Timer ---\r\n");
+    hal.console.writeString("\r\n--- Timer ---\r\n");
     interrupts.registerIrq(timer.timer_vector, interrupts.timerIrqHandler);
     const ticks_per_irq = timer.init() catch {
-        serial.writeString("LAPIC timer init failed\r\n");
-        cpu.haltForever();
+        hal.console.writeString("LAPIC timer init failed\r\n");
+        hal.processor.haltForever();
     };
-    serial.printf("LAPIC periodic timer started ({d} Hz, {d} ticks/irq)\r\n", .{
+    hal.console.printf("LAPIC periodic timer started ({d} Hz, {d} ticks/irq)\r\n", .{
         100,
         ticks_per_irq,
     });
@@ -186,24 +186,24 @@ fn reserveMemoryMapBuffer(response: *const limine.MemmapResponse) void {
 }
 
 fn initMemoryAllocators() void {
-    serial.writeString("\r\n--- Memory Allocators ---\r\n");
+    hal.console.writeString("\r\n--- Memory Allocators ---\r\n");
     physical.init();
     virtual.init();
     heap.init() catch {
-        serial.writeString("heap init failed\r\n");
-        cpu.haltForever();
+        hal.console.writeString("heap init failed\r\n");
+        hal.processor.haltForever();
     };
-    serial.writeString("physical, virtual, and heap allocators initialized\r\n");
+    hal.console.writeString("physical, virtual, and heap allocators initialized\r\n");
 }
 
 fn printAllocatorStats() void {
-    serial.printf("Physical pages: total={d} free={d} used={d}\r\n", .{
+    hal.console.printf("Physical pages: total={d} free={d} used={d}\r\n", .{
         physical.totalPages(),
         physical.freePages(),
         physical.usedPages(),
     });
-    serial.printf("Kernel mapped pages: {d}\r\n", .{virtual.mappedPages()});
-    serial.printf("Heap live allocations: {d} bytes={d} allocs={d} frees={d}\r\n", .{
+    hal.console.printf("Kernel mapped pages: {d}\r\n", .{virtual.mappedPages()});
+    hal.console.printf("Heap live allocations: {d} bytes={d} allocs={d} frees={d}\r\n", .{
         heap.liveAllocations(),
         heap.liveBytes(),
         heap.totalAllocs(),
@@ -212,7 +212,7 @@ fn printAllocatorStats() void {
 }
 
 fn runPhysicalStressTest() void {
-    serial.writeString("\r\n--- Physical Page Stress ---\r\n");
+    hal.console.writeString("\r\n--- Physical Page Stress ---\r\n");
 
     const initial_free = physical.freePages();
     var pages: [64]u64 = undefined;
@@ -234,15 +234,15 @@ fn runPhysicalStressTest() void {
         allocated = 0;
     }
 
-    serial.printf("Physical stress cycles: {d}\r\n", .{cycle});
-    serial.printf("Physical free pages after stress: {d} (initial {d})\r\n", .{
+    hal.console.printf("Physical stress cycles: {d}\r\n", .{cycle});
+    hal.console.printf("Physical free pages after stress: {d} (initial {d})\r\n", .{
         physical.freePages(),
         initial_free,
     });
 }
 
 fn runHeapStressTest() void {
-    serial.writeString("\r\n--- Kernel Heap Stress ---\r\n");
+    hal.console.writeString("\r\n--- Kernel Heap Stress ---\r\n");
 
     const sizes = [_]usize{ 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
 
@@ -257,8 +257,8 @@ fn runHeapStressTest() void {
         heap.kfree(ptr) catch break;
     }
 
-    serial.printf("Heap stress cycles: {d}\r\n", .{cycle});
-    serial.printf("Heap counters: live={d} allocs={d} frees={d}\r\n", .{
+    hal.console.printf("Heap stress cycles: {d}\r\n", .{cycle});
+    hal.console.printf("Heap counters: live={d} allocs={d} frees={d}\r\n", .{
         heap.liveAllocations(),
         heap.totalAllocs(),
         heap.totalFrees(),
@@ -266,14 +266,14 @@ fn runHeapStressTest() void {
 }
 
 fn verifyMemoryMapBuffer(response: *const limine.MemmapResponse) void {
-    serial.writeString("\r\n--- Memory Map Buffer Check ---\r\n");
-    serial.printf("Memory map entries still readable: {d}\r\n", .{response.entry_count});
+    hal.console.writeString("\r\n--- Memory Map Buffer Check ---\r\n");
+    hal.console.printf("Memory map entries still readable: {d}\r\n", .{response.entry_count});
 
     if (response.entries) |entries| {
         var i: usize = 0;
         while (i < response.entry_count and i < 3) : (i += 1) {
             if (entries[i]) |entry| {
-                serial.printf("  entry {d}: base=0x{x} len=0x{x}\r\n", .{
+                hal.console.printf("  entry {d}: base=0x{x} len=0x{x}\r\n", .{
                     i,
                     entry.base,
                     entry.length,
@@ -285,31 +285,31 @@ fn verifyMemoryMapBuffer(response: *const limine.MemmapResponse) void {
 
 fn verifyHigherHalfExecution() void {
     const rip = cpu.readRip();
-    serial.printf("RIP: 0x{x} (higher-half: {s})\r\n", .{
+    hal.console.printf("RIP: 0x{x} (higher-half: {s})\r\n", .{
         rip,
         if (address.isHigherHalf(rip)) "yes" else "NO",
     });
 }
 
 fn verifyPagingHelpers() void {
-    serial.printf("CR3: 0x{x}\r\n", .{paging.readCr3()});
-    serial.printf("Page fault probe 0x{x} mapped: {s}\r\n", .{
+    hal.console.printf("CR3: 0x{x}\r\n", .{paging.readCr3()});
+    hal.console.printf("Page fault probe 0x{x} mapped: {s}\r\n", .{
         page_fault_test_addr,
         if (paging.isMapped(page_fault_test_addr)) "yes" else "no",
     });
 }
 
 fn triggerDeliberatePageFault() noreturn {
-    serial.writeString("Triggering deliberate page fault...\r\n");
+    hal.console.writeString("Triggering deliberate page fault...\r\n");
     const bad_ptr: *volatile u8 = @ptrFromInt(page_fault_test_addr);
     _ = bad_ptr.*;
-    cpu.haltForever();
+    hal.processor.haltForever();
 }
 
 fn printMemoryMap() void {
-    serial.writeString("\r\n--- Physical Memory Map ---\r\n");
+    hal.console.writeString("\r\n--- Physical Memory Map ---\r\n");
     for (memory_map.regionsSlice()) |region| {
-        serial.printf("  [{s}] 0x{x} - 0x{x} ({d} pages)", .{
+        hal.console.printf("  [{s}] 0x{x} - 0x{x} ({d} pages)", .{
             region.kind.name(),
             region.start,
             region.end,
@@ -317,12 +317,12 @@ fn printMemoryMap() void {
         });
 
         if (region.boot_reserved) {
-            serial.printf("  BOOT:{s}", .{region.reservation.?});
+            hal.console.printf("  BOOT:{s}", .{region.reservation.?});
         }
 
-        serial.printf("  alloc={s}\r\n", .{if (region.allocatable) "yes" else "no"});
+        hal.console.printf("  alloc={s}\r\n", .{if (region.allocatable) "yes" else "no"});
     }
-    serial.printf("Total regions: {d}\r\n", .{memory_map.regionCount()});
+    hal.console.printf("Total regions: {d}\r\n", .{memory_map.regionCount()});
 }
 
 pub fn run() noreturn {
