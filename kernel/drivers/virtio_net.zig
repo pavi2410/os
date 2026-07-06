@@ -3,6 +3,7 @@ const virtual = @import("../mm/virtual.zig");
 const ethernet = @import("../net/ethernet.zig");
 const net_device = @import("net_device.zig");
 const virtio_pci = @import("virtio_pci.zig");
+const virtio_queue = @import("virtio_queue.zig");
 
 pub const NetError = virtio_pci.VirtioError || error{
     NotReady,
@@ -15,9 +16,6 @@ pub const NetError = virtio_pci.VirtioError || error{
 pub const max_frame_size = ethernet.max_frame_len;
 
 const VIRTIO_F_VERSION_1: u64 = 1 << 32;
-
-const VIRTQ_DESC_F_NEXT: u16 = 1;
-const VIRTQ_DESC_F_WRITE: u16 = 2;
 
 const rx_queue_index: u16 = 0;
 const tx_queue_index: u16 = 1;
@@ -32,45 +30,8 @@ const NetHdr = extern struct {
     num_buffers: u16, // present when VIRTIO_F_VERSION_1 is negotiated
 };
 
-const Desc = extern struct {
-    addr: u64,
-    len: u32,
-    flags: u16,
-    next: u16,
-};
-
-const max_queue_size = 256;
 const rx_slots = 8;
 const rx_descs_per_slot = 2;
-
-const AvailRing = extern struct {
-    flags: u16,
-    idx: u16,
-    ring: [max_queue_size]u16,
-};
-
-const UsedElem = extern struct {
-    id: u32,
-    len: u32,
-};
-
-const UsedRing = extern struct {
-    flags: u16,
-    idx: u16,
-    ring: [max_queue_size]UsedElem,
-};
-
-const Queue = struct {
-    desc_table: *align(4096) [max_queue_size]Desc,
-    avail_ring: *align(4096) AvailRing,
-    used_ring: *align(4096) UsedRing,
-    desc_phys: u64,
-    avail_phys: u64,
-    used_phys: u64,
-    size: u16,
-    avail_idx: u16,
-    last_used_idx: u16,
-};
 
 const RxSlot = struct {
     page: *align(4096) [4096]u8,
@@ -80,8 +41,8 @@ var device: virtio_pci.Device = undefined;
 var ready = false;
 var mac: ethernet.Mac = undefined;
 
-var rx_queue: Queue = undefined;
-var tx_queue: Queue = undefined;
+var rx_queue: virtio_queue.Queue = .{};
+var tx_queue: virtio_queue.Queue = .{};
 
 var rx_slots_storage: [rx_slots]RxSlot = undefined;
 var tx_header: *align(4096) NetHdr = undefined;
@@ -95,8 +56,8 @@ pub fn init() NetError!void {
     device.acknowledge();
     device.setDriver();
     try device.negotiateFeatures(VIRTIO_F_VERSION_1);
-    try setupQueue(&rx_queue, rx_queue_index);
-    try setupQueue(&tx_queue, tx_queue_index);
+    try rx_queue.init(&device, rx_queue_index);
+    try tx_queue.init(&device, tx_queue_index);
 
     const tx_header_virt = virtual.allocPages(1) catch return NetError.QueueSetupFailed;
     const tx_frame_virt = virtual.allocPages(1) catch return NetError.QueueSetupFailed;
@@ -148,7 +109,7 @@ pub fn sendFrame(frame: []const u8) NetError!void {
     tx_queue.desc_table[0] = .{
         .addr = header_phys,
         .len = @sizeOf(NetHdr),
-        .flags = VIRTQ_DESC_F_NEXT,
+        .flags = virtio_queue.desc_flags.next,
         .next = 1,
     };
     tx_queue.desc_table[1] = .{
@@ -158,32 +119,21 @@ pub fn sendFrame(frame: []const u8) NetError!void {
         .next = 0,
     };
 
-    const slot = tx_queue.avail_idx % tx_queue.size;
-    tx_queue.avail_ring.ring[slot] = 0;
-    tx_queue.avail_idx +%= 1;
-    asm volatile ("" ::: .{ .memory = true });
-    tx_queue.avail_ring.idx = tx_queue.avail_idx;
-
-    device.notifyQueue(tx_queue_index);
-    try waitUsed(&tx_queue);
-}
-
-fn usedIdx(queue: *const Queue) u16 {
-    const ptr: *const volatile u16 = @ptrCast(@alignCast(&queue.used_ring.idx));
-    return ptr.*;
+    tx_queue.submit(0);
+    tx_queue.notify(&device);
+    _ = try tx_queue.waitUsed(&device);
 }
 
 pub fn recvFrame(buf: []u8) NetError!usize {
     if (!ready) return NetError.NotReady;
     if (buf.len < max_frame_size) return NetError.BufferTooSmall;
 
-    if (usedIdx(&rx_queue) == rx_queue.last_used_idx) {
+    if (!rx_queue.hasUsed()) {
         device.ackInterrupt();
         return NetError.NoPacket;
     }
 
-    asm volatile ("" ::: .{ .memory = true });
-    const used = rx_queue.used_ring.ring[rx_queue.last_used_idx % rx_queue.size];
+    const used = rx_queue.popUsed();
     const desc_index = @as(usize, @intCast(used.id));
     if (desc_index % rx_descs_per_slot != 0) return NetError.IoError;
     const slot_index = desc_index / rx_descs_per_slot;
@@ -197,7 +147,6 @@ pub fn recvFrame(buf: []u8) NetError!usize {
     @memcpy(buf[0..frame_len], rx_slots_storage[slot_index].page[frame_off..][0..frame_len]);
     try resubmitRxSlot(slot_index);
 
-    rx_queue.last_used_idx +%= 1;
     device.ackInterrupt();
     return frame_len;
 }
@@ -280,28 +229,6 @@ pub fn logStatus() void {
     serial.printf("RX slots: {d}, TX queue: {d}\r\n", .{ rx_slots, tx_queue.size });
 }
 
-fn setupQueue(queue: *Queue, queue_index: u16) NetError!void {
-    const desc_virt = virtual.allocPages(1) catch return NetError.QueueSetupFailed;
-    const avail_virt = virtual.allocPages(1) catch return NetError.QueueSetupFailed;
-    const used_virt = virtual.allocPages(1) catch return NetError.QueueSetupFailed;
-
-    queue.desc_table = @ptrFromInt(desc_virt);
-    queue.avail_ring = @ptrFromInt(avail_virt);
-    queue.used_ring = @ptrFromInt(used_virt);
-
-    queue.desc_phys = virtio_pci.physFromVirt(desc_virt) orelse return NetError.QueueSetupFailed;
-    queue.avail_phys = virtio_pci.physFromVirt(avail_virt) orelse return NetError.QueueSetupFailed;
-    queue.used_phys = virtio_pci.physFromVirt(used_virt) orelse return NetError.QueueSetupFailed;
-
-    for (&queue.desc_table.*) |*entry| entry.* = .{ .addr = 0, .len = 0, .flags = 0, .next = 0 };
-    queue.avail_ring.* = .{ .flags = 0, .idx = 0, .ring = undefined };
-    queue.used_ring.* = .{ .flags = 0, .idx = 0, .ring = undefined };
-    queue.avail_idx = 0;
-    queue.last_used_idx = 0;
-
-    queue.size = try device.setupQueue(queue_index, queue.desc_phys, queue.avail_phys, queue.used_phys, max_queue_size);
-}
-
 fn setupRxSlots() NetError!void {
     var slot: usize = 0;
     while (slot < rx_slots) : (slot += 1) {
@@ -309,7 +236,7 @@ fn setupRxSlots() NetError!void {
         rx_slots_storage[slot] = .{ .page = @ptrFromInt(page_virt) };
         try queueRxSlot(slot);
     }
-    device.notifyQueue(rx_queue_index);
+    rx_queue.notify(&device);
 }
 
 fn queueRxSlot(slot: usize) NetError!void {
@@ -321,39 +248,20 @@ fn queueRxSlot(slot: usize) NetError!void {
     rx_queue.desc_table[desc_base] = .{
         .addr = header_phys,
         .len = @sizeOf(NetHdr),
-        .flags = VIRTQ_DESC_F_NEXT | VIRTQ_DESC_F_WRITE,
+        .flags = virtio_queue.desc_flags.next | virtio_queue.desc_flags.write,
         .next = desc_base + 1,
     };
     rx_queue.desc_table[desc_base + 1] = .{
         .addr = frame_phys,
         .len = max_frame_size,
-        .flags = VIRTQ_DESC_F_WRITE,
+        .flags = virtio_queue.desc_flags.write,
         .next = 0,
     };
 
-    const ring_slot = rx_queue.avail_idx % rx_queue.size;
-    rx_queue.avail_ring.ring[ring_slot] = desc_base;
-    rx_queue.avail_idx +%= 1;
-    asm volatile ("" ::: .{ .memory = true });
-    rx_queue.avail_ring.idx = rx_queue.avail_idx;
+    rx_queue.submit(desc_base);
 }
 
 fn resubmitRxSlot(slot: usize) NetError!void {
     try queueRxSlot(slot);
-    device.notifyQueue(rx_queue_index);
-}
-
-fn waitUsed(queue: *Queue) NetError!void {
-    var spins: usize = 0;
-    while (usedIdx(queue) == queue.last_used_idx) {
-        device.ackInterrupt();
-        asm volatile ("sti; pause; cli" ::: .{ .memory = true });
-        spins += 1;
-        if (spins > 10_000_000) return NetError.Timeout;
-    }
-
-    asm volatile ("" ::: .{ .memory = true });
-    _ = queue.used_ring.ring[queue.last_used_idx % queue.size];
-    queue.last_used_idx +%= 1;
-    device.ackInterrupt();
+    rx_queue.notify(&device);
 }

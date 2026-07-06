@@ -275,6 +275,22 @@ pub fn build(b: *std.Build) void {
     });
     const run_device_registry_tests = b.addRunArtifact(device_registry_tests);
 
+    const virtio_queue_index_host_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/drivers/virtio_queue_index.zig"),
+        .target = b.graph.host,
+    });
+
+    const virtio_queue_index_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/kernel/virtio_queue_index_test.zig"),
+        .target = b.graph.host,
+    });
+    virtio_queue_index_test_mod.addImport("virtio_queue_index", virtio_queue_index_host_mod);
+
+    const virtio_queue_index_tests = b.addTest(.{
+        .root_module = virtio_queue_index_test_mod,
+    });
+    const run_virtio_queue_index_tests = b.addRunArtifact(virtio_queue_index_tests);
+
     const icmp_test_mod = b.createModule(.{
         .root_source_file = b.path("kernel/net/icmp_test.zig"),
         .target = b.graph.host,
@@ -378,6 +394,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_memory_map_tests.step);
     test_step.dependOn(&run_physical_tests.step);
     test_step.dependOn(&run_device_registry_tests.step);
+    test_step.dependOn(&run_virtio_queue_index_tests.step);
     test_step.dependOn(&run_icmp_tests.step);
     test_step.dependOn(&run_tcp_tests.step);
     test_step.dependOn(&run_curl_target_tests.step);
