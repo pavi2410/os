@@ -1,6 +1,46 @@
 /// Pure DNS message helpers (no syscalls; host-testable).
 const bytes = @import("common_bytes");
 
+pub const Answer = struct {
+    name_off: usize,
+    rtype: u16,
+    class: u16,
+    ttl: u32,
+    rdata: []const u8,
+};
+
+pub const AnswerIterator = struct {
+    pkt: []const u8,
+    off: usize,
+    remaining: u16,
+
+    pub fn next(self: *AnswerIterator) ?Answer {
+        if (self.remaining == 0) return null;
+        const name_off = self.off;
+        self.off = skipName(self.pkt, self.off) orelse return null;
+        if (self.off + 10 > self.pkt.len) return null;
+
+        const rtype = bytes.readU16Be(self.pkt, self.off);
+        const class = bytes.readU16Be(self.pkt, self.off + 2);
+        const ttl = bytes.readU32Be(self.pkt, self.off + 4);
+        const rdlen = bytes.readU16Be(self.pkt, self.off + 8);
+        self.off += 10;
+        if (self.off + rdlen > self.pkt.len) return null;
+
+        const rdata = self.pkt[self.off .. self.off + rdlen];
+        self.off += rdlen;
+        self.remaining -= 1;
+
+        return .{
+            .name_off = name_off,
+            .rtype = rtype,
+            .class = class,
+            .ttl = ttl,
+            .rdata = rdata,
+        };
+    }
+};
+
 pub fn buildQuery(name: []const u8, out: []u8) !usize {
     if (out.len < 18) return error.BufferTooSmall;
     @memset(out[0..18], 0);
@@ -49,35 +89,67 @@ pub fn encodeName(name: []const u8, out: []u8) !usize {
 }
 
 pub fn parseFirstA(pkt: []const u8, out: *[4]u8) bool {
-    if (pkt.len < 12) return false;
+    var iter = answers(pkt) orelse return false;
+    while (iter.next()) |answer| {
+        if (answer.rtype == 1 and answer.rdata.len == 4) {
+            @memcpy(out, answer.rdata);
+            return true;
+        }
+    }
+    return false;
+}
+
+pub fn answers(pkt: []const u8) ?AnswerIterator {
+    if (pkt.len < 12) return null;
     const qdcount = bytes.readU16Be(pkt, 4);
     const ancount = bytes.readU16Be(pkt, 6);
-    if (ancount == 0) return false;
 
     var off: usize = 12;
     var qi: usize = 0;
     while (qi < qdcount) : (qi += 1) {
-        off = skipName(pkt, off) orelse return false;
+        off = skipName(pkt, off) orelse return null;
+        if (off + 4 > pkt.len) return null;
         off += 4;
-        if (off > pkt.len) return false;
     }
 
-    var ai: usize = 0;
-    while (ai < ancount) : (ai += 1) {
-        off = skipName(pkt, off) orelse return false;
-        if (off + 10 > pkt.len) return false;
-        const rtype = bytes.readU16Be(pkt, off);
-        const rdlen = bytes.readU16Be(pkt, off + 8);
-        off += 10;
-        if (off + rdlen > pkt.len) return false;
+    return .{
+        .pkt = pkt,
+        .off = off,
+        .remaining = ancount,
+    };
+}
 
-        if (rtype == 1 and rdlen == 4) {
-            @memcpy(out, pkt[off .. off + 4]);
-            return true;
+pub fn answerCount(pkt: []const u8) u16 {
+    if (pkt.len < 8) return 0;
+    return bytes.readU16Be(pkt, 6);
+}
+
+pub fn formatName(pkt: []const u8, off: usize, out: []u8) ?[]const u8 {
+    var pos = off;
+    var len: usize = 0;
+    var steps: usize = 0;
+    while (steps < 128) : (steps += 1) {
+        if (pos >= pkt.len) return null;
+        const len_byte = pkt[pos];
+        if (len_byte == 0) break;
+        if ((len_byte & 0xC0) == 0xC0) {
+            if (pos + 1 >= pkt.len) return null;
+            pos = (@as(usize, len_byte & 0x3F) << 8) | pkt[pos + 1];
+            continue;
         }
-        off += rdlen;
+        pos += 1;
+        if (pos + len_byte > pkt.len) return null;
+        if (len != 0) {
+            if (len >= out.len) return null;
+            out[len] = '.';
+            len += 1;
+        }
+        if (len + len_byte > out.len) return null;
+        @memcpy(out[len .. len + len_byte], pkt[pos .. pos + len_byte]);
+        len += len_byte;
+        pos += len_byte;
     }
-    return false;
+    return out[0..len];
 }
 
 fn skipName(pkt: []const u8, off: usize) ?usize {

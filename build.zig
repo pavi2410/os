@@ -115,6 +115,7 @@ pub fn build(b: *std.Build) void {
     dig.setLinkerScript(b.path("userspace/linker.ld"));
     dig.root_module.addImport("libc", user_libc);
     dig.root_module.addImport("freestanding_std", freestanding_std);
+    dig.root_module.addImport("dns_codec", dns_codec_user);
     const install_dig = b.addInstallArtifact(dig, user_install);
 
     const ping = b.addExecutable(.{

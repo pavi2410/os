@@ -38,6 +38,33 @@ test "parseFirstA extracts first A record" {
     try std.testing.expectEqual(@as(u8, 154), ip[3]);
 }
 
+test "answers iterates records and formats compressed names" {
+    const reply = [_]u8{
+        0x12, 0x34, 0x81, 0x80, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
+        7,    'e',  'x',  'a',  'm',  'p',  'l',  'e',  3,    'c',  'o',  'm',  0,
+        0x00, 0x01, 0x00, 0x01,
+        0xC0, 0x0C, 0x00, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x3C, 0x00, 0x02,
+        0xC0, 0x0C,
+        0xC0, 0x0C, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x3C, 0x00, 0x04,
+        104,  20,   23,   154,
+    };
+
+    try std.testing.expectEqual(@as(u16, 2), dns_codec.answerCount(&reply));
+
+    var iter = dns_codec.answers(&reply).?;
+    const cname = iter.next().?;
+    try std.testing.expectEqual(@as(u16, 5), cname.rtype);
+    try std.testing.expectEqual(@as(u32, 60), cname.ttl);
+
+    const a = iter.next().?;
+    try std.testing.expectEqual(@as(u16, 1), a.rtype);
+    try std.testing.expectEqualSlices(u8, &.{ 104, 20, 23, 154 }, a.rdata);
+    try std.testing.expect(iter.next() == null);
+
+    var name_buf: [64]u8 = undefined;
+    try std.testing.expectEqualStrings("example.com", dns_codec.formatName(&reply, a.name_off, &name_buf).?);
+}
+
 test "parseFirstA rejects truncated packets" {
     var ip: [4]u8 = undefined;
     try std.testing.expect(!dns_codec.parseFirstA(&.{ 0, 0, 0x81, 0x80, 0, 1, 0, 0 }, &ip));
