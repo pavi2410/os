@@ -1,6 +1,6 @@
 const std = @import("std");
 const acpi_access = @import("../acpi/access.zig");
-const virtio_blk = @import("../drivers/virtio_blk.zig");
+const block = @import("../drivers/block.zig");
 
 pub const FatError = error{
     NotReady,
@@ -48,11 +48,14 @@ const Mount = struct {
 
 var mounted = false;
 var fs: Mount = undefined;
+var disk: ?*const block.Device = null;
 var cluster_buf: [32768]u8 align(512) = undefined;
 var next_free_hint: u32 = 2;
 
 pub fn mount() FatError!void {
-    if (!virtio_blk.isReady()) return FatError.NotReady;
+    const dev = block.default() orelse return FatError.NotReady;
+    if (!dev.isReady()) return FatError.NotReady;
+    disk = dev;
 
     var boot: [512]u8 = undefined;
     try readSector(0, &boot);
@@ -70,7 +73,7 @@ pub fn mount() FatError!void {
     const sectors_per_fat = acpi_access.readU32(&boot, 0x24);
     const root_cluster = acpi_access.readU32(&boot, 0x2C);
 
-    if (bytes_per_sector != virtio_blk.sector_size) return FatError.InvalidBpb;
+    if (bytes_per_sector != dev.sectorSize()) return FatError.InvalidBpb;
     if (sectors_per_cluster == 0 or num_fats == 0) return FatError.InvalidBpb;
 
     const cluster_bytes = @as(u32, sectors_per_cluster) * bytes_per_sector;
@@ -455,7 +458,8 @@ fn loadNextFreeHint(boot: *const [512]u8) ?u32 {
 }
 
 fn maxDataCluster() u32 {
-    const cap = virtio_blk.capacity();
+    const dev = diskDevice() catch return 2;
+    const cap = dev.capacity();
     if (cap <= fs.data_start_sector) return 2;
     const data_sectors = cap - fs.data_start_sector;
     const clusters = data_sectors / fs.sectors_per_cluster;
@@ -752,11 +756,17 @@ fn readCluster(cluster: u32, buf: []u8) FatError!void {
 }
 
 fn readSector(lba: u64, buf: []u8) FatError!void {
-    virtio_blk.readSectors(lba, buf) catch return FatError.IoError;
+    const dev = try diskDevice();
+    dev.readSectors(lba, buf) catch return FatError.IoError;
 }
 
 fn writeSector(lba: u64, buf: []const u8) FatError!void {
-    virtio_blk.writeSectors(lba, buf) catch return FatError.IoError;
+    const dev = try diskDevice();
+    dev.writeSectors(lba, buf) catch return FatError.IoError;
+}
+
+fn diskDevice() FatError!*const block.Device {
+    return disk orelse block.default() orelse FatError.NotReady;
 }
 
 fn writeU16Le(buf: []u8, off: usize, value: u16) void {

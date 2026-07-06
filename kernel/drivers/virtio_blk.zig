@@ -1,5 +1,6 @@
 const serial = @import("../arch/x86_64/serial.zig");
 const virtual = @import("../mm/virtual.zig");
+const block = @import("block.zig");
 const virtio_pci = @import("virtio_pci.zig");
 
 pub const sector_size = 512;
@@ -81,6 +82,7 @@ pub fn init() BlkError!void {
 
     capacity_sectors = device.readDevice64(0);
     ready = true;
+    block.registerDefault(blockDevice());
 }
 
 pub fn isReady() bool {
@@ -111,6 +113,40 @@ pub fn writeSectors(lba: u64, buf: []const u8) BlkError!void {
     while (sector < sector_count) : (sector += 1) {
         try transferOne(.out, lba + sector, @constCast(buf[sector * sector_size ..][0..sector_size]));
     }
+}
+
+fn blockDevice() block.Device {
+    return .{
+        .name = "virtio-blk",
+        .sector_size = sector_size,
+        .capacity_sectors = capacity_sectors,
+        .is_ready = blockIsReady,
+        .read_sectors = blockReadSectors,
+        .write_sectors = blockWriteSectors,
+    };
+}
+
+fn blockIsReady(ctx: ?*anyopaque) bool {
+    _ = ctx;
+    return isReady();
+}
+
+fn blockReadSectors(ctx: ?*anyopaque, lba: u64, buf: []u8) block.Error!void {
+    _ = ctx;
+    readSectors(lba, buf) catch |err| return blockError(err);
+}
+
+fn blockWriteSectors(ctx: ?*anyopaque, lba: u64, buf: []const u8) block.Error!void {
+    _ = ctx;
+    writeSectors(lba, buf) catch |err| return blockError(err);
+}
+
+fn blockError(err: BlkError) block.Error {
+    return switch (err) {
+        BlkError.NotReady => block.Error.NotReady,
+        BlkError.Timeout => block.Error.Timeout,
+        else => block.Error.IoError,
+    };
 }
 
 pub fn logStatus() void {

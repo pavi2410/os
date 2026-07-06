@@ -254,6 +254,27 @@ pub fn build(b: *std.Build) void {
 
     const run_physical_tests = b.addRunArtifact(physical_tests);
 
+    const block_host_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/drivers/block.zig"),
+        .target = b.graph.host,
+    });
+    const net_device_host_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/drivers/net_device.zig"),
+        .target = b.graph.host,
+    });
+
+    const device_registry_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/kernel/device_registry_test.zig"),
+        .target = b.graph.host,
+    });
+    device_registry_test_mod.addImport("block", block_host_mod);
+    device_registry_test_mod.addImport("net_device", net_device_host_mod);
+
+    const device_registry_tests = b.addTest(.{
+        .root_module = device_registry_test_mod,
+    });
+    const run_device_registry_tests = b.addRunArtifact(device_registry_tests);
+
     const icmp_test_mod = b.createModule(.{
         .root_source_file = b.path("kernel/net/icmp_test.zig"),
         .target = b.graph.host,
@@ -356,6 +377,7 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_memory_map_tests.step);
     test_step.dependOn(&run_physical_tests.step);
+    test_step.dependOn(&run_device_registry_tests.step);
     test_step.dependOn(&run_icmp_tests.step);
     test_step.dependOn(&run_tcp_tests.step);
     test_step.dependOn(&run_curl_target_tests.step);

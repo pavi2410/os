@@ -1,5 +1,5 @@
 const ethernet = @import("ethernet.zig");
-const virtio_net = @import("../drivers/virtio_net.zig");
+const net_device = @import("../drivers/net_device.zig");
 
 pub const max_frame_len = ethernet.max_frame_len;
 
@@ -9,25 +9,30 @@ pub const ReceiveError = error{
 };
 
 pub fn isReady() bool {
-    return virtio_net.isReady();
+    const dev = net_device.default() orelse return false;
+    return dev.isReady();
 }
 
 pub fn localMac() ethernet.Mac {
-    return virtio_net.macAddress();
+    const dev = net_device.default() orelse return .{ 0, 0, 0, 0, 0, 0 };
+    return dev.macAddress();
 }
 
-pub fn transmitOrFail(frame: []const u8) virtio_net.NetError!void {
-    try virtio_net.sendFrame(frame);
+pub fn transmitOrFail(frame: []const u8) net_device.Error!void {
+    const dev = net_device.default() orelse return net_device.Error.NotReady;
+    try dev.sendFrame(frame);
 }
 
 /// Spin until a frame arrives or `max_spins` is exhausted. Returns length or null.
 pub fn pollReceive(buf: []u8, max_spins: usize) ?usize {
-    return virtio_net.pollRecv(buf, max_spins) catch null;
+    const dev = net_device.default() orelse return null;
+    return dev.pollRecv(buf, max_spins) catch null;
 }
 
 pub fn receive(buf: []u8) ReceiveError!usize {
-    return virtio_net.recvFrame(buf) catch |err| switch (err) {
-        virtio_net.NetError.NoPacket => error.NoPacket,
+    const dev = net_device.default() orelse return error.IoError;
+    return dev.recvFrame(buf) catch |err| switch (err) {
+        net_device.Error.NoPacket => error.NoPacket,
         else => error.IoError,
     };
 }

@@ -1,6 +1,7 @@
 const serial = @import("../arch/x86_64/serial.zig");
 const virtual = @import("../mm/virtual.zig");
 const ethernet = @import("../net/ethernet.zig");
+const net_device = @import("net_device.zig");
 const virtio_pci = @import("virtio_pci.zig");
 
 pub const NetError = virtio_pci.VirtioError || error{
@@ -115,6 +116,7 @@ pub fn init() NetError!void {
 
     try setupRxSlots();
     ready = true;
+    net_device.registerDefault(netDevice());
 }
 
 pub fn isReady() bool {
@@ -216,6 +218,53 @@ pub fn pollRecv(buf: []u8, max_spins: usize) NetError!usize {
         return len;
     }
     return NetError.Timeout;
+}
+
+fn netDevice() net_device.Device {
+    return .{
+        .name = "virtio-net",
+        .max_frame_size = max_frame_size,
+        .is_ready = netIsReady,
+        .mac_address = netMacAddress,
+        .send_frame = netSendFrame,
+        .recv_frame = netRecvFrame,
+        .poll_recv = netPollRecv,
+    };
+}
+
+fn netIsReady(ctx: ?*anyopaque) bool {
+    _ = ctx;
+    return isReady();
+}
+
+fn netMacAddress(ctx: ?*anyopaque) net_device.Mac {
+    _ = ctx;
+    return macAddress();
+}
+
+fn netSendFrame(ctx: ?*anyopaque, frame: []const u8) net_device.Error!void {
+    _ = ctx;
+    sendFrame(frame) catch |err| return netError(err);
+}
+
+fn netRecvFrame(ctx: ?*anyopaque, buf: []u8) net_device.Error!usize {
+    _ = ctx;
+    return recvFrame(buf) catch |err| return netError(err);
+}
+
+fn netPollRecv(ctx: ?*anyopaque, buf: []u8, max_spins: usize) net_device.Error!usize {
+    _ = ctx;
+    return pollRecv(buf, max_spins) catch |err| return netError(err);
+}
+
+fn netError(err: NetError) net_device.Error {
+    return switch (err) {
+        NetError.NotReady => net_device.Error.NotReady,
+        NetError.Timeout => net_device.Error.Timeout,
+        NetError.BufferTooSmall => net_device.Error.BufferTooSmall,
+        NetError.NoPacket => net_device.Error.NoPacket,
+        else => net_device.Error.IoError,
+    };
 }
 
 pub fn logStatus() void {
