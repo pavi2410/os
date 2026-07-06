@@ -1,4 +1,5 @@
 const virtual = @import("../mm/virtual.zig");
+const descriptor = @import("virtio_descriptor.zig");
 const virtio_pci = @import("virtio_pci.zig");
 const index = @import("virtio_queue_index.zig");
 
@@ -8,10 +9,8 @@ pub const Error = virtio_pci.VirtioError || error{
 
 pub const max_queue_size = 256;
 
-pub const desc_flags = struct {
-    pub const next: u16 = 1;
-    pub const write: u16 = 2;
-};
+pub const desc_flags = descriptor.flags;
+pub const Segment = descriptor.Segment;
 
 pub const Desc = extern struct {
     addr: u64,
@@ -74,6 +73,20 @@ pub const Queue = struct {
         self.avail_idx = index.advance(self.avail_idx);
         memoryBarrier();
         self.avail_ring.idx = self.avail_idx;
+    }
+
+    pub fn writeChain(self: *Queue, start_index: u16, segments: []const Segment) void {
+        var i: usize = 0;
+        while (i < segments.len) : (i += 1) {
+            const desc_index: u16 = start_index + @as(u16, @intCast(i));
+            const has_next = i + 1 < segments.len;
+            self.desc_table[desc_index] = .{
+                .addr = segments[i].phys,
+                .len = segments[i].len,
+                .flags = descriptor.descriptorFlags(has_next, segments[i].writable),
+                .next = if (has_next) desc_index + 1 else 0,
+            };
+        }
     }
 
     pub fn notify(self: *const Queue, device: *const virtio_pci.Device) void {

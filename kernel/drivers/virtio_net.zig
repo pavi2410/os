@@ -106,18 +106,11 @@ pub fn sendFrame(frame: []const u8) NetError!void {
     const header_phys = virtio_pci.physFromVirt(@intFromPtr(tx_header)) orelse return NetError.IoError;
     const frame_phys = virtio_pci.physFromVirt(@intFromPtr(tx_frame)) orelse return NetError.IoError;
 
-    tx_queue.desc_table[0] = .{
-        .addr = header_phys,
-        .len = @sizeOf(NetHdr),
-        .flags = virtio_queue.desc_flags.next,
-        .next = 1,
+    const segments = [_]virtio_queue.Segment{
+        .{ .phys = header_phys, .len = @sizeOf(NetHdr) },
+        .{ .phys = frame_phys, .len = @intCast(frame.len) },
     };
-    tx_queue.desc_table[1] = .{
-        .addr = frame_phys,
-        .len = @intCast(frame.len),
-        .flags = 0,
-        .next = 0,
-    };
+    tx_queue.writeChain(0, &segments);
 
     tx_queue.submit(0);
     tx_queue.notify(&device);
@@ -245,18 +238,11 @@ fn queueRxSlot(slot: usize) NetError!void {
     const frame_phys = virtio_pci.physFromVirt(page_virt + @sizeOf(NetHdr)) orelse return NetError.IoError;
 
     const desc_base: u16 = @intCast(slot * rx_descs_per_slot);
-    rx_queue.desc_table[desc_base] = .{
-        .addr = header_phys,
-        .len = @sizeOf(NetHdr),
-        .flags = virtio_queue.desc_flags.next | virtio_queue.desc_flags.write,
-        .next = desc_base + 1,
+    const segments = [_]virtio_queue.Segment{
+        .{ .phys = header_phys, .len = @sizeOf(NetHdr), .writable = true },
+        .{ .phys = frame_phys, .len = max_frame_size, .writable = true },
     };
-    rx_queue.desc_table[desc_base + 1] = .{
-        .addr = frame_phys,
-        .len = max_frame_size,
-        .flags = virtio_queue.desc_flags.write,
-        .next = 0,
-    };
+    rx_queue.writeChain(desc_base, &segments);
 
     rx_queue.submit(desc_base);
 }

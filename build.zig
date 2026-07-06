@@ -291,6 +291,22 @@ pub fn build(b: *std.Build) void {
     });
     const run_virtio_queue_index_tests = b.addRunArtifact(virtio_queue_index_tests);
 
+    const virtio_descriptor_host_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/drivers/virtio_descriptor.zig"),
+        .target = b.graph.host,
+    });
+
+    const virtio_descriptor_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/kernel/virtio_descriptor_test.zig"),
+        .target = b.graph.host,
+    });
+    virtio_descriptor_test_mod.addImport("virtio_descriptor", virtio_descriptor_host_mod);
+
+    const virtio_descriptor_tests = b.addTest(.{
+        .root_module = virtio_descriptor_test_mod,
+    });
+    const run_virtio_descriptor_tests = b.addRunArtifact(virtio_descriptor_tests);
+
     const icmp_test_mod = b.createModule(.{
         .root_source_file = b.path("kernel/net/icmp_test.zig"),
         .target = b.graph.host,
@@ -443,6 +459,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_physical_tests.step);
     test_step.dependOn(&run_device_registry_tests.step);
     test_step.dependOn(&run_virtio_queue_index_tests.step);
+    test_step.dependOn(&run_virtio_descriptor_tests.step);
     test_step.dependOn(&run_filesystem_contract_tests.step);
     test_step.dependOn(&run_syscall_user_tests.step);
     test_step.dependOn(&run_icmp_tests.step);

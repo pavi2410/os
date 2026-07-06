@@ -172,26 +172,12 @@ fn transferOne(dir: TransferDir, lba: u64, data: []u8) BlkError!void {
     const data_phys = virtio_pci.physFromVirt(@intFromPtr(data.ptr)) orelse return BlkError.IoError;
     const status_phys = virtio_pci.physFromVirt(@intFromPtr(req_status)) orelse return BlkError.IoError;
 
-    const data_flags: u16 = if (dir == .in) virtio_queue.desc_flags.write else 0;
-
-    queue.desc_table[0] = .{
-        .addr = header_phys,
-        .len = @sizeOf(BlkReqHeader),
-        .flags = virtio_queue.desc_flags.next,
-        .next = 1,
+    const segments = [_]virtio_queue.Segment{
+        .{ .phys = header_phys, .len = @sizeOf(BlkReqHeader) },
+        .{ .phys = data_phys, .len = sector_size, .writable = dir == .in },
+        .{ .phys = status_phys, .len = 1, .writable = true },
     };
-    queue.desc_table[1] = .{
-        .addr = data_phys,
-        .len = sector_size,
-        .flags = virtio_queue.desc_flags.next | data_flags,
-        .next = 2,
-    };
-    queue.desc_table[2] = .{
-        .addr = status_phys,
-        .len = 1,
-        .flags = virtio_queue.desc_flags.write,
-        .next = 0,
-    };
+    queue.writeChain(0, &segments);
 
     queue.submit(0);
     queue.notify(&device);
