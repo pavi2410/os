@@ -23,17 +23,20 @@
 - [x] Extend syscalls: `open`, `close`, `lseek`, `stat` (minimal subset)
 - [x] FAT32 write/create/truncate/append; files persist across reboot (same `disk.img`)
 - [x] Shell builtins: `cat`, `ls`, `write` (with `-a` append)
-- [ ] Add network device driver
-  - [ ] VirtIO-net **or** e1000
-  - [ ] TX/RX ring handling
-- [ ] Add [`net/`](../../kernel/net/)
-  - [ ] Ethernet frame TX/RX
-  - [ ] ARP
-  - [ ] IPv4
-  - [ ] UDP
-  - [ ] TCP (minimal: connect, send, recv, close)
-- [ ] Add socket syscalls: `socket`, `bind`, `connect`, `send`, `recv`, `close`
-- [ ] Userland test: `ping`-like tool or static HTTP fetch over TCP (optional stretch)
+- [x] Add network device driver
+  - [x] VirtIO-net **or** e1000
+  - [x] TX/RX ring handling
+- [x] Add [`net/`](../../kernel/net/)
+  - [x] Ethernet frame TX/RX
+  - [x] ARP
+  - [x] IPv4
+  - [x] UDP
+  - [x] ICMP echo
+  - [x] TCP (minimal: connect, send, recv, close)
+- [x] Add socket syscalls: `socket`, `bind`, `connect`, `send`, `recv`, `sendto`, `recvfrom`, `close`
+- [x] Add network inspection syscalls for `ip addr`, `ip route`, and `ip neigh`
+- [x] Userland tests: `ping`, DNS (`dig`/codec), and HTTP GET over TCP via `curl`
+- [ ] Improve `ping` output with multiple packets, RTT, packet loss, and summary stats
 
 ---
 
@@ -42,8 +45,8 @@
 1. **Read a file from disk via VFS** — user program opens `/path` and reads bytes correctly.
 2. **Write/create file** persists across reboot (same virtual disk image).
 3. **Syscall file I/O** matches POSIX-ish behavior for the implemented subset.
-4. **Network driver sends and receives frames** — ARP and ping (or raw UDP echo) succeeds on QEMU user networking.
-5. **TCP connection** to a host service (e.g. QEMU's built-in services or a local test server) completes a round-trip.
+4. **Network driver sends and receives frames** — ARP and ping succeed on QEMU user networking.
+5. **TCP connection** to a host service (e.g. QEMU's built-in services or a local test server) completes a round-trip via `curl`.
 6. **Kernel remains stable** under concurrent file and network activity from userspace.
 
 ---
@@ -52,4 +55,4 @@
 
 - Prefer one device type per category and stick with it for QEMU (`-device virtio-blk-pci`, `-device virtio-net-pci`).
 - TCP can start as a minimal implementation; full POSIX socket edge cases come later.
-- Consider documenting QEMU command-line flags for block/net devices in the README when this phase lands.
+- Current userspace network tools are intentionally small: `ip` for local network state, `dig` for DNS, `ping` for ICMP, and `curl` for HTTP over TCP.

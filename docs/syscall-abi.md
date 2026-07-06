@@ -28,8 +28,33 @@ Negative `RAX` values follow the Linux errno convention (e.g. `-38` = `ENOSYS`).
 
 | Number | Name | Notes |
 |--------|------|-------|
+| 0 | `read` | File/console read |
 | 1 | `write` | `fd` 1 or 2 → serial; returns bytes written |
+| 2 | `open` | VFS open |
+| 3 | `close` | Close file descriptor |
+| 4 | `stat` | Minimal stat metadata |
+| 8 | `lseek` | File offset seek |
+| 12 | `brk` | Userspace heap break |
+| 39 | `getpid` | Current process ID |
+| 41 | `socket` | `AF_INET` datagram/stream sockets |
+| 42 | `connect` | TCP client connect |
+| 44 | `sendto` | Datagram send |
+| 45 | `recvfrom` | Datagram receive |
+| 46 | `send` | Connected socket send |
+| 47 | `recv` | Connected socket receive |
+| 49 | `bind` | Bind socket address |
+| 57 | `fork` | Duplicate process |
+| 59 | `execve` | Replace process image |
 | 60 | `exit` | Terminates current thread; does not return |
+| 61 | `wait4` | Reap child process |
+| 83 | `mkdir` | Create directory |
+| 84 | `rmdir` | Remove directory |
+| 87 | `unlink` | Remove file |
+| 217 | `getdents64` | Directory entries |
+| 228 | `clock_gettime` | Realtime/monotonic clocks |
+| 231 | `exit_group` | Process exit |
+| 1024 | `getnetconfig` | Kernel network config snapshot for `ip addr`/`ip route` |
+| 1025 | `getneighbors` | ARP/neighbor table snapshot for `ip neigh` |
 
 ## Segments
 

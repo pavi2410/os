@@ -4,7 +4,7 @@
 
 ## Current status
 
-The kernel boots under QEMU, runs a serial shell in userspace, reads and writes files on a VirtIO FAT32 disk, and runs ELF programs from `/BIN` via `fork`/`execve`.
+The kernel boots under QEMU, runs a serial shell in userspace, reads and writes files on a VirtIO FAT32 disk, runs ELF programs from `/BIN` via `fork`/`execve`, and has a small VirtIO-net TCP/IP stack.
 
 **Working today**
 
@@ -13,6 +13,7 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 * ELF64 user program loader, ring-3 execution, serial TTY (canonical mode + basic ANSI)
 * Syscalls: `read`, `write`, `open` (`O_CREAT`, `O_TRUNC`, `O_APPEND`), `close`, `lseek`, `stat`, `brk`, `getpid`, `fork`, `execve`, `wait4`, `unlink`, `mkdir`, `rmdir`, `getdents64`, `clock_gettime`, `exit`/`exit_group`
 * PCI enumeration (legacy I/O ports on QEMU q35), VirtIO-blk read/write, FAT32 VFS (read/write/create/truncate/append)
+* VirtIO-net with ARP, IPv4, UDP, ICMP echo, minimal TCP client sockets, and DNS A-record resolution
 * Userspace programs on the VirtIO FAT disk (`/README.TXT`, `/BIN/hello`, `/BIN/shell`, …)
 * Serial shell with modular builtins: `help`, `exit`, `pid`, `echo`, `cat`, `ls`, `write`, `rm`, `mkdir`, `rmdir`, `cd`, `pwd`, `date`
 * Disk image sync preserves user-created files across `mise run boot` (see [disk notes](#virtio-disk))
@@ -20,7 +21,7 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 
 **Next up** (see [docs/roadmap/](docs/roadmap/))
 
-Phase 5 networking: VirtIO-net and a minimal TCP/IP stack.
+Phase 5 networking polish: richer `ping` statistics and TCP/IP hardening.
 
 ## 🚀 Goals
 
@@ -114,6 +115,10 @@ write /NOTES.TXT hello
 write -a /NOTES.TXT world
 cat /NOTES.TXT
 hello
+ip addr
+ip route
+dig example.com
+curl example.com
 ```
 
 Use full paths for file builtins (`cat`, `ls`, `write`). Programs in `/BIN` can be launched by name (e.g. `hello`).
@@ -155,7 +160,7 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 | 2 — Memory | Done | Physical, virtual, and heap allocators |
 | 3 — Kernel runtime | Done | APIC, timer, threads, scheduler, syscalls |
 | 4 — Userspace | Done | ELF loader, TTY, shell, programs on FAT disk |
-| 5 — I/O stack | In progress | VirtIO-blk + FAT32 read/write done; networking next |
+| 5 — I/O stack | In progress | VirtIO-blk, FAT32 read/write, VirtIO-net, sockets, `ip`, DNS, and `curl` |
 | 6 — SMP and GUI | Planned | Multicore, framebuffer, window manager |
 
 **Phase 5 — done**
@@ -164,13 +169,17 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 * [x] FAT32 read/write, create, truncate, append
 * [x] Install user programs on the FAT disk (`/BIN/*`)
 * [x] Shell file builtins with persistence across reboot
+* [x] `cd`/`pwd`
+* [x] VirtIO-net driver
+* [x] ARP, IPv4, UDP, ICMP echo, minimal TCP
+* [x] Socket syscalls
+* [x] `ip addr`, `ip route`, `ip neigh`
+* [x] DNS-backed `curl`
 
 **Phase 5 — next**
 
-* [x] `cd`/`pwd`
-* [ ] VirtIO-net (or e1000) driver
-* [ ] ARP, IPv4, UDP, minimal TCP
-* [ ] Socket syscalls
+* [ ] `ping` with multiple packets, RTT, packet loss, and summary stats
+* [ ] TCP/IP hardening under repeated userspace network activity
 
 ## 🔗 Links
 
