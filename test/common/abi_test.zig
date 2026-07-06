@@ -18,6 +18,21 @@ test "filesystem ABI layouts match syscall handlers" {
     try std.testing.expectEqual(@as(u32, 0o040000), abi_fs.S_IFDIR);
 }
 
+test "dirent64 helpers round-trip records" {
+    var buf: [64]u8 = undefined;
+    abi_fs.writeDirent64(&buf, 42, 7, abi_fs.DT_REG, "foo.txt");
+    try std.testing.expectEqual(@as(usize, 32), abi_fs.dirent64Reclen("foo.txt".len));
+
+    var it = abi_fs.Dirent64Iterator{ .data = &buf };
+    const entry = it.next().?;
+    try std.testing.expectEqual(@as(u64, 42), entry.header.d_ino);
+    try std.testing.expectEqual(@as(i64, 7), entry.header.d_off);
+    try std.testing.expectEqual(@as(u16, 32), entry.header.d_reclen);
+    try std.testing.expectEqual(abi_fs.DT_REG, entry.header.d_type);
+    try std.testing.expectEqualStrings("foo.txt", entry.name);
+    try std.testing.expect(it.next() == null);
+}
+
 test "network ABI sockaddr uses big-endian port" {
     const addr = abi_net.sockaddrIn(.{ 10, 0, 2, 2 }, 8080);
     try std.testing.expectEqual(abi_net.AF_INET, addr.family);

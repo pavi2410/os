@@ -19,6 +19,12 @@ pub const S_IFDIR = abi_fs.S_IFDIR;
 pub const Stat = abi_fs.Stat;
 pub const Dirent64 = abi_fs.Dirent64;
 pub const dirent64_name_offset = abi_fs.dirent64_name_offset;
+pub const DT_DIR = abi_fs.DT_DIR;
+pub const DT_REG = abi_fs.DT_REG;
+pub const dirent64Reclen = abi_fs.dirent64Reclen;
+pub const Dirent64Entry = abi_fs.Dirent64Entry;
+pub const Dirent64Iterator = abi_fs.Dirent64Iterator;
+pub const writeDirent64 = abi_fs.writeDirent64;
 
 pub fn open(path: [*:0]const u8, flags: u32, mode: u32) isize {
     return syscall.open(path, flags, mode);

@@ -40,3 +40,52 @@ pub const Dirent64 = extern struct {
 };
 
 pub const dirent64_name_offset: usize = 19;
+
+pub const DT_DIR: u8 = 4;
+pub const DT_REG: u8 = 8;
+
+pub fn dirent64Reclen(name_len: usize) usize {
+    const raw = dirent64_name_offset + name_len + 1;
+    return (raw + 7) & ~@as(usize, 7);
+}
+
+pub const Dirent64Entry = struct {
+    header: *const Dirent64,
+    name: []const u8,
+};
+
+pub const Dirent64Iterator = struct {
+    data: []const u8,
+    off: usize = 0,
+
+    pub fn next(self: *Dirent64Iterator) ?Dirent64Entry {
+        if (self.off + dirent64_name_offset > self.data.len) return null;
+        const hdr: *const Dirent64 = @ptrCast(@alignCast(self.data.ptr + self.off));
+        const reclen = hdr.d_reclen;
+        if (reclen < dirent64_name_offset or self.off + reclen > self.data.len) return null;
+
+        const name_start = self.off + dirent64_name_offset;
+        var name_len: usize = 0;
+        while (name_len < reclen - dirent64_name_offset and self.data[name_start + name_len] != 0) {
+            name_len += 1;
+        }
+        const entry = Dirent64Entry{
+            .header = hdr,
+            .name = self.data[name_start .. name_start + name_len],
+        };
+        self.off += reclen;
+        return entry;
+    }
+};
+
+pub fn writeDirent64(out: []u8, ino: u64, off: i64, d_type: u8, name: []const u8) void {
+    const reclen = dirent64Reclen(name.len);
+    @memset(out[0..reclen], 0);
+    const hdr: *Dirent64 = @ptrCast(@alignCast(out.ptr));
+    hdr.d_ino = ino;
+    hdr.d_off = off;
+    hdr.d_reclen = @intCast(reclen);
+    hdr.d_type = d_type;
+    @memcpy(out[dirent64_name_offset .. dirent64_name_offset + name.len], name);
+    out[dirent64_name_offset + name.len] = 0;
+}

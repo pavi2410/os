@@ -1,4 +1,5 @@
 const std = @import("std");
+const abi_fs = @import("abi_fs");
 const acpi_access = @import("../acpi/access.zig");
 const block = @import("../drivers/block.zig");
 const filesystem = @import("filesystem.zig");
@@ -598,21 +599,7 @@ pub fn openDirectory(path: []const u8) FatError!OpenResult {
     return .{ .entry = entry, .loc = .{ .cluster = 0, .offset = 0 } };
 }
 
-const Dirent64Hdr = extern struct {
-    d_ino: u64,
-    d_off: i64,
-    d_reclen: u16,
-    d_type: u8,
-};
-
-const dirent_name_off: usize = 19;
-const DT_DIR: u8 = 4;
-const DT_REG: u8 = 8;
-
-fn direntReclen(name_len: usize) usize {
-    const raw = dirent_name_off + name_len + 1;
-    return (raw + 7) & ~@as(usize, 7);
-}
+const dirent_name_off = abi_fs.dirent64_name_offset;
 
 /// Fill `out` with linux_dirent64 records from `dir_cluster`, skipping the first `skip` entries.
 pub fn getDents64(dir_cluster: u32, skip: *usize, out: []u8) FatError!usize {
@@ -661,7 +648,7 @@ pub fn getDents64(dir_cluster: u32, skip: *usize, out: []u8) FatError!usize {
                 continue;
             }
 
-            const reclen = direntReclen(name.len);
+            const reclen = abi_fs.dirent64Reclen(name.len);
             if (written + reclen > out.len) {
                 if (written == 0) return FatError.BufferTooSmall;
                 skip.* = index;
@@ -669,16 +656,13 @@ pub fn getDents64(dir_cluster: u32, skip: *usize, out: []u8) FatError!usize {
             }
 
             const rec = out[written .. written + reclen];
-            @memset(rec, 0);
-
-            const hdr: *Dirent64Hdr = @ptrCast(@alignCast(rec.ptr));
-            hdr.d_ino = (@as(u64, cluster) << 16) | @as(u64, off);
-            hdr.d_off = next_off;
-            hdr.d_reclen = @intCast(reclen);
-            hdr.d_type = if (entry[11] & 0x10 != 0) DT_DIR else DT_REG;
-
-            @memcpy(rec[dirent_name_off .. dirent_name_off + name.len], name);
-            rec[dirent_name_off + name.len] = 0;
+            abi_fs.writeDirent64(
+                rec,
+                (@as(u64, cluster) << 16) | @as(u64, off),
+                next_off,
+                if (entry[11] & 0x10 != 0) abi_fs.DT_DIR else abi_fs.DT_REG,
+                name,
+            );
 
             written += reclen;
             next_off += 1;

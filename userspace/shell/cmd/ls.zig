@@ -5,8 +5,6 @@ const io = @import("../io.zig");
 const path = @import("../path.zig");
 const libc = @import("libc");
 
-const dirent_name_off = libc.fs.dirent64_name_offset;
-
 pub fn run(parsed: *const argv.Parsed) void {
     const dir_arg = parsed.positionalAt(0);
     lsDir(dir_arg, parsed.hasFlag('l'));
@@ -40,41 +38,19 @@ fn lsDir(dir_arg: ?[]const u8, long: bool) void {
 }
 
 fn emitShortNames(data: []const u8) void {
-    var off: usize = 0;
-    while (off + dirent_name_off <= data.len) {
-        const hdr: *const libc.fs.Dirent64 = @ptrCast(@alignCast(data.ptr + off));
-        const reclen = hdr.d_reclen;
-        if (reclen < dirent_name_off or off + reclen > data.len) break;
-
-        const name_start = off + dirent_name_off;
-        var name_len: usize = 0;
-        while (name_len < reclen - dirent_name_off and data[name_start + name_len] != 0) {
-            name_len += 1;
-        }
-        const name = data[name_start .. name_start + name_len];
-        if (name.len > 0) {
-            io.writeStr(name);
-            io.writeNewline();
-        }
-        off += reclen;
+    var it = libc.fs.Dirent64Iterator{ .data = data };
+    while (it.next()) |entry| {
+        if (entry.name.len == 0) continue;
+        io.writeStr(entry.name);
+        io.writeNewline();
     }
 }
 
 fn emitLongNames(dir: []const u8, data: []const u8) void {
-    var off: usize = 0;
-    while (off + dirent_name_off <= data.len) {
-        const hdr: *const libc.fs.Dirent64 = @ptrCast(@alignCast(data.ptr + off));
-        const reclen = hdr.d_reclen;
-        if (reclen < dirent_name_off or off + reclen > data.len) break;
-
-        const name_start = off + dirent_name_off;
-        var name_len: usize = 0;
-        while (name_len < reclen - dirent_name_off and data[name_start + name_len] != 0) {
-            name_len += 1;
-        }
-        const name = data[name_start .. name_start + name_len];
-        if (name.len > 0) printLongEntry(dir, name);
-        off += reclen;
+    var it = libc.fs.Dirent64Iterator{ .data = data };
+    while (it.next()) |entry| {
+        if (entry.name.len == 0) continue;
+        printLongEntry(dir, entry.name);
     }
 }
 
