@@ -1,3 +1,4 @@
+const hal = @import("../hal.zig");
 const virtual = @import("../mm/virtual.zig");
 const descriptor = @import("virtio_descriptor.zig");
 const virtio_pci = @import("virtio_pci.zig");
@@ -108,7 +109,7 @@ pub const Queue = struct {
         var spins: usize = 0;
         while (!self.hasUsed()) {
             device.ackInterrupt();
-            asm volatile ("sti; pause; cli" ::: .{ .memory = true });
+            hal.processor.relaxInterruptible();
             spins += 1;
             if (spins > 10_000_000) return Error.Timeout;
         }

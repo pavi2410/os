@@ -1,4 +1,5 @@
 const serial = @import("../arch/x86_64/serial.zig");
+const hal = @import("../hal.zig");
 const virtual = @import("../mm/virtual.zig");
 const ethernet = @import("../net/ethernet.zig");
 const net_device = @import("net_device.zig");
@@ -151,7 +152,7 @@ pub fn pollRecv(buf: []u8, max_spins: usize) NetError!usize {
             switch (err) {
                 NetError.NoPacket => {
                     device.ackInterrupt();
-                    asm volatile ("sti; pause; cli" ::: .{ .memory = true });
+                    hal.processor.relaxInterruptible();
                 },
                 else => return err,
             }

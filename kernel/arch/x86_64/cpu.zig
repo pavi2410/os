@@ -13,6 +13,11 @@ pub inline fn hlt() void {
     asm volatile ("hlt");
 }
 
+/// Briefly enable interrupts while yielding inside a polling loop.
+pub inline fn relaxInterruptible() void {
+    asm volatile ("sti; pause; cli" ::: .{ .memory = true });
+}
+
 /// Return the address of the next instruction (approximate RIP).
 pub inline fn readRip() u64 {
     return asm volatile ("lea (%%rip), %[rip]"

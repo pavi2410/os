@@ -21,6 +21,10 @@ pub const processor = struct {
     pub fn haltForever() noreturn {
         cpu_arch.haltForever();
     }
+
+    pub fn relaxInterruptible() void {
+        cpu_arch.relaxInterruptible();
+    }
 };
 
 pub const clock = struct {

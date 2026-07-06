@@ -1,4 +1,5 @@
 const icmp = @import("icmp.zig");
+const hal = @import("../hal.zig");
 const ipv4 = @import("ipv4.zig");
 const link = @import("link.zig");
 const tcp = @import("tcp.zig");
@@ -44,7 +45,7 @@ pub fn pollFrame(buf: []u8, max_spins: usize, matcher: anytype) Error!usize {
     while (spins < max_spins) : (spins += 1) {
         const len = link.receive(buf) catch |err| switch (err) {
             error.NoPacket => {
-                cpuRelaxInterruptible();
+                hal.processor.relaxInterruptible();
                 continue;
             },
             else => return Error.IoError,
@@ -52,8 +53,4 @@ pub fn pollFrame(buf: []u8, max_spins: usize, matcher: anytype) Error!usize {
         if (matcher.matches(buf[0..len])) return len;
     }
     return Error.Timeout;
-}
-
-fn cpuRelaxInterruptible() void {
-    asm volatile ("sti; pause; cli" ::: .{ .memory = true });
 }

@@ -1,4 +1,5 @@
 const config = @import("config.zig");
+const hal = @import("../hal.zig");
 const icmp = @import("icmp.zig");
 const ipv4 = @import("ipv4.zig");
 const link = @import("link.zig");
@@ -209,7 +210,7 @@ pub fn recv(handle: u32, buf: []u8, max_spins: usize) SocketError!usize {
             if (sock.tcp_state == .peer_closed) return 0;
             continue;
         }
-        asm volatile ("sti; pause; cli" ::: .{ .memory = true });
+        hal.processor.relaxInterruptible();
     }
     return SocketError.Timeout;
 }
