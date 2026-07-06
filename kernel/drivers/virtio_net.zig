@@ -1,5 +1,4 @@
 const serial = @import("../arch/x86_64/serial.zig");
-const arp = @import("../net/arp.zig");
 const virtual = @import("../mm/virtual.zig");
 const virtio_pci = @import("virtio_pci.zig");
 
@@ -230,31 +229,6 @@ pub fn logStatus() void {
         .{ mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] },
     );
     serial.printf("RX slots: {d}, TX queue: {d}\r\n", .{ rx_slots, tx_queue.size });
-}
-
-pub fn selfTest() void {
-    if (!ready) return;
-
-    const guest_ip = [_]u8{ 10, 0, 2, 15 };
-    const gateway_ip = [_]u8{ 10, 0, 2, 2 };
-    var frame: [max_frame_size]u8 = undefined;
-    const frame_len = arp.buildRequest(&frame, mac, guest_ip, gateway_ip);
-    sendFrame(frame[0..frame_len]) catch {
-        serial.writeString("virtio-net TX failed\r\n");
-        return;
-    };
-    serial.writeString("virtio-net TX ok\r\n");
-
-    var recv_buf: [max_frame_size]u8 = undefined;
-    if (pollRecv(&recv_buf, 100_000)) |len| {
-        if (arp.isReply(recv_buf[0..len])) {
-            serial.printf("virtio-net ARP reply ({d} bytes)\r\n", .{len});
-        } else {
-            serial.printf("virtio-net RX frame ({d} bytes)\r\n", .{len});
-        }
-    } else |_| {
-        serial.writeString("virtio-net RX timeout\r\n");
-    }
 }
 
 fn setupQueue(queue: *Queue, queue_index: u16) NetError!void {

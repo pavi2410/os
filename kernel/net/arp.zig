@@ -52,6 +52,18 @@ pub fn isReply(frame: []const u8) bool {
     if (frame.len < ethernet.header_len + @sizeOf(Header)) return false;
     const eth: *const ethernet.Header = @ptrCast(@alignCast(frame.ptr));
     if (ethernet.ethertypeHost(eth) != ethernet.ethertype_arp) return false;
-    const arp: *const Header = @ptrCast(@alignCast(frame[ethernet.header_len..].ptr));
-    return opcodeHost(arp) == op_reply;
+    const arp_hdr: *const Header = @ptrCast(@alignCast(frame[ethernet.header_len..].ptr));
+    return opcodeHost(arp_hdr) == op_reply;
+}
+
+/// ARP reply for @p ip: returns the sender hardware address (resolved MAC).
+pub fn senderMacFor(frame: []const u8, ip: [ipv4_len]u8) ?[ethernet.mac_len]u8 {
+    if (!isReply(frame)) return null;
+    const arp_hdr: *const Header = @ptrCast(@alignCast(frame[ethernet.header_len..].ptr));
+    if (!ipEqual(arp_hdr.sender_ip, ip)) return null;
+    return arp_hdr.sender_mac;
+}
+
+fn ipEqual(a: [ipv4_len]u8, b: [ipv4_len]u8) bool {
+    return @as(u32, @bitCast(a)) == @as(u32, @bitCast(b));
 }
