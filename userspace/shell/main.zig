@@ -6,21 +6,7 @@ pub const std_options = freestanding_std.std_options;
 const cwd = @import("cwd.zig");
 const io = @import("io.zig");
 const libc = @import("libc");
-
-const cmd_cat = @import("cmd/cat.zig");
-const cmd_cd = @import("cmd/cd.zig");
-const cmd_date = @import("cmd/date.zig");
-const cmd_echo = @import("cmd/echo.zig");
-const cmd_exit = @import("cmd/exit.zig");
-const cmd_help = @import("cmd/help.zig");
-const cmd_ls = @import("cmd/ls.zig");
-const cmd_mkdir = @import("cmd/mkdir.zig");
-const cmd_pid = @import("cmd/pid.zig");
-const cmd_pwd = @import("cmd/pwd.zig");
-const cmd_rm = @import("cmd/rm.zig");
-const cmd_rmdir = @import("cmd/rmdir.zig");
-const cmd_run = @import("cmd/run.zig");
-const cmd_write = @import("cmd/write.zig");
+const registry = @import("cmd/registry.zig");
 
 fn writePrompt() void {
     io.writeNewline();
@@ -47,37 +33,6 @@ export fn main(argc: usize, raw_argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }
         if (parsed.argc == 0) continue;
 
         const cmd = parsed.cmd().?;
-
-        if (io.eql(cmd, "exit")) {
-            cmd_exit.run();
-        } else if (io.eql(cmd, "help")) {
-            cmd_help.run();
-        } else if (io.eql(cmd, "pid")) {
-            cmd_pid.run();
-        } else if (io.eql(cmd, "echo")) {
-            cmd_echo.run(&parsed);
-        } else if (io.eql(cmd, "ls")) {
-            cmd_ls.run(&parsed);
-        } else if (io.eql(cmd, "write")) {
-            cmd_write.run(&parsed);
-        } else if (io.eql(cmd, "cat")) {
-            cmd_cat.run(&parsed);
-        } else if (io.eql(cmd, "cd")) {
-            cmd_cd.run(&parsed);
-        } else if (io.eql(cmd, "pwd")) {
-            cmd_pwd.run();
-        } else if (io.eql(cmd, "date")) {
-            cmd_date.run();
-        } else if (io.eql(cmd, "rm")) {
-            cmd_rm.run(&parsed);
-        } else if (io.eql(cmd, "mkdir")) {
-            cmd_mkdir.run(&parsed);
-        } else if (io.eql(cmd, "rmdir")) {
-            cmd_rmdir.run(&parsed);
-        } else if (cmd.len > 0 and cmd[0] == '/') {
-            io.writeStr("unknown command\n");
-        } else {
-            cmd_run.run(&parsed);
-        }
+        registry.dispatch(cmd, &parsed);
     }
 }
