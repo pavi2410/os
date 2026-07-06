@@ -4,12 +4,20 @@ const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 const link = @import("link.zig");
 
-var cached_mac: ?ethernet.Mac = null;
-var cached_ip: ipv4.Addr = .{ 0, 0, 0, 0 };
+const cache_size = 8;
+
+const CacheEntry = struct {
+    ip: ipv4.Addr = .{ 0, 0, 0, 0 },
+    mac: ethernet.Mac = undefined,
+    valid: bool = false,
+};
+
+var cache: [cache_size]CacheEntry = [_]CacheEntry{.{}} ** cache_size;
+var next_slot: usize = 0;
 
 pub fn resolve(ip: ipv4.Addr, src_mac: ethernet.Mac) ?ethernet.Mac {
-    if (cached_mac) |mac| {
-        if (ipv4.equal(cached_ip, ip)) return mac;
+    for (&cache) |entry| {
+        if (entry.valid and ipv4.equal(entry.ip, ip)) return entry.mac;
     }
 
     var frame: [link.max_frame_len]u8 = undefined;
@@ -21,8 +29,7 @@ pub fn resolve(ip: ipv4.Addr, src_mac: ethernet.Mac) ?ethernet.Mac {
     while (attempt < 5) : (attempt += 1) {
         if (link.pollReceive(&recv_buf, 100_000)) |len| {
             if (arp.senderMacFor(recv_buf[0..len], ip)) |resolved| {
-                cached_mac = resolved;
-                cached_ip = ip;
+                store(ip, resolved);
                 return resolved;
             }
         }
@@ -31,6 +38,18 @@ pub fn resolve(ip: ipv4.Addr, src_mac: ethernet.Mac) ?ethernet.Mac {
 }
 
 pub fn resetCache() void {
-    cached_mac = null;
-    cached_ip = .{ 0, 0, 0, 0 };
+    for (&cache) |*entry| entry.* = .{};
+    next_slot = 0;
+}
+
+fn store(ip: ipv4.Addr, mac: ethernet.Mac) void {
+    for (&cache) |*entry| {
+        if (entry.valid and ipv4.equal(entry.ip, ip)) {
+            entry.mac = mac;
+            return;
+        }
+    }
+
+    cache[next_slot] = .{ .ip = ip, .mac = mac, .valid = true };
+    next_slot = (next_slot + 1) % cache_size;
 }
