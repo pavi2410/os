@@ -1,16 +1,18 @@
 const serial = @import("../arch/x86_64/serial.zig");
 const config = @import("config.zig");
 const ipv4 = @import("ipv4.zig");
+const link = @import("link.zig");
 const resolve = @import("resolve.zig");
 const udp = @import("udp.zig");
-const virtio_net = @import("../drivers/virtio_net.zig");
 
 pub const dns_port: u16 = 53;
 
-pub fn runSelfTest() void {
-    if (!virtio_net.isReady()) return;
+const test_src_port: u16 = 42000;
 
-    const mac = virtio_net.macAddress();
+pub fn runSelfTest() void {
+    if (!link.isReady()) return;
+
+    const mac = link.localMac();
     const dns_mac = resolve.resolve(config.dns_ip, mac) orelse {
         serial.writeString("udp: ARP failed\r\n");
         return;
@@ -19,35 +21,35 @@ pub fn runSelfTest() void {
     var query: [32]u8 = undefined;
     const query_len = buildExampleQuery(&query);
 
-    var frame: [virtio_net.max_frame_size]u8 = undefined;
+    var frame: [link.max_frame_len]u8 = undefined;
     const frame_len = udp.build(
         &frame,
         dns_mac,
         mac,
         config.guest_ip,
         config.dns_ip,
-        42000,
+        test_src_port,
         dns_port,
         query[0..query_len],
     );
-    virtio_net.sendFrame(frame[0..frame_len]) catch {
+    link.transmitOrFail(frame[0..frame_len]) catch {
         serial.writeString("udp: TX failed\r\n");
         return;
     };
 
-    var recv_buf: [virtio_net.max_frame_size]u8 = undefined;
+    var recv_buf: [link.max_frame_len]u8 = undefined;
     var attempt: usize = 0;
     while (attempt < 10) : (attempt += 1) {
-        if (virtio_net.pollRecv(&recv_buf, 100_000)) |len| {
+        if (link.pollReceive(&recv_buf, 100_000)) |len| {
             var src_ip: ipv4.Addr = undefined;
             var src_port: u16 = 0;
-            if (udp.match(recv_buf[0..len], 42000, &src_ip, &src_port)) |payload| {
+            if (udp.match(recv_buf[0..len], test_src_port, &src_ip, &src_port)) |payload| {
                 if (ipv4.equal(src_ip, config.dns_ip) and src_port == dns_port and payload.len >= 12) {
                     serial.printf("udp: DNS reply ({d} bytes)\r\n", .{payload.len});
                     return;
                 }
             }
-        } else |_| {}
+        }
     }
     serial.writeString("udp: timeout\r\n");
 }

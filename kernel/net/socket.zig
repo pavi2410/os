@@ -1,8 +1,8 @@
 const config = @import("config.zig");
 const ipv4 = @import("ipv4.zig");
+const link = @import("link.zig");
 const resolve = @import("resolve.zig");
 const udp = @import("udp.zig");
-const virtio_net = @import("../drivers/virtio_net.zig");
 
 pub const AF_INET: u16 = 2;
 pub const SOCK_DGRAM: u16 = 2;
@@ -37,7 +37,7 @@ var next_ephemeral: u16 = 49152;
 pub fn create(domain: u32, sock_type: u32, protocol: i32) SocketError!u32 {
     if (domain != AF_INET or sock_type != SOCK_DGRAM) return SocketError.Unsupported;
     _ = protocol;
-    if (!virtio_net.isReady()) return SocketError.NotReady;
+    if (!link.isReady()) return SocketError.NotReady;
 
     var i: usize = 0;
     while (i < max_sockets) : (i += 1) {
@@ -67,7 +67,7 @@ pub fn sendto(
 ) SocketError!usize {
     if (handle >= max_sockets or !sockets[handle].in_use) return SocketError.NotFound;
     if (dest.family != AF_INET) return SocketError.Unsupported;
-    if (!virtio_net.isReady()) return SocketError.NotReady;
+    if (!link.isReady()) return SocketError.NotReady;
 
     const sock = &sockets[handle];
     if (sock.local_port == 0) {
@@ -78,10 +78,10 @@ pub fn sendto(
 
     const dst_ip = dest.addr;
     const dst_port = @byteSwap(dest.port_be);
-    const mac = virtio_net.macAddress();
+    const mac = link.localMac();
     const dst_mac = resolve.resolve(dst_ip, mac) orelse return SocketError.IoError;
 
-    var frame: [virtio_net.max_frame_size]u8 = undefined;
+    var frame: [link.max_frame_len]u8 = undefined;
     const frame_len = udp.build(
         &frame,
         dst_mac,
@@ -92,7 +92,7 @@ pub fn sendto(
         dst_port,
         data,
     );
-    virtio_net.sendFrame(frame[0..frame_len]) catch return SocketError.IoError;
+    link.transmitOrFail(frame[0..frame_len]) catch return SocketError.IoError;
     return data.len;
 }
 
@@ -105,13 +105,13 @@ pub fn recvfrom(
     if (handle >= max_sockets or !sockets[handle].in_use) return SocketError.NotFound;
     const local_port = sockets[handle].local_port;
     if (local_port == 0) return SocketError.NotBound;
-    if (!virtio_net.isReady()) return SocketError.NotReady;
+    if (!link.isReady()) return SocketError.NotReady;
 
-    var recv_buf: [virtio_net.max_frame_size]u8 = undefined;
+    var recv_buf: [link.max_frame_len]u8 = undefined;
     var spins: usize = 0;
     while (spins < max_spins) : (spins += 1) {
-        const len = virtio_net.recvFrame(&recv_buf) catch |err| switch (err) {
-            virtio_net.NetError.NoPacket => {
+        const len = link.receive(&recv_buf) catch |err| switch (err) {
+            error.NoPacket => {
                 asm volatile ("sti; pause; cli" ::: .{ .memory = true });
                 continue;
             },

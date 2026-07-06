@@ -2,7 +2,7 @@ const arp = @import("arp.zig");
 const config = @import("config.zig");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
-const virtio_net = @import("../drivers/virtio_net.zig");
+const link = @import("link.zig");
 
 var cached_mac: ?ethernet.Mac = null;
 var cached_ip: ipv4.Addr = .{ 0, 0, 0, 0 };
@@ -12,20 +12,20 @@ pub fn resolve(ip: ipv4.Addr, src_mac: ethernet.Mac) ?ethernet.Mac {
         if (ipv4.equal(cached_ip, ip)) return mac;
     }
 
-    var frame: [virtio_net.max_frame_size]u8 = undefined;
+    var frame: [link.max_frame_len]u8 = undefined;
     const frame_len = arp.buildRequest(&frame, src_mac, config.guest_ip, ip);
-    virtio_net.sendFrame(frame[0..frame_len]) catch return null;
+    link.transmitOrFail(frame[0..frame_len]) catch return null;
 
-    var recv_buf: [virtio_net.max_frame_size]u8 = undefined;
+    var recv_buf: [link.max_frame_len]u8 = undefined;
     var attempt: usize = 0;
     while (attempt < 5) : (attempt += 1) {
-        if (virtio_net.pollRecv(&recv_buf, 100_000)) |len| {
+        if (link.pollReceive(&recv_buf, 100_000)) |len| {
             if (arp.senderMacFor(recv_buf[0..len], ip)) |resolved| {
                 cached_mac = resolved;
                 cached_ip = ip;
                 return resolved;
             }
-        } else |_| {}
+        }
     }
     return null;
 }
