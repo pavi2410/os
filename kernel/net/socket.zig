@@ -25,6 +25,7 @@ pub const SockaddrIn = extern struct {
 };
 
 const max_sockets = 16;
+const ephemeral_port_min: u16 = 49152;
 
 const Socket = struct {
     in_use: bool = false,
@@ -32,7 +33,7 @@ const Socket = struct {
 };
 
 var sockets: [max_sockets]Socket = [_]Socket{.{}} ** max_sockets;
-var next_ephemeral: u16 = 49152;
+var next_ephemeral: u16 = ephemeral_port_min;
 
 pub fn create(domain: u32, sock_type: u32, protocol: i32) SocketError!u32 {
     if (domain != AF_INET or sock_type != SOCK_DGRAM) return SocketError.Unsupported;
@@ -73,7 +74,7 @@ pub fn sendto(
     if (sock.local_port == 0) {
         sock.local_port = next_ephemeral;
         next_ephemeral +%= 1;
-        if (next_ephemeral < 1024) next_ephemeral = 49152;
+        if (next_ephemeral < 1024) next_ephemeral = ephemeral_port_min;
     }
 
     const dst_ip = dest.addr;
