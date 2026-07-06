@@ -3,6 +3,9 @@ pub const header_len = 20;
 
 pub const Addr = [addr_len]u8;
 
+/// Buffer size for `format` (`ddd.ddd.ddd.ddd`).
+pub const format_len = 15;
+
 pub const proto_icmp: u8 = 1;
 pub const proto_udp: u8 = 17;
 
@@ -21,6 +24,37 @@ pub const Header = extern struct {
 
 pub fn equal(a: Addr, b: Addr) bool {
     return @as(u32, @bitCast(a)) == @as(u32, @bitCast(b));
+}
+
+/// Writes dotted decimal into `buf`. Returns slice or null.
+pub fn format(addr: Addr, buf: []u8) ?[]const u8 {
+    if (buf.len < format_len) return null;
+    var i: usize = 0;
+    var octet: usize = 0;
+    while (octet < addr_len) : (octet += 1) {
+        if (octet > 0) {
+            buf[i] = '.';
+            i += 1;
+        }
+        i += writeU8Decimal(addr[octet], buf[i..]);
+    }
+    return buf[0..i];
+}
+
+fn writeU8Decimal(n: u8, out: []u8) usize {
+    if (n >= 100) {
+        out[0] = '0' + (n / 100);
+        out[1] = '0' + ((n / 10) % 10);
+        out[2] = '0' + (n % 10);
+        return 3;
+    }
+    if (n >= 10) {
+        out[0] = '0' + (n / 10);
+        out[1] = '0' + (n % 10);
+        return 2;
+    }
+    out[0] = '0' + n;
+    return 1;
 }
 
 pub fn totalLengthHost(hdr: *const Header) u16 {

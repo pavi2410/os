@@ -33,13 +33,9 @@ pub fn runSelfTest() void {
     while (attempt < 10) : (attempt += 1) {
         if (virtio_net.pollRecv(&recv_buf, 100_000)) |len| {
             if (icmp.isEchoReply(recv_buf[0..len], gateway_ip, ping_id, ping_seq)) {
-                serial.printf("ping: {d}.{d}.{d}.{d} reply ({d} bytes)\r\n", .{
-                    gateway_ip[0],
-                    gateway_ip[1],
-                    gateway_ip[2],
-                    gateway_ip[3],
-                    len,
-                });
+                var ip_buf: [ipv4.format_len]u8 = undefined;
+                const ip_str = ipv4.format(gateway_ip, &ip_buf) orelse "?";
+                serial.printf("ping: {s} reply ({d} bytes)\r\n", .{ ip_str, len });
                 return;
             }
         } else |_| {}
