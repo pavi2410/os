@@ -2,6 +2,7 @@ const config = @import("config.zig");
 const icmp = @import("icmp.zig");
 const ipv4 = @import("ipv4.zig");
 const link = @import("link.zig");
+const pump = @import("pump.zig");
 const resolve = @import("resolve.zig");
 const tcp = @import("tcp.zig");
 const udp = @import("udp.zig");
@@ -27,6 +28,13 @@ pub const SocketError = error{
 };
 
 pub const SockaddrIn = abi_net.SockaddrIn;
+
+fn socketErrorFromPump(err: pump.Error) SocketError {
+    return switch (err) {
+        pump.Error.IoError => SocketError.IoError,
+        pump.Error.Timeout => SocketError.Timeout,
+    };
+}
 
 const Kind = enum {
     udp,
@@ -300,32 +308,24 @@ fn recvUdp(
     if (local_port == 0) return SocketError.NotBound;
 
     var recv_buf: [link.max_frame_len]u8 = undefined;
-    var spins: usize = 0;
-    while (spins < max_spins) : (spins += 1) {
-        const len = link.receive(&recv_buf) catch |err| switch (err) {
-            error.NoPacket => {
-                asm volatile ("sti; pause; cli" ::: .{ .memory = true });
-                continue;
-            },
-            else => return SocketError.IoError,
-        };
+    const len = pump.pollFrame(&recv_buf, max_spins, pump.UdpMatcher{
+        .local_port = local_port,
+    }) catch |err| return socketErrorFromPump(err);
 
-        var src_ip: ipv4.Addr = undefined;
-        var src_port: u16 = 0;
-        const payload = udp.match(recv_buf[0..len], local_port, &src_ip, &src_port) orelse continue;
-        const copy_len = @min(payload.len, buf.len);
-        @memcpy(buf[0..copy_len], payload[0..copy_len]);
-        if (src_out) |out| {
-            out.* = .{
-                .family = AF_INET,
-                .port_be = @byteSwap(src_port),
-                .addr = src_ip,
-                .zero = .{0} ** 8,
-            };
-        }
-        return copy_len;
+    var src_ip: ipv4.Addr = undefined;
+    var src_port: u16 = 0;
+    const payload = udp.match(recv_buf[0..len], local_port, &src_ip, &src_port) orelse return SocketError.IoError;
+    const copy_len = @min(payload.len, buf.len);
+    @memcpy(buf[0..copy_len], payload[0..copy_len]);
+    if (src_out) |out| {
+        out.* = .{
+            .family = AF_INET,
+            .port_be = @byteSwap(src_port),
+            .addr = src_ip,
+            .zero = .{0} ** 8,
+        };
     }
-    return SocketError.Timeout;
+    return copy_len;
 }
 
 fn recvIcmp(
@@ -338,33 +338,25 @@ fn recvIcmp(
     const expect_seq = if (sock.icmp_seq > 0) sock.icmp_seq - 1 else 0;
 
     var recv_buf: [link.max_frame_len]u8 = undefined;
-    var spins: usize = 0;
-    while (spins < max_spins) : (spins += 1) {
-        const len = link.receive(&recv_buf) catch |err| switch (err) {
-            error.NoPacket => {
-                asm volatile ("sti; pause; cli" ::: .{ .memory = true });
-                continue;
-            },
-            else => return SocketError.IoError,
+    const len = pump.pollFrame(&recv_buf, max_spins, pump.IcmpEchoMatcher{
+        .id = sock.icmp_id,
+        .sequence = expect_seq,
+        .expected_src = sock.last_peer,
+    }) catch |err| return socketErrorFromPump(err);
+
+    var src_ip: ipv4.Addr = undefined;
+    const payload = icmp.matchEchoReply(recv_buf[0..len], sock.icmp_id, expect_seq, &src_ip) orelse return SocketError.IoError;
+    const copy_len = @min(payload.len, buf.len);
+    @memcpy(buf[0..copy_len], payload[0..copy_len]);
+    if (src_out) |out| {
+        out.* = .{
+            .family = AF_INET,
+            .port_be = 0,
+            .addr = src_ip,
+            .zero = .{0} ** 8,
         };
-
-        var src_ip: ipv4.Addr = undefined;
-        const payload = icmp.matchEchoReply(recv_buf[0..len], sock.icmp_id, expect_seq, &src_ip) orelse continue;
-        if (!ipv4.equal(src_ip, sock.last_peer)) continue;
-
-        const copy_len = @min(payload.len, buf.len);
-        @memcpy(buf[0..copy_len], payload[0..copy_len]);
-        if (src_out) |out| {
-            out.* = .{
-                .family = AF_INET,
-                .port_be = 0,
-                .addr = src_ip,
-                .zero = .{0} ** 8,
-            };
-        }
-        return copy_len;
     }
-    return SocketError.Timeout;
+    return copy_len;
 }
 
 fn tcpSendSegment(sock: *Socket, seq: u32, ack: u32, flags: u8, payload: []const u8) SocketError!void {
@@ -387,20 +379,15 @@ fn tcpSendSegment(sock: *Socket, seq: u32, ack: u32, flags: u8, payload: []const
 }
 
 fn pollTcpSegment(sock: *const Socket, max_spins: usize) SocketError!?tcp.Segment {
-    var spins: usize = 0;
-    while (spins < max_spins) : (spins += 1) {
-        const len = link.receive(&tcp_rx_scratch) catch |err| switch (err) {
-            error.NoPacket => {
-                asm volatile ("sti; pause; cli" ::: .{ .memory = true });
-                continue;
-            },
-            else => return SocketError.IoError,
-        };
-        if (tcp.matchEndpoint(tcp_rx_scratch[0..len], sock.local_port, sock.remote_ip, sock.remote_port)) |seg| {
-            return seg;
-        }
-    }
-    return null;
+    const len = pump.pollFrame(&tcp_rx_scratch, max_spins, pump.TcpEndpointMatcher{
+        .local_port = sock.local_port,
+        .remote_ip = sock.remote_ip,
+        .remote_port = sock.remote_port,
+    }) catch |err| switch (err) {
+        pump.Error.Timeout => return null,
+        pump.Error.IoError => return SocketError.IoError,
+    };
+    return tcp.matchEndpoint(tcp_rx_scratch[0..len], sock.local_port, sock.remote_ip, sock.remote_port);
 }
 
 fn ingestTcpSegment(sock: *Socket, seg: tcp.Segment) SocketError!void {
