@@ -12,12 +12,12 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         libc.syscall.exit(1);
     }
 
-    const sub = cstr(argv[1]);
-    if (eql(sub, "addr") or eql(sub, "a")) {
+    const sub = libc.io.cstr(argv[1]);
+    if (libc.io.eql(sub, "addr") or libc.io.eql(sub, "a")) {
         cmdAddr();
-    } else if (eql(sub, "route") or eql(sub, "r")) {
+    } else if (libc.io.eql(sub, "route") or libc.io.eql(sub, "r")) {
         cmdRoute();
-    } else if (eql(sub, "neigh") or eql(sub, "n")) {
+    } else if (libc.io.eql(sub, "neigh") or libc.io.eql(sub, "n")) {
         cmdNeigh();
     } else {
         writeStr("ip: unknown subcommand '");
@@ -35,8 +35,8 @@ fn printUsage() void {
 }
 
 fn cmdAddr() void {
-    var cfg: libc.syscall.NetConfig = undefined;
-    if (libc.syscall.getnetconfig(&cfg) < 0) {
+    var cfg: libc.net.NetConfig = undefined;
+    if (libc.net.getnetconfig(&cfg) < 0) {
         writeStr("ip: getnetconfig failed\n");
         libc.syscall.exit(1);
     }
@@ -46,7 +46,7 @@ fn cmdAddr() void {
     writeStr("    inet ");
     writeIpv4(cfg.ip);
     writeStr("/");
-    writeDecimal(maskPrefix(cfg.mask));
+    writeDecimal(libc.ip.maskPrefix(cfg.mask));
     writeStr(" scope global ");
     writeStr(iface_name);
     writeStr("\n    link/ether ");
@@ -55,8 +55,8 @@ fn cmdAddr() void {
 }
 
 fn cmdRoute() void {
-    var cfg: libc.syscall.NetConfig = undefined;
-    if (libc.syscall.getnetconfig(&cfg) < 0) {
+    var cfg: libc.net.NetConfig = undefined;
+    if (libc.net.getnetconfig(&cfg) < 0) {
         writeStr("ip: getnetconfig failed\n");
         libc.syscall.exit(1);
     }
@@ -68,17 +68,17 @@ fn cmdRoute() void {
     writeStr("\n");
 
     writeStr("network ");
-    writeIpv4(networkAddr(cfg.ip, cfg.mask));
+    writeIpv4(libc.ip.networkAddr(cfg.ip, cfg.mask));
     writeStr("/");
-    writeDecimal(maskPrefix(cfg.mask));
+    writeDecimal(libc.ip.maskPrefix(cfg.mask));
     writeStr(" dev ");
     writeStr(iface_name);
     writeStr(" scope link\n");
 }
 
 fn cmdNeigh() void {
-    var entries: [8]libc.syscall.NeighEntry = undefined;
-    const n = libc.syscall.getneighbors(&entries, entries.len);
+    var entries: [8]libc.net.NeighEntry = undefined;
+    const n = libc.net.getneighbors(&entries, entries.len);
     if (n < 0) {
         writeStr("ip: getneighbors failed\n");
         libc.syscall.exit(1);
@@ -95,97 +95,20 @@ fn cmdNeigh() void {
     }
 }
 
-fn networkAddr(ip: [4]u8, mask: [4]u8) [4]u8 {
-    return .{
-        ip[0] & mask[0],
-        ip[1] & mask[1],
-        ip[2] & mask[2],
-        ip[3] & mask[3],
-    };
-}
-
-fn maskPrefix(mask: [4]u8) u8 {
-    var bits: u8 = 0;
-    var i: usize = 0;
-    while (i < 4) : (i += 1) {
-        var byte = mask[i];
-        while (byte != 0) : (byte <<= 1) {
-            bits += 1;
-        }
-    }
-    return bits;
-}
-
-fn cstr(ptr: [*]u8) []const u8 {
-    var len: usize = 0;
-    while (len < 256) : (len += 1) {
-        if (ptr[len] == 0) return ptr[0..len];
-    }
-    return ptr[0..256];
-}
-
-fn eql(a: []const u8, b: []const u8) bool {
-    if (a.len != b.len) return false;
-    var i: usize = 0;
-    while (i < a.len) : (i += 1) {
-        if (a[i] != b[i]) return false;
-    }
-    return true;
-}
-
 fn writeIpv4(addr: [4]u8) void {
     var buf: [16]u8 = undefined;
-    var pos: usize = 0;
-    var i: usize = 0;
-    while (i < 4) : (i += 1) {
-        if (i > 0) {
-            buf[pos] = '.';
-            pos += 1;
-        }
-        pos += writeU8Decimal(addr[i], buf[pos..]);
-    }
-    writeStr(buf[0..pos]);
+    writeStr(libc.ip.formatIpv4(addr, &buf) orelse "?");
 }
 
 fn writeMac(mac: [6]u8) void {
-    const hex = "0123456789abcdef";
     var buf: [18]u8 = undefined;
-    var pos: usize = 0;
-    var i: usize = 0;
-    while (i < 6) : (i += 1) {
-        if (i > 0) {
-            buf[pos] = ':';
-            pos += 1;
-        }
-        buf[pos] = hex[mac[i] >> 4];
-        buf[pos + 1] = hex[mac[i] & 0x0F];
-        pos += 2;
-    }
-    writeStr(buf[0..pos]);
-}
-
-fn writeU8Decimal(n: u8, out: []u8) usize {
-    if (n >= 100) {
-        out[0] = '0' + (n / 100);
-        out[1] = '0' + ((n / 10) % 10);
-        out[2] = '0' + (n % 10);
-        return 3;
-    }
-    if (n >= 10) {
-        out[0] = '0' + (n / 10);
-        out[1] = '0' + (n % 10);
-        return 2;
-    }
-    out[0] = '0' + n;
-    return 1;
+    writeStr(libc.ip.formatMac(mac, &buf) orelse "??:??:??:??:??:??");
 }
 
 fn writeDecimal(n: u8) void {
-    var buf: [4]u8 = undefined;
-    const len = writeU8Decimal(n, &buf);
-    writeStr(buf[0..len]);
+    libc.io.writeDecimal(n);
 }
 
 fn writeStr(s: []const u8) void {
-    _ = libc.syscall.write(1, s.ptr, s.len);
+    libc.io.writeStr(s);
 }

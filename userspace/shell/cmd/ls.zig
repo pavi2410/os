@@ -5,17 +5,7 @@ const io = @import("../io.zig");
 const path = @import("../path.zig");
 const libc = @import("libc");
 
-const S_IFDIR: u32 = 0o040000;
-const O_RDONLY: u32 = 0;
-
-const Dirent64 = extern struct {
-    d_ino: u64,
-    d_off: i64,
-    d_reclen: u16,
-    d_type: u8,
-};
-
-const dirent_name_off: usize = 19;
+const dirent_name_off = libc.fs.dirent64_name_offset;
 
 pub fn run(parsed: *const argv.Parsed) void {
     const dir_arg = parsed.positionalAt(0);
@@ -30,16 +20,16 @@ fn lsDir(dir_arg: ?[]const u8, long: bool) void {
         return;
     };
 
-    const fd = libc.syscall.open(@ptrCast(dir.ptr), O_RDONLY, 0);
+    const fd = libc.fs.open(@ptrCast(dir.ptr), libc.fs.O_RDONLY, 0);
     if (fd < 0) {
         io.writeStr("ls: failed\n");
         return;
     }
-    defer _ = libc.syscall.close(@intCast(fd));
+    defer _ = libc.fs.close(@intCast(fd));
 
     var buf: [1024]u8 = undefined;
     while (true) {
-        const n = libc.syscall.getdents64(@intCast(fd), &buf, buf.len);
+        const n = libc.fs.getdents64(@intCast(fd), &buf, buf.len);
         if (n <= 0) break;
         if (long) {
             emitLongNames(dir, buf[0..@intCast(n)]);
@@ -52,7 +42,7 @@ fn lsDir(dir_arg: ?[]const u8, long: bool) void {
 fn emitShortNames(data: []const u8) void {
     var off: usize = 0;
     while (off + dirent_name_off <= data.len) {
-        const hdr: *const Dirent64 = @ptrCast(@alignCast(data.ptr + off));
+        const hdr: *const libc.fs.Dirent64 = @ptrCast(@alignCast(data.ptr + off));
         const reclen = hdr.d_reclen;
         if (reclen < dirent_name_off or off + reclen > data.len) break;
 
@@ -73,7 +63,7 @@ fn emitShortNames(data: []const u8) void {
 fn emitLongNames(dir: []const u8, data: []const u8) void {
     var off: usize = 0;
     while (off + dirent_name_off <= data.len) {
-        const hdr: *const Dirent64 = @ptrCast(@alignCast(data.ptr + off));
+        const hdr: *const libc.fs.Dirent64 = @ptrCast(@alignCast(data.ptr + off));
         const reclen = hdr.d_reclen;
         if (reclen < dirent_name_off or off + reclen > data.len) break;
 
@@ -92,8 +82,8 @@ fn printLongEntry(dir: []const u8, name: []const u8) void {
     var pathbuf: [128]u8 = undefined;
     if (!path.join(dir, name, &pathbuf)) return;
 
-    var st: libc.syscall.Stat = .{};
-    if (libc.syscall.stat(@ptrCast(&pathbuf), &st) < 0) return;
+    var st: libc.fs.Stat = .{};
+    if (libc.fs.stat(@ptrCast(&pathbuf), &st) < 0) return;
 
     writeEntryType(st.st_mode);
     printSizePadded(@intCast(@max(st.st_size, 0)));
@@ -103,7 +93,7 @@ fn printLongEntry(dir: []const u8, name: []const u8) void {
 }
 
 fn writeEntryType(mode: u32) void {
-    if (mode & S_IFDIR != 0) {
+    if (mode & libc.fs.S_IFDIR != 0) {
         io.writeStr("dir  ");
     } else {
         io.writeStr("file ");

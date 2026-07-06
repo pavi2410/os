@@ -11,6 +11,8 @@ const socket = @import("../net/socket.zig");
 const net_info = @import("../net/info.zig");
 const rtc = @import("../arch/x86_64/rtc.zig");
 const interrupts = @import("../arch/x86_64/interrupts.zig");
+const abi_fs = @import("abi_fs");
+const abi_syscall = @import("abi_syscall");
 
 /// Matches the stack layout built by `syscall_entry` (callee-saved pushed first).
 pub const Frame = extern struct {
@@ -130,19 +132,13 @@ fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
     const path = userCString(path_ptr) orelse return EFAULT;
     const proc = process.currentProcess() orelse return EBADF;
 
-    const O_ACCMODE: u64 = 0o3;
-    const O_WRONLY: u64 = 0o1;
-    const O_CREAT: u64 = 0o100;
-    const O_TRUNC: u64 = 0o1000;
-    const O_APPEND: u64 = 0o2000;
-
-    const accmode = flags & O_ACCMODE;
+    const accmode = flags & abi_fs.O_ACCMODE;
     const open_flags: vfs.OpenFlags = .{
-        .read = accmode != O_WRONLY,
+        .read = accmode != abi_fs.O_WRONLY,
         .write = accmode != 0, // O_RDONLY=0, O_WRONLY=1, O_RDWR=2
-        .create = flags & O_CREAT != 0,
-        .truncate = flags & O_TRUNC != 0,
-        .append = flags & O_APPEND != 0,
+        .create = flags & abi_fs.O_CREAT != 0,
+        .truncate = flags & abi_fs.O_TRUNC != 0,
+        .append = flags & abi_fs.O_APPEND != 0,
     };
 
     const handle = vfs.open(path, open_flags) catch |err| return errnoFromVfsErr(err);
@@ -277,9 +273,6 @@ fn sysGetdents64(fd: u64, buf_ptr: u64, count: u64) i64 {
     return @intCast(n);
 }
 
-const CLOCK_REALTIME: u64 = 0;
-const CLOCK_MONOTONIC: u64 = 1;
-
 const Timespec = extern struct {
     tv_sec: i64,
     tv_nsec: i64,
@@ -289,10 +282,10 @@ fn sysClockGettime(clock_id: u64, timespec_ptr: u64) i64 {
     if (timespec_ptr == 0) return EFAULT;
     var ts: Timespec = .{ .tv_sec = 0, .tv_nsec = 0 };
     switch (clock_id) {
-        CLOCK_REALTIME => {
+        abi_syscall.CLOCK_REALTIME => {
             ts.tv_sec = rtc.realtimeSeconds();
         },
-        CLOCK_MONOTONIC => {
+        abi_syscall.CLOCK_MONOTONIC => {
             const ticks = interrupts.timerTickCount();
             ts.tv_sec = @intCast(@divTrunc(ticks, 100));
             ts.tv_nsec = @intCast(@mod(ticks, 100) * 10_000_000);

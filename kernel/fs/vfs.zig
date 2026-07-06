@@ -1,5 +1,6 @@
 const fat32 = @import("fat32.zig");
 const serial = @import("../arch/x86_64/serial.zig");
+const abi_fs = @import("abi_fs");
 
 pub const VfsError = fat32.FatError || error{
     TooManyOpenFiles,
@@ -22,27 +23,7 @@ pub const OpenFlags = struct {
     append: bool = false,
 };
 
-pub const Stat = extern struct {
-    st_dev: u64 = 0,
-    st_ino: u64 = 0,
-    st_nlink: u64 = 1,
-    st_mode: u32 = 0,
-    _pad0: u32 = 0,
-    st_uid: u32 = 0,
-    st_gid: u32 = 0,
-    _pad1: u32 = 0,
-    st_rdev: u64 = 0,
-    st_size: i64 = 0,
-    st_blksize: i64 = 4096,
-    st_blocks: i64 = 0,
-    st_atime: i64 = 0,
-    st_mtime: i64 = 0,
-    st_ctime: i64 = 0,
-    _pad2: [24]u8 = .{0} ** 24,
-};
-
-const S_IFREG: u32 = 0o100000;
-const S_IFDIR: u32 = 0o040000;
+pub const Stat = abi_fs.Stat;
 
 const max_handles = 16;
 
@@ -153,7 +134,7 @@ pub fn lseek(handle: u32, offset: i64, whence: Whence) VfsError!u64 {
 pub fn stat(path: []const u8, out: *Stat) VfsError!void {
     const entry = try fat32.lookup(path);
     out.* = .{};
-    out.st_mode = if (entry.attr & 0x10 != 0) S_IFDIR | 0o755 else S_IFREG | 0o644;
+    out.st_mode = if (entry.attr & 0x10 != 0) abi_fs.S_IFDIR | 0o755 else abi_fs.S_IFREG | 0o644;
     out.st_size = @intCast(entry.size);
 }
 

@@ -1,5 +1,5 @@
-const libc = @import("syscall.zig");
 const dns_codec = @import("dns_codec");
+const net = @import("net.zig");
 
 const default_dns = [4]u8{ 10, 0, 2, 3 };
 const dns_port: u16 = 53;
@@ -12,26 +12,21 @@ pub noinline fn resolveA(name: []const u8, server: ?[4]u8, out: *[4]u8) bool {
     var query: [256]u8 = undefined;
     const query_len = dns_codec.buildQuery(name, &query) catch return false;
 
-    const fd = libc.socket(libc.AF_INET, libc.SOCK_DGRAM, 0);
+    const fd = net.socket(net.AF_INET, net.SOCK_DGRAM, 0);
     if (fd < 0) return false;
 
-    var dest: libc.SockaddrIn = .{
-        .family = libc.AF_INET,
-        .port_be = @byteSwap(dns_port),
-        .addr = dns_addr,
-    };
+    var dest = net.sockaddrIn(dns_addr, dns_port);
 
-    if (libc.sendto(
+    if (net.sendto(
         @intCast(fd),
         &query,
         query_len,
         0,
         &dest,
-        @sizeOf(libc.SockaddrIn),
     ) < 0) return false;
 
     var reply: [512]u8 = undefined;
-    const n = libc.recvfrom(
+    const n = net.recvfrom(
         @intCast(fd),
         &reply,
         reply.len,

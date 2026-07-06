@@ -3,11 +3,6 @@ const io = @import("../io.zig");
 const path = @import("../path.zig");
 const libc = @import("libc");
 
-const O_WRONLY: u32 = 1;
-const O_CREAT: u32 = 0o100;
-const O_TRUNC: u32 = 0o1000;
-const O_APPEND: u32 = 0o2000;
-
 pub fn run(parsed: *const argv.Parsed) void {
     const file_path = parsed.positionalAt(0) orelse {
         io.writeStr("write: usage: write [-a] /path text...\n");
@@ -30,27 +25,27 @@ fn writeFile(file_path: []const u8, content: []const u8, append: bool) void {
         return;
     };
 
-    var open_flags: u32 = O_WRONLY | O_CREAT;
+    var open_flags: u32 = libc.fs.O_WRONLY | libc.fs.O_CREAT;
     if (append) {
-        open_flags |= O_APPEND;
+        open_flags |= libc.fs.O_APPEND;
     } else {
-        open_flags |= O_TRUNC;
+        open_flags |= libc.fs.O_TRUNC;
     }
 
-    const fd = libc.syscall.open(@ptrCast(resolved.ptr), open_flags, 0);
+    const fd = libc.fs.open(@ptrCast(resolved.ptr), open_flags, 0);
     if (fd < 0) {
         io.writeStr("write: open failed\n");
         return;
     }
 
     if (content.len > 0) {
-        const n = libc.syscall.write(@intCast(fd), content.ptr, content.len);
+        const n = libc.fs.write(@intCast(fd), content.ptr, content.len);
         if (n < 0) {
             io.writeStr("write: I/O failed\n");
-            _ = libc.syscall.close(@intCast(fd));
+            _ = libc.fs.close(@intCast(fd));
             return;
         }
     }
-    _ = libc.syscall.close(@intCast(fd));
+    _ = libc.fs.close(@intCast(fd));
     io.writeStr("write: ok\n");
 }

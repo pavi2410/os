@@ -14,29 +14,29 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
 
     var argi: usize = 1;
     while (argi < argc) : (argi += 1) {
-        const arg = cstr(argv[argi]);
-        if (eql(arg, "-c")) {
+        const arg = libc.io.cstr(argv[argi]);
+        if (libc.io.eql(arg, "-c")) {
             argi += 1;
             if (argi >= argc) {
                 writeStr("usage: ping [-c count] [ip]\n");
                 libc.syscall.exit(1);
             }
-            count = parseCount(cstr(argv[argi])) orelse {
+            count = parseCount(libc.io.cstr(argv[argi])) orelse {
                 writeStr("ping: bad count\n");
                 libc.syscall.exit(1);
             };
             continue;
         }
-        if (!parseIpv4(arg, &host)) {
+        if (!libc.ip.parseIpv4(arg, &host)) {
             writeStr("ping: bad address\n");
             libc.syscall.exit(1);
         }
     }
 
     const fd = libc.syscall.socket(
-        libc.syscall.AF_INET,
-        libc.syscall.SOCK_DGRAM,
-        libc.syscall.IPPROTO_ICMP,
+        libc.net.AF_INET,
+        libc.net.SOCK_DGRAM,
+        libc.net.IPPROTO_ICMP,
     );
     if (fd < 0) {
         writeStr("ping: socket failed\n");
@@ -44,16 +44,12 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
     }
 
     var ip_buf: [16]u8 = undefined;
-    const ip_str = formatIpv4(host, &ip_buf) orelse "?";
+    const ip_str = libc.ip.formatIpv4(host, &ip_buf) orelse "?";
     writeStr("PING ");
     writeStr(ip_str);
     writeStr(" 32 data bytes\n");
 
-    var dest: libc.syscall.SockaddrIn = .{
-        .family = libc.syscall.AF_INET,
-        .port_be = 0,
-        .addr = host,
-    };
+    var dest = libc.net.sockaddrIn(host, 0);
 
     const empty: [0]u8 = .{};
     var reply: [64]u8 = undefined;
@@ -71,7 +67,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
             0,
             0,
             &dest,
-            @sizeOf(libc.syscall.SockaddrIn),
+            @sizeOf(libc.net.SockaddrIn),
         ) < 0) {
             writeStr("ping: send failed\n");
             libc.syscall.exit(1);
@@ -135,35 +131,6 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
     libc.syscall.exit(1);
 }
 
-fn cstr(ptr: [*]u8) []const u8 {
-    var len: usize = 0;
-    while (len < 256) : (len += 1) {
-        if (ptr[len] == 0) return ptr[0..len];
-    }
-    return ptr[0..256];
-}
-
-fn parseIpv4(s: []const u8, out: *[4]u8) bool {
-    var part: u8 = 0;
-    var idx: usize = 0;
-    var i: usize = 0;
-    while (i <= s.len) : (i += 1) {
-        if (i == s.len or s[i] == '.') {
-            if (idx >= 4) return false;
-            out[idx] = part;
-            idx += 1;
-            part = 0;
-            continue;
-        }
-        const ch = s[i];
-        if (ch < '0' or ch > '9') return false;
-        const next = @as(u16, part) * 10 + (ch - '0');
-        if (next > 255) return false;
-        part = @intCast(next);
-    }
-    return idx == 4;
-}
-
 fn parseCount(s: []const u8) ?usize {
     if (s.len == 0) return null;
     var value: usize = 0;
@@ -174,44 +141,6 @@ fn parseCount(s: []const u8) ?usize {
     }
     if (value == 0) return null;
     return value;
-}
-
-fn eql(a: []const u8, b: []const u8) bool {
-    if (a.len != b.len) return false;
-    for (a, b) |x, y| {
-        if (x != y) return false;
-    }
-    return true;
-}
-
-fn formatIpv4(addr: [4]u8, out: []u8) ?[]const u8 {
-    var pos: usize = 0;
-    var i: usize = 0;
-    while (i < 4) : (i += 1) {
-        if (i > 0) {
-            if (pos >= out.len) return null;
-            out[pos] = '.';
-            pos += 1;
-        }
-        pos += writeU8Decimal(addr[i], out[pos..]);
-    }
-    return out[0..pos];
-}
-
-fn writeU8Decimal(n: u8, out: []u8) usize {
-    if (n >= 100) {
-        out[0] = '0' + (n / 100);
-        out[1] = '0' + ((n / 10) % 10);
-        out[2] = '0' + (n % 10);
-        return 3;
-    }
-    if (n >= 10) {
-        out[0] = '0' + (n / 10);
-        out[1] = '0' + (n % 10);
-        return 2;
-    }
-    out[0] = '0' + n;
-    return 1;
 }
 
 fn writeDecimal(n: usize) void {
@@ -263,5 +192,5 @@ fn timespecUs(ts: libc.syscall.Timespec) u64 {
 }
 
 fn writeStr(s: []const u8) void {
-    _ = libc.syscall.write(1, s.ptr, s.len);
+    libc.io.writeStr(s);
 }

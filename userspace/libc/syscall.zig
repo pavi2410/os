@@ -1,70 +1,57 @@
 /// Freestanding Linux x86_64 syscall wrappers for user programs.
+const abi_syscall = @import("abi_syscall");
+const abi_fs = @import("abi_fs");
+const abi_net = @import("abi_net");
+
 pub fn exit(status: u32) noreturn {
-    _ = syscall6(60, status, 0, 0, 0, 0, 0);
+    _ = syscall6(abi_syscall.exit, status, 0, 0, 0, 0, 0);
     unreachable;
 }
 
 pub fn write(fd: u32, buf: [*]const u8, count: usize) isize {
-    return syscall6(1, fd, @intFromPtr(buf), count, 0, 0, 0);
+    return syscall6(abi_syscall.write, fd, @intFromPtr(buf), count, 0, 0, 0);
 }
 
 pub fn read(fd: u32, buf: [*]u8, count: usize) isize {
-    return syscall6(0, fd, @intFromPtr(buf), count, 0, 0, 0);
+    return syscall6(abi_syscall.read, fd, @intFromPtr(buf), count, 0, 0, 0);
 }
 
 pub fn open(path: [*:0]const u8, flags: u32, mode: u32) isize {
-    return syscall6(2, @intFromPtr(path), flags, mode, 0, 0, 0);
+    return syscall6(abi_syscall.open, @intFromPtr(path), flags, mode, 0, 0, 0);
 }
 
 pub fn close(fd: u32) isize {
-    return syscall6(3, fd, 0, 0, 0, 0, 0);
+    return syscall6(abi_syscall.close, fd, 0, 0, 0, 0, 0);
 }
 
 pub fn lseek(fd: u32, offset: i64, whence: u32) isize {
-    return syscall6(8, fd, @bitCast(@as(u64, @intCast(offset))), whence, 0, 0, 0);
+    return syscall6(abi_syscall.lseek, fd, @bitCast(@as(u64, @intCast(offset))), whence, 0, 0, 0);
 }
 
-pub const Stat = extern struct {
-    st_dev: u64 = 0,
-    st_ino: u64 = 0,
-    st_nlink: u64 = 1,
-    st_mode: u32 = 0,
-    _pad0: u32 = 0,
-    st_uid: u32 = 0,
-    st_gid: u32 = 0,
-    _pad1: u32 = 0,
-    st_rdev: u64 = 0,
-    st_size: i64 = 0,
-    st_blksize: i64 = 4096,
-    st_blocks: i64 = 0,
-    st_atime: i64 = 0,
-    st_mtime: i64 = 0,
-    st_ctime: i64 = 0,
-    _pad2: [24]u8 = .{0} ** 24,
-};
+pub const Stat = abi_fs.Stat;
 
 pub fn stat(path: [*:0]const u8, out: *Stat) isize {
-    return syscall6(4, @intFromPtr(path), @intFromPtr(out), 0, 0, 0, 0);
+    return syscall6(abi_syscall.stat, @intFromPtr(path), @intFromPtr(out), 0, 0, 0, 0);
 }
 
 pub fn getpid() isize {
-    return syscall6(39, 0, 0, 0, 0, 0, 0);
+    return syscall6(abi_syscall.getpid, 0, 0, 0, 0, 0, 0);
 }
 
 pub fn fork() isize {
-    return syscall6(57, 0, 0, 0, 0, 0, 0);
+    return syscall6(abi_syscall.fork, 0, 0, 0, 0, 0, 0);
 }
 
 pub fn brk(addr: usize) isize {
-    return syscall6(12, addr, 0, 0, 0, 0, 0);
+    return syscall6(abi_syscall.brk, addr, 0, 0, 0, 0, 0);
 }
 
 pub fn getdents64(fd: u32, buf: [*]u8, count: usize) isize {
-    return syscall6(217, fd, @intFromPtr(buf), count, 0, 0, 0);
+    return syscall6(abi_syscall.getdents64, fd, @intFromPtr(buf), count, 0, 0, 0);
 }
 
-pub const CLOCK_REALTIME: u32 = 0;
-pub const CLOCK_MONOTONIC: u32 = 1;
+pub const CLOCK_REALTIME = abi_syscall.CLOCK_REALTIME;
+pub const CLOCK_MONOTONIC = abi_syscall.CLOCK_MONOTONIC;
 
 pub const Timespec = extern struct {
     tv_sec: i64,
@@ -72,45 +59,40 @@ pub const Timespec = extern struct {
 };
 
 pub fn clock_gettime(clock_id: u32, out: *Timespec) isize {
-    return syscall6(228, clock_id, @intFromPtr(out), 0, 0, 0, 0);
+    return syscall6(abi_syscall.clock_gettime, clock_id, @intFromPtr(out), 0, 0, 0, 0);
 }
 
 pub fn execve(path: [*:0]const u8, argv: [*:null]?[*:0]const u8, envp: [*:null]?[*:0]const u8) isize {
-    return syscall6(59, @intFromPtr(path), @intFromPtr(argv), @intFromPtr(envp), 0, 0, 0);
+    return syscall6(abi_syscall.execve, @intFromPtr(path), @intFromPtr(argv), @intFromPtr(envp), 0, 0, 0);
 }
 
-pub const AF_INET: u16 = 2;
-pub const SOCK_DGRAM: u16 = 2;
-pub const SOCK_STREAM: u16 = 1;
-pub const IPPROTO_ICMP: u32 = 1;
-pub const IPPROTO_TCP: u32 = 6;
-pub const IPPROTO_UDP: u32 = 17;
+pub const AF_INET = abi_net.AF_INET;
+pub const SOCK_DGRAM = abi_net.SOCK_DGRAM;
+pub const SOCK_STREAM = abi_net.SOCK_STREAM;
+pub const IPPROTO_ICMP: u32 = @intCast(abi_net.IPPROTO_ICMP);
+pub const IPPROTO_TCP: u32 = @intCast(abi_net.IPPROTO_TCP);
+pub const IPPROTO_UDP: u32 = @intCast(abi_net.IPPROTO_UDP);
 
-pub const SockaddrIn = extern struct {
-    family: u16,
-    port_be: u16,
-    addr: [4]u8,
-    zero: [8]u8 = .{0} ** 8,
-};
+pub const SockaddrIn = abi_net.SockaddrIn;
 
 pub fn socket(domain: u32, sock_type: u32, protocol: u32) isize {
-    return syscall6(41, domain, sock_type, protocol, 0, 0, 0);
+    return syscall6(abi_syscall.socket, domain, sock_type, protocol, 0, 0, 0);
 }
 
 pub fn bind(fd: u32, addr: *const SockaddrIn, addrlen: u32) isize {
-    return syscall6(49, fd, @intFromPtr(addr), addrlen, 0, 0, 0);
+    return syscall6(abi_syscall.bind, fd, @intFromPtr(addr), addrlen, 0, 0, 0);
 }
 
 pub fn connect(fd: u32, addr: *const SockaddrIn, addrlen: u32) isize {
-    return syscall6(42, fd, @intFromPtr(addr), addrlen, 0, 0, 0);
+    return syscall6(abi_syscall.connect, fd, @intFromPtr(addr), addrlen, 0, 0, 0);
 }
 
 pub fn send(fd: u32, buf: [*]const u8, len: usize, flags: u32) isize {
-    return syscall6(46, fd, @intFromPtr(buf), len, flags, 0, 0);
+    return syscall6(abi_syscall.send, fd, @intFromPtr(buf), len, flags, 0, 0);
 }
 
 pub fn recv(fd: u32, buf: [*]u8, len: usize, flags: u32) isize {
-    return syscall6(47, fd, @intFromPtr(buf), len, flags, 0, 0);
+    return syscall6(abi_syscall.recv, fd, @intFromPtr(buf), len, flags, 0, 0);
 }
 
 pub fn sendto(
@@ -121,7 +103,7 @@ pub fn sendto(
     dest: *const SockaddrIn,
     addrlen: u32,
 ) isize {
-    return syscall6(44, fd, @intFromPtr(buf), len, flags, @intFromPtr(dest), addrlen);
+    return syscall6(abi_syscall.sendto, fd, @intFromPtr(buf), len, flags, @intFromPtr(dest), addrlen);
 }
 
 pub fn recvfrom(
@@ -134,45 +116,35 @@ pub fn recvfrom(
 ) isize {
     const src_ptr: u64 = if (src) |s| @intFromPtr(s) else 0;
     const alen_ptr: u64 = if (addrlen) |a| @intFromPtr(a) else 0;
-    return syscall6(45, fd, @intFromPtr(buf), len, flags, src_ptr, alen_ptr);
+    return syscall6(abi_syscall.recvfrom, fd, @intFromPtr(buf), len, flags, src_ptr, alen_ptr);
 }
 
-pub const NetConfig = extern struct {
-    ip: [4]u8,
-    mask: [4]u8,
-    gateway: [4]u8,
-    dns: [4]u8,
-    mac: [6]u8,
-};
-
-pub const NeighEntry = extern struct {
-    ip: [4]u8,
-    mac: [6]u8,
-};
+pub const NetConfig = abi_net.NetConfig;
+pub const NeighEntry = abi_net.NeighEntry;
 
 pub fn getnetconfig(out: *NetConfig) isize {
-    return syscall6(1024, @intFromPtr(out), 0, 0, 0, 0, 0);
+    return syscall6(abi_syscall.getnetconfig, @intFromPtr(out), 0, 0, 0, 0, 0);
 }
 
 pub fn getneighbors(buf: [*]NeighEntry, max: usize) isize {
-    return syscall6(1025, @intFromPtr(buf), max, 0, 0, 0, 0);
+    return syscall6(abi_syscall.getneighbors, @intFromPtr(buf), max, 0, 0, 0, 0);
 }
 
 pub fn waitpid(pid: isize, status: ?*u32, options: u32) isize {
     const status_ptr: u64 = if (status) |s| @intFromPtr(s) else 0;
-    return syscall6(61, @bitCast(@as(u64, @intCast(pid))), status_ptr, options, 0, 0, 0);
+    return syscall6(abi_syscall.wait4, @bitCast(@as(u64, @intCast(pid))), status_ptr, options, 0, 0, 0);
 }
 
 pub fn unlink(path: [*:0]const u8) isize {
-    return syscall6(87, @intFromPtr(path), 0, 0, 0, 0, 0);
+    return syscall6(abi_syscall.unlink, @intFromPtr(path), 0, 0, 0, 0, 0);
 }
 
 pub fn mkdir(path: [*:0]const u8, mode: u32) isize {
-    return syscall6(83, @intFromPtr(path), mode, 0, 0, 0, 0);
+    return syscall6(abi_syscall.mkdir, @intFromPtr(path), mode, 0, 0, 0, 0);
 }
 
 pub fn rmdir(path: [*:0]const u8) isize {
-    return syscall6(84, @intFromPtr(path), 0, 0, 0, 0, 0);
+    return syscall6(abi_syscall.rmdir, @intFromPtr(path), 0, 0, 0, 0, 0);
 }
 
 fn syscall6(

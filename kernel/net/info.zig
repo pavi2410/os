@@ -3,19 +3,10 @@ const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 const link = @import("link.zig");
 const resolve = @import("resolve.zig");
+const abi_net = @import("abi_net");
 
-pub const NetConfig = extern struct {
-    ip: [4]u8,
-    mask: [4]u8,
-    gateway: [4]u8,
-    dns: [4]u8,
-    mac: [6]u8,
-};
-
-pub const NeighEntry = extern struct {
-    ip: [4]u8,
-    mac: [6]u8,
-};
+pub const NetConfig = abi_net.NetConfig;
+pub const NeighEntry = abi_net.NeighEntry;
 
 pub fn fillConfig(out: *NetConfig) void {
     out.ip = config.guest_ip;

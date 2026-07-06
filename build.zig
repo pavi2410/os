@@ -21,11 +21,30 @@ pub fn build(b: *std.Build) void {
 
     const user_optimize: std.builtin.OptimizeMode = .ReleaseSmall;
 
+    const abi_syscall_user = b.createModule(.{
+        .root_source_file = b.path("common/abi/syscall.zig"),
+        .target = user_target,
+        .optimize = user_optimize,
+    });
+    const abi_fs_user = b.createModule(.{
+        .root_source_file = b.path("common/abi/fs.zig"),
+        .target = user_target,
+        .optimize = user_optimize,
+    });
+    const abi_net_user = b.createModule(.{
+        .root_source_file = b.path("common/abi/net.zig"),
+        .target = user_target,
+        .optimize = user_optimize,
+    });
+
     const user_libc = b.createModule(.{
         .root_source_file = b.path("userspace/libc/mod.zig"),
         .target = user_target,
         .optimize = user_optimize,
     });
+    user_libc.addImport("abi_syscall", abi_syscall_user);
+    user_libc.addImport("abi_fs", abi_fs_user);
+    user_libc.addImport("abi_net", abi_net_user);
 
     const dns_codec_user = b.createModule(.{
         .root_source_file = b.path("userspace/net/dns_codec.zig"),
@@ -156,6 +175,24 @@ pub fn build(b: *std.Build) void {
         .code_model = .kernel,
     });
     kernel_mod.addImport("limine", limine_kernel_mod);
+    const abi_syscall_kernel = b.createModule(.{
+        .root_source_file = b.path("common/abi/syscall.zig"),
+        .target = kernel_target,
+        .optimize = optimize,
+    });
+    const abi_fs_kernel = b.createModule(.{
+        .root_source_file = b.path("common/abi/fs.zig"),
+        .target = kernel_target,
+        .optimize = optimize,
+    });
+    const abi_net_kernel = b.createModule(.{
+        .root_source_file = b.path("common/abi/net.zig"),
+        .target = kernel_target,
+        .optimize = optimize,
+    });
+    kernel_mod.addImport("abi_syscall", abi_syscall_kernel);
+    kernel_mod.addImport("abi_fs", abi_fs_kernel);
+    kernel_mod.addImport("abi_net", abi_net_kernel);
 
     const time_unix_kernel = b.createModule(.{
         .root_source_file = b.path("common/time_unix.zig"),
@@ -269,6 +306,53 @@ pub fn build(b: *std.Build) void {
     });
     const run_dns_codec_tests = b.addRunArtifact(dns_codec_tests);
 
+    const abi_syscall_host = b.createModule(.{
+        .root_source_file = b.path("common/abi/syscall.zig"),
+        .target = b.graph.host,
+    });
+    const abi_fs_host = b.createModule(.{
+        .root_source_file = b.path("common/abi/fs.zig"),
+        .target = b.graph.host,
+    });
+    const abi_net_host = b.createModule(.{
+        .root_source_file = b.path("common/abi/net.zig"),
+        .target = b.graph.host,
+    });
+
+    const abi_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/common/abi_test.zig"),
+        .target = b.graph.host,
+    });
+    abi_test_mod.addImport("abi_syscall", abi_syscall_host);
+    abi_test_mod.addImport("abi_fs", abi_fs_host);
+    abi_test_mod.addImport("abi_net", abi_net_host);
+
+    const abi_tests = b.addTest(.{
+        .root_module = abi_test_mod,
+    });
+    const run_abi_tests = b.addRunArtifact(abi_tests);
+
+    const libc_ip_host = b.createModule(.{
+        .root_source_file = b.path("userspace/libc/ip.zig"),
+        .target = b.graph.host,
+    });
+    const libc_format_host = b.createModule(.{
+        .root_source_file = b.path("userspace/libc/format.zig"),
+        .target = b.graph.host,
+    });
+
+    const libc_helpers_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/userspace/libc_helpers_test.zig"),
+        .target = b.graph.host,
+    });
+    libc_helpers_test_mod.addImport("libc_ip", libc_ip_host);
+    libc_helpers_test_mod.addImport("libc_format", libc_format_host);
+
+    const libc_helpers_tests = b.addTest(.{
+        .root_module = libc_helpers_test_mod,
+    });
+    const run_libc_helpers_tests = b.addRunArtifact(libc_helpers_tests);
+
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_memory_map_tests.step);
     test_step.dependOn(&run_physical_tests.step);
@@ -276,4 +360,6 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_tcp_tests.step);
     test_step.dependOn(&run_curl_target_tests.step);
     test_step.dependOn(&run_dns_codec_tests.step);
+    test_step.dependOn(&run_abi_tests.step);
+    test_step.dependOn(&run_libc_helpers_tests.step);
 }

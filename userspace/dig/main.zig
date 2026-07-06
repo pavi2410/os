@@ -13,10 +13,10 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
 
     var i: usize = 1;
     while (i < argc) : (i += 1) {
-        const arg = cstr(argv[i]);
+        const arg = libc.io.cstr(argv[i]);
         if (arg.len == 0) continue;
         if (arg[0] == '@') {
-            if (!parseIpv4(arg[1..], &dns_addr)) {
+            if (!libc.ip.parseIpv4(arg[1..], &dns_addr)) {
                 writeStr("dig: bad server address\n");
                 libc.syscall.exit(1);
             }
@@ -37,17 +37,13 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         libc.syscall.exit(1);
     };
 
-    const fd = libc.syscall.socket(libc.syscall.AF_INET, libc.syscall.SOCK_DGRAM, 0);
+    const fd = libc.net.socket(libc.net.AF_INET, libc.net.SOCK_DGRAM, 0);
     if (fd < 0) {
         writeStr("dig: socket failed\n");
         libc.syscall.exit(1);
     }
 
-    var dest: libc.syscall.SockaddrIn = .{
-        .family = libc.syscall.AF_INET,
-        .port_be = @byteSwap(dns_port),
-        .addr = dns_addr,
-    };
+    var dest = libc.net.sockaddrIn(dns_addr, dns_port);
 
     if (libc.syscall.sendto(
         @intCast(fd),
@@ -55,7 +51,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         query_len,
         0,
         &dest,
-        @sizeOf(libc.syscall.SockaddrIn),
+        @sizeOf(libc.net.SockaddrIn),
     ) < 0) {
         writeStr("dig: send failed\n");
         libc.syscall.exit(1);
@@ -77,14 +73,6 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
 
     printResult(qname, reply[0..@intCast(n)]);
     libc.syscall.exit(0);
-}
-
-fn cstr(ptr: [*]u8) []const u8 {
-    var len: usize = 0;
-    while (len < 256) : (len += 1) {
-        if (ptr[len] == 0) return ptr[0..len];
-    }
-    return ptr[0..256];
 }
 
 fn buildQuery(name: []const u8, out: []u8) !usize {
@@ -234,56 +222,13 @@ fn readU32(pkt: []const u8, off: usize) u32 {
         pkt[off + 3];
 }
 
-fn parseIpv4(s: []const u8, out: *[4]u8) bool {
-    var part: u8 = 0;
-    var idx: usize = 0;
-    var i: usize = 0;
-    while (i <= s.len) : (i += 1) {
-        if (i == s.len or s[i] == '.') {
-            if (idx >= 4) return false;
-            out[idx] = part;
-            idx += 1;
-            part = 0;
-            continue;
-        }
-        const ch = s[i];
-        if (ch < '0' or ch > '9') return false;
-        part = @truncate(part * 10 + (ch - '0'));
-        if (part > 255) return false;
-    }
-    return idx == 4;
-}
-
 fn writeIpv4(addr: []const u8) void {
+    if (addr.len < 4) return;
+    const ip: [4]u8 = .{ addr[0], addr[1], addr[2], addr[3] };
     var buf: [16]u8 = undefined;
-    var pos: usize = 0;
-    var i: usize = 0;
-    while (i < 4) : (i += 1) {
-        if (i > 0) {
-            buf[pos] = '.';
-            pos += 1;
-        }
-        pos += writeU8Decimal(addr[i], buf[pos..]);
-    }
-    writeStr(buf[0..pos]);
-}
-
-fn writeU8Decimal(n: u8, out: []u8) usize {
-    if (n >= 100) {
-        out[0] = '0' + (n / 100);
-        out[1] = '0' + ((n / 10) % 10);
-        out[2] = '0' + (n % 10);
-        return 3;
-    }
-    if (n >= 10) {
-        out[0] = '0' + (n / 10);
-        out[1] = '0' + (n % 10);
-        return 2;
-    }
-    out[0] = '0' + n;
-    return 1;
+    writeStr(libc.ip.formatIpv4(ip, &buf) orelse "?");
 }
 
 fn writeStr(s: []const u8) void {
-    _ = libc.syscall.write(1, s.ptr, s.len);
+    libc.io.writeStr(s);
 }
