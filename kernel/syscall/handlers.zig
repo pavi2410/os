@@ -13,6 +13,9 @@ const rtc = @import("../arch/x86_64/rtc.zig");
 const interrupts = @import("../arch/x86_64/interrupts.zig");
 const abi_fs = @import("abi_fs");
 const abi_syscall = @import("abi_syscall");
+const errno = @import("errno.zig");
+const fdtab = @import("fd.zig");
+const user = @import("user.zig");
 
 /// Matches the stack layout built by `syscall_entry` (callee-saved pushed first).
 pub const Frame = extern struct {
@@ -33,14 +36,6 @@ pub const Frame = extern struct {
     user_rflags: u64,
     user_rsp: u64,
 };
-
-const ENOSYS: i64 = -38;
-const EBADF: i64 = -9;
-const EINVAL: i64 = -22;
-const ENOENT: i64 = -2;
-const EISDIR: i64 = -21;
-const EMFILE: i64 = -24;
-const EFAULT: i64 = -14;
 
 pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) i64 {
     return switch (frame.nr) {
@@ -70,7 +65,7 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.getnetconfig => sysGetnetconfig(frame.arg0),
         numbers.getneighbors => sysGetneighbors(frame.arg0, frame.arg1),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
-        else => ENOSYS,
+        else => errno.ENOSYS,
     };
 }
 
@@ -78,59 +73,53 @@ fn sysRead(fd: u64, buf_ptr: u64, count: u64) i64 {
     if (count == 0) return 0;
     const max_len: usize = 4096;
     const len: usize = @intCast(@min(count, max_len));
-    const buf: [*]u8 = @ptrFromInt(buf_ptr);
+    const buf = user.bytes(buf_ptr, len) orelse return errno.EFAULT;
 
-    const proc = process.currentProcess() orelse return EBADF;
-    if (fd >= process.max_fds) return EBADF;
-    const slot = &proc.fds.fds[@intCast(fd)];
+    const slot = fdtab.currentSlot(fd) catch return errno.EBADF;
 
     return switch (slot.kind) {
         .console => {
-            if (fd != 0) return EBADF;
-            const read_len = tty.get().read(buf[0..len]) catch |err| switch (err) {
+            if (fd != 0) return errno.EBADF;
+            const read_len = tty.get().read(buf) catch |err| switch (err) {
                 tty.TtyError.WouldBlock => return -4,
             };
             return @intCast(read_len);
         },
         .file => {
-            const n = vfs.read(slot.vfs_handle, buf[0..len]) catch return errnoFromVfs();
+            const n = vfs.read(slot.vfs_handle, buf) catch return errno.EIO;
             return @intCast(n);
         },
-        .socket, .none => EBADF,
+        .socket, .none => errno.EBADF,
     };
 }
-
-const EACCES: i64 = -13;
 
 fn sysWrite(fd: u64, buf_ptr: u64, count: u64) i64 {
     if (count == 0) return 0;
 
     const max_len: usize = 4096;
     const len: usize = @intCast(@min(count, max_len));
-    const buf: [*]const u8 = @ptrFromInt(buf_ptr);
+    const buf = user.constBytes(buf_ptr, len) orelse return errno.EFAULT;
 
     if (fd == 1 or fd == 2) {
-        const written = tty.get().write(buf[0..len]);
+        const written = tty.get().write(buf);
         return @intCast(written);
     }
 
-    const proc = process.currentProcess() orelse return EBADF;
-    if (fd >= process.max_fds) return EBADF;
-    const slot = &proc.fds.fds[@intCast(fd)];
+    const slot = fdtab.currentSlot(fd) catch return errno.EBADF;
 
     return switch (slot.kind) {
         .file => {
-            const n = vfs.write(slot.vfs_handle, buf[0..len]) catch |err| return errnoFromVfsErr(err);
+            const n = vfs.write(slot.vfs_handle, buf) catch |err| return errno.fromVfs(err);
             return @intCast(n);
         },
-        .console, .socket, .none => EBADF,
+        .console, .socket, .none => errno.EBADF,
     };
 }
 
 fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
     _ = mode;
-    const path = userCString(path_ptr) orelse return EFAULT;
-    const proc = process.currentProcess() orelse return EBADF;
+    const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    const proc = fdtab.currentProcess() catch return errno.EBADF;
 
     const accmode = flags & abi_fs.O_ACCMODE;
     const open_flags: vfs.OpenFlags = .{
@@ -141,20 +130,17 @@ fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
         .append = flags & abi_fs.O_APPEND != 0,
     };
 
-    const handle = vfs.open(path, open_flags) catch |err| return errnoFromVfsErr(err);
-    const fd = proc.fds.allocFd() orelse {
+    const handle = vfs.open(path, open_flags) catch |err| return errno.fromVfs(err);
+    const fd = fdtab.alloc(proc) catch {
         vfs.close(handle);
-        return EMFILE;
+        return errno.EMFILE;
     };
     proc.fds.fds[fd] = .{ .kind = .file, .vfs_handle = handle };
     return @intCast(fd);
 }
 
 fn sysClose(fd: u64) i64 {
-    const proc = process.currentProcess() orelse return EBADF;
-    if (fd >= process.max_fds) return EBADF;
-    const slot = &proc.fds.fds[@intCast(fd)];
-    if (slot.kind == .none) return EBADF;
+    const slot = fdtab.currentSlot(fd) catch return errno.EBADF;
     if (slot.kind == .file) vfs.close(slot.vfs_handle);
     if (slot.kind == .socket) socket.close(slot.socket_handle);
     slot.* = .{};
@@ -162,19 +148,15 @@ fn sysClose(fd: u64) i64 {
 }
 
 fn sysStat(path_ptr: u64, stat_ptr: u64) i64 {
-    const path = userCString(path_ptr) orelse return EFAULT;
-    if (stat_ptr == 0) return EFAULT;
-    const out: *vfs.Stat = @ptrFromInt(stat_ptr);
-    vfs.stat(path, out) catch |err| return errnoFromVfsErr(err);
+    const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    const out = user.outPtr(vfs.Stat, stat_ptr) orelse return errno.EFAULT;
+    vfs.stat(path, out) catch |err| return errno.fromVfs(err);
     return 0;
 }
 
 fn sysLseek(fd: u64, offset: i64, whence: u32) i64 {
-    const proc = process.currentProcess() orelse return EBADF;
-    if (fd >= process.max_fds) return EBADF;
-    const slot = &proc.fds.fds[@intCast(fd)];
-    if (slot.kind != .file) return EBADF;
-    const pos = vfs.lseek(slot.vfs_handle, offset, @enumFromInt(whence)) catch |err| return errnoFromVfsErr(err);
+    const slot = fdtab.expectFile(fd) catch return errno.EBADF;
+    const pos = vfs.lseek(slot.vfs_handle, offset, @enumFromInt(whence)) catch |err| return errno.fromVfs(err);
     return @bitCast(@as(i64, @intCast(pos)));
 }
 
@@ -195,38 +177,11 @@ fn sysFork(frame: *Frame) i64 {
 
 fn sysExecve(path_ptr: u64, argv_ptr: u64, envp_ptr: u64) i64 {
     _ = envp_ptr;
-    const path = userCString(path_ptr) orelse return EFAULT;
+    const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
     var argv_buf: [16][]const u8 = undefined;
-    const argv_count = readUserArgv(argv_ptr, &argv_buf) catch return EFAULT;
-    user_exec.execve(path, argv_buf[0..argv_count]) catch |err| return errnoFromExecErr(err);
+    const argv_count = user.readArgv(argv_ptr, &argv_buf, 256) catch return errno.EFAULT;
+    user_exec.execve(path, argv_buf[0..argv_count]) catch |err| return errno.fromExec(err);
     unreachable;
-}
-
-fn readUserArgv(argv_ptr: u64, out: [][]const u8) error{Fault}!usize {
-    if (argv_ptr == 0) return 0;
-    var count: usize = 0;
-    var idx: usize = 0;
-    while (idx < out.len) : (idx += 1) {
-        const slot_ptr: *const u64 = @ptrFromInt(argv_ptr + idx * 8);
-        const arg_ptr = slot_ptr.*;
-        if (arg_ptr == 0) break;
-        const arg = userCString(arg_ptr) orelse return error.Fault;
-        out[count] = arg;
-        count += 1;
-    }
-    return count;
-}
-
-fn errnoFromExecErr(err: user_exec.ExecError) i64 {
-    return switch (err) {
-        user_exec.ExecError.NotFound => ENOENT,
-        user_exec.ExecError.NotFile => EINVAL,
-        user_exec.ExecError.PathTooLong => EINVAL,
-        user_exec.ExecError.InvalidElf => ENOENT,
-        user_exec.ExecError.OutOfMemory => -12,
-        user_exec.ExecError.IoError => -5,
-        user_exec.ExecError.NoProcess => -1,
-    };
 }
 
 fn sysWait4(pid: u64, status_ptr: u64, options: u64, rusage_ptr: u64) i64 {
@@ -236,40 +191,37 @@ fn sysWait4(pid: u64, status_ptr: u64, options: u64, rusage_ptr: u64) i64 {
 }
 
 fn sysUnlink(path_ptr: u64) i64 {
-    const path = userCString(path_ptr) orelse return EFAULT;
-    vfs.unlink(path) catch |err| return errnoFromVfsErr(err);
+    const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    vfs.unlink(path) catch |err| return errno.fromVfs(err);
     return 0;
 }
 
 fn sysMkdir(path_ptr: u64, mode: u64) i64 {
     _ = mode;
-    const path = userCString(path_ptr) orelse return EFAULT;
-    vfs.mkdir(path) catch |err| return errnoFromVfsErr(err);
+    const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    vfs.mkdir(path) catch |err| return errno.fromVfs(err);
     return 0;
 }
 
 fn sysRmdir(path_ptr: u64) i64 {
-    const path = userCString(path_ptr) orelse return EFAULT;
-    vfs.rmdir(path) catch |err| return errnoFromVfsErr(err);
+    const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    vfs.rmdir(path) catch |err| return errno.fromVfs(err);
     return 0;
 }
 
 fn sysGetdents64(fd: u64, buf_ptr: u64, count: u64) i64 {
-    if (buf_ptr == 0 or count == 0) return EINVAL;
+    if (buf_ptr == 0 or count == 0) return errno.EINVAL;
 
-    const proc = process.currentProcess() orelse return EBADF;
-    if (fd >= process.max_fds) return EBADF;
-    const slot = &proc.fds.fds[@intCast(fd)];
-    if (slot.kind != .file) return EBADF;
+    const slot = fdtab.expectFile(fd) catch return errno.EBADF;
 
     const max_len: usize = 4096;
     const cap_len: usize = @intCast(@min(count, max_len));
 
     var kbuf: [4096]u8 = undefined;
-    const n = vfs.getdents64(slot.vfs_handle, kbuf[0..cap_len]) catch |err| return errnoFromVfsErr(err);
+    const n = vfs.getdents64(slot.vfs_handle, kbuf[0..cap_len]) catch |err| return errno.fromVfs(err);
 
-    const user_buf: [*]u8 = @ptrFromInt(buf_ptr);
-    @memcpy(user_buf[0..n], kbuf[0..n]);
+    const user_buf = user.bytes(buf_ptr, n) orelse return errno.EFAULT;
+    @memcpy(user_buf, kbuf[0..n]);
     return @intCast(n);
 }
 
@@ -279,7 +231,7 @@ const Timespec = extern struct {
 };
 
 fn sysClockGettime(clock_id: u64, timespec_ptr: u64) i64 {
-    if (timespec_ptr == 0) return EFAULT;
+    if (timespec_ptr == 0) return errno.EFAULT;
     var ts: Timespec = .{ .tv_sec = 0, .tv_nsec = 0 };
     switch (clock_id) {
         abi_syscall.CLOCK_REALTIME => {
@@ -290,57 +242,48 @@ fn sysClockGettime(clock_id: u64, timespec_ptr: u64) i64 {
             ts.tv_sec = @intCast(@divTrunc(ticks, 100));
             ts.tv_nsec = @intCast(@mod(ticks, 100) * 10_000_000);
         },
-        else => return EINVAL,
+        else => return errno.EINVAL,
     }
-    const user_buf: [*]u8 = @ptrFromInt(timespec_ptr);
-    @memcpy(user_buf[0..@sizeOf(Timespec)], @as([*]const u8, @ptrCast(&ts)));
+    const user_buf = user.bytes(timespec_ptr, @sizeOf(Timespec)) orelse return errno.EFAULT;
+    @memcpy(user_buf, @as([*]const u8, @ptrCast(&ts))[0..@sizeOf(Timespec)]);
     return 0;
 }
 
 fn sysSocket(domain: u64, sock_type: u64, protocol: u64) i64 {
     const handle = socket.create(@truncate(domain), @truncate(sock_type), @intCast(protocol)) catch |err| {
-        return errnoFromSocket(err);
+        return errno.fromSocket(err);
     };
-    const proc = process.currentProcess() orelse return EBADF;
-    const fd = proc.fds.allocFd() orelse return EMFILE;
+    const proc = fdtab.currentProcess() catch return errno.EBADF;
+    const fd = fdtab.alloc(proc) catch return errno.EMFILE;
     proc.fds.fds[fd] = .{ .kind = .socket, .socket_handle = handle };
     return @intCast(fd);
 }
 
 fn sysBind(sockfd: u64, addr_ptr: u64, addrlen: u64) i64 {
     _ = addrlen;
-    const proc = process.currentProcess() orelse return EBADF;
-    if (sockfd >= process.max_fds) return EBADF;
-    const slot = &proc.fds.fds[@intCast(sockfd)];
-    if (slot.kind != .socket) return EBADF;
-    const addr = userSockaddrIn(addr_ptr) orelse return EFAULT;
-    socket.bind(slot.socket_handle, &addr) catch |err| return errnoFromSocket(err);
+    const slot = fdtab.expectSocket(sockfd) catch return errno.EBADF;
+    const addr = user.value(socket.SockaddrIn, addr_ptr) orelse return errno.EFAULT;
+    socket.bind(slot.socket_handle, &addr) catch |err| return errno.fromSocket(err);
     return 0;
 }
 
 fn sysConnect(sockfd: u64, addr_ptr: u64, addrlen: u64) i64 {
     _ = addrlen;
-    const proc = process.currentProcess() orelse return EBADF;
-    if (sockfd >= process.max_fds) return EBADF;
-    const slot = &proc.fds.fds[@intCast(sockfd)];
-    if (slot.kind != .socket) return EBADF;
-    const addr = userSockaddrIn(addr_ptr) orelse return EFAULT;
-    socket.connect(slot.socket_handle, &addr) catch |err| return errnoFromSocket(err);
+    const slot = fdtab.expectSocket(sockfd) catch return errno.EBADF;
+    const addr = user.value(socket.SockaddrIn, addr_ptr) orelse return errno.EFAULT;
+    socket.connect(slot.socket_handle, &addr) catch |err| return errno.fromSocket(err);
     return 0;
 }
 
 fn sysSend(sockfd: u64, buf_ptr: u64, len: u64, flags: u64) i64 {
     _ = flags;
     if (len == 0) return 0;
-    const proc = process.currentProcess() orelse return EBADF;
-    if (sockfd >= process.max_fds) return EBADF;
-    const slot = &proc.fds.fds[@intCast(sockfd)];
-    if (slot.kind != .socket) return EBADF;
+    const slot = fdtab.expectSocket(sockfd) catch return errno.EBADF;
     const max_len: usize = 4096;
     const copy_len: usize = @intCast(@min(len, max_len));
-    const buf: [*]const u8 = @ptrFromInt(buf_ptr);
-    const sent = socket.send(slot.socket_handle, buf[0..copy_len]) catch |err| {
-        return errnoFromSocket(err);
+    const buf = user.constBytes(buf_ptr, copy_len) orelse return errno.EFAULT;
+    const sent = socket.send(slot.socket_handle, buf) catch |err| {
+        return errno.fromSocket(err);
     };
     return @intCast(sent);
 }
@@ -348,15 +291,12 @@ fn sysSend(sockfd: u64, buf_ptr: u64, len: u64, flags: u64) i64 {
 fn sysRecv(sockfd: u64, buf_ptr: u64, len: u64, flags: u64) i64 {
     _ = flags;
     if (len == 0) return 0;
-    const proc = process.currentProcess() orelse return EBADF;
-    if (sockfd >= process.max_fds) return EBADF;
-    const slot = &proc.fds.fds[@intCast(sockfd)];
-    if (slot.kind != .socket) return EBADF;
+    const slot = fdtab.expectSocket(sockfd) catch return errno.EBADF;
     const max_len: usize = 4096;
     const copy_len: usize = @intCast(@min(len, max_len));
-    const buf: [*]u8 = @ptrFromInt(buf_ptr);
-    const received = socket.recv(slot.socket_handle, buf[0..copy_len], 2_000_000) catch |err| {
-        return errnoFromSocket(err);
+    const buf = user.bytes(buf_ptr, copy_len) orelse return errno.EFAULT;
+    const received = socket.recv(slot.socket_handle, buf, 2_000_000) catch |err| {
+        return errno.fromSocket(err);
     };
     return @intCast(received);
 }
@@ -364,16 +304,13 @@ fn sysRecv(sockfd: u64, buf_ptr: u64, len: u64, flags: u64) i64 {
 fn sysSendto(sockfd: u64, buf_ptr: u64, len: u64, flags: u64, dest_ptr: u64, addrlen: u64) i64 {
     _ = flags;
     _ = addrlen;
-    const proc = process.currentProcess() orelse return EBADF;
-    if (sockfd >= process.max_fds) return EBADF;
-    const slot = &proc.fds.fds[@intCast(sockfd)];
-    if (slot.kind != .socket) return EBADF;
-    const dest = userSockaddrIn(dest_ptr) orelse return EFAULT;
+    const slot = fdtab.expectSocket(sockfd) catch return errno.EBADF;
+    const dest = user.value(socket.SockaddrIn, dest_ptr) orelse return errno.EFAULT;
     const max_len: usize = 4096;
     const copy_len: usize = @intCast(@min(len, max_len));
-    const buf: [*]const u8 = @ptrFromInt(buf_ptr);
-    const sent = socket.sendto(slot.socket_handle, buf[0..copy_len], &dest) catch |err| {
-        return errnoFromSocket(err);
+    const buf = user.constBytes(buf_ptr, copy_len) orelse return errno.EFAULT;
+    const sent = socket.sendto(slot.socket_handle, buf, &dest) catch |err| {
+        return errno.fromSocket(err);
     };
     return @intCast(sent);
 }
@@ -381,57 +318,37 @@ fn sysSendto(sockfd: u64, buf_ptr: u64, len: u64, flags: u64, dest_ptr: u64, add
 fn sysRecvfrom(sockfd: u64, buf_ptr: u64, len: u64, flags: u64, src_ptr: u64, addrlen_ptr: u64) i64 {
     _ = flags;
     if (len == 0) return 0;
-    const proc = process.currentProcess() orelse return EBADF;
-    if (sockfd >= process.max_fds) return EBADF;
-    const slot = &proc.fds.fds[@intCast(sockfd)];
-    if (slot.kind != .socket) return EBADF;
+    const slot = fdtab.expectSocket(sockfd) catch return errno.EBADF;
     const max_len: usize = 4096;
     const copy_len: usize = @intCast(@min(len, max_len));
-    const buf: [*]u8 = @ptrFromInt(buf_ptr);
+    const buf = user.bytes(buf_ptr, copy_len) orelse return errno.EFAULT;
 
     var src: socket.SockaddrIn = undefined;
     const src_out: ?*socket.SockaddrIn = if (src_ptr != 0) &src else null;
-    const received = socket.recvfrom(slot.socket_handle, buf[0..copy_len], src_out, 2_000_000) catch |err| {
-        return errnoFromSocket(err);
+    const received = socket.recvfrom(slot.socket_handle, buf, src_out, 2_000_000) catch |err| {
+        return errno.fromSocket(err);
     };
 
     if (src_ptr != 0) {
-        @as(*socket.SockaddrIn, @ptrFromInt(src_ptr)).* = src;
+        (user.outPtr(socket.SockaddrIn, src_ptr) orelse return errno.EFAULT).* = src;
         if (addrlen_ptr != 0) {
-            @as(*u32, @ptrFromInt(addrlen_ptr)).* = @sizeOf(socket.SockaddrIn);
+            (user.outPtr(u32, addrlen_ptr) orelse return errno.EFAULT).* = @sizeOf(socket.SockaddrIn);
         }
     }
     return @intCast(received);
 }
 
-fn errnoFromSocket(err: socket.SocketError) i64 {
-    return switch (err) {
-        socket.SocketError.Unsupported => EINVAL,
-        socket.SocketError.NotFound, socket.SocketError.NotBound => EBADF,
-        socket.SocketError.NotConnected => -107, // ENOTCONN
-        socket.SocketError.NotReady, socket.SocketError.IoError => -5,
-        socket.SocketError.Timeout => -110, // ETIMEDOUT
-        socket.SocketError.TooManySockets => EMFILE,
-    };
-}
-
-fn userSockaddrIn(ptr: u64) ?socket.SockaddrIn {
-    if (ptr == 0) return null;
-    return @as(*const socket.SockaddrIn, @ptrFromInt(ptr)).*;
-}
-
 fn sysGetnetconfig(buf_ptr: u64) i64 {
-    if (buf_ptr == 0) return EFAULT;
-    const out: *net_info.NetConfig = @ptrFromInt(buf_ptr);
+    const out = user.outPtr(net_info.NetConfig, buf_ptr) orelse return errno.EFAULT;
     net_info.fillConfig(out);
     return 0;
 }
 
 fn sysGetneighbors(buf_ptr: u64, max: u64) i64 {
-    if (buf_ptr == 0 or max == 0) return EINVAL;
+    if (buf_ptr == 0 or max == 0) return errno.EINVAL;
     const cap: usize = @intCast(@min(max, 64));
-    const out: [*]net_info.NeighEntry = @ptrFromInt(buf_ptr);
-    const count = net_info.fillNeighbors(out[0..cap]);
+    const out = user.slice(net_info.NeighEntry, buf_ptr, cap) orelse return errno.EFAULT;
+    const count = net_info.fillNeighbors(out);
     return @intCast(count);
 }
 
@@ -442,35 +359,3 @@ fn sysExit(status: u64) i64 {
     thread.exit();
 }
 
-fn errnoFromVfs() i64 {
-    return -5; // EIO
-}
-
-fn errnoFromVfsErr(err: vfs.VfsError) i64 {
-    return switch (err) {
-        vfs.VfsError.NotFound => ENOENT,
-        vfs.VfsError.IsDirectory => EISDIR,
-        vfs.VfsError.BadHandle => EBADF,
-        vfs.VfsError.TooManyOpenFiles => EMFILE,
-        vfs.VfsError.InvalidWhence => EINVAL,
-        vfs.VfsError.NotReady, vfs.VfsError.IoError => -5,
-        vfs.VfsError.InvalidBpb => -5,
-        vfs.VfsError.NotFile => EINVAL,
-        vfs.VfsError.NameTooLong, vfs.VfsError.PathTooLong => EINVAL,
-        vfs.VfsError.BufferTooSmall => EINVAL,
-        vfs.VfsError.Exists => -17, // EEXIST
-        vfs.VfsError.NoSpace => -28, // ENOSPC
-        vfs.VfsError.NotEmpty => -39, // ENOTEMPTY
-        vfs.VfsError.ReadOnly => EACCES,
-    };
-}
-
-fn userCString(ptr: u64) ?[]const u8 {
-    if (ptr == 0) return null;
-    const start: [*]const u8 = @ptrFromInt(ptr);
-    var len: usize = 0;
-    while (len < 256) : (len += 1) {
-        if (start[len] == 0) return start[0..len];
-    }
-    return null;
-}

@@ -386,6 +386,22 @@ pub fn build(b: *std.Build) void {
     });
     const run_filesystem_contract_tests = b.addRunArtifact(filesystem_contract_tests);
 
+    const syscall_user_host_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/syscall/user.zig"),
+        .target = b.graph.host,
+    });
+
+    const syscall_user_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/kernel/syscall_user_test.zig"),
+        .target = b.graph.host,
+    });
+    syscall_user_test_mod.addImport("syscall_user", syscall_user_host_mod);
+
+    const syscall_user_tests = b.addTest(.{
+        .root_module = syscall_user_test_mod,
+    });
+    const run_syscall_user_tests = b.addRunArtifact(syscall_user_tests);
+
     const libc_ip_host = b.createModule(.{
         .root_source_file = b.path("userspace/libc/ip.zig"),
         .target = b.graph.host,
@@ -413,6 +429,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_device_registry_tests.step);
     test_step.dependOn(&run_virtio_queue_index_tests.step);
     test_step.dependOn(&run_filesystem_contract_tests.step);
+    test_step.dependOn(&run_syscall_user_tests.step);
     test_step.dependOn(&run_icmp_tests.step);
     test_step.dependOn(&run_tcp_tests.step);
     test_step.dependOn(&run_curl_target_tests.step);
