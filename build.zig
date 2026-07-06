@@ -111,11 +111,25 @@ pub fn build(b: *std.Build) void {
     fetch.root_module.addImport("freestanding_std", freestanding_std);
     const install_fetch = b.addInstallArtifact(fetch, user_install);
 
+    const ip = b.addExecutable(.{
+        .name = "ip",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("userspace/ip/main.zig"),
+            .target = user_target,
+            .optimize = user_optimize,
+        }),
+    });
+    ip.setLinkerScript(b.path("userspace/linker.ld"));
+    ip.root_module.addImport("libc", user_libc);
+    ip.root_module.addImport("freestanding_std", freestanding_std);
+    const install_ip = b.addInstallArtifact(ip, user_install);
+
     b.getInstallStep().dependOn(&install_hello.step);
     b.getInstallStep().dependOn(&install_shell.step);
     b.getInstallStep().dependOn(&install_dig.step);
     b.getInstallStep().dependOn(&install_ping.step);
     b.getInstallStep().dependOn(&install_fetch.step);
+    b.getInstallStep().dependOn(&install_ip.step);
 
     const limine_kernel_mod = b.createModule(.{
         .root_source_file = b.path("kernel/boot/limine.zig"),

@@ -137,6 +137,27 @@ pub fn recvfrom(
     return syscall6(45, fd, @intFromPtr(buf), len, flags, src_ptr, alen_ptr);
 }
 
+pub const NetConfig = extern struct {
+    ip: [4]u8,
+    mask: [4]u8,
+    gateway: [4]u8,
+    dns: [4]u8,
+    mac: [6]u8,
+};
+
+pub const NeighEntry = extern struct {
+    ip: [4]u8,
+    mac: [6]u8,
+};
+
+pub fn getnetconfig(out: *NetConfig) isize {
+    return syscall6(1024, @intFromPtr(out), 0, 0, 0, 0, 0);
+}
+
+pub fn getneighbors(buf: [*]NeighEntry, max: usize) isize {
+    return syscall6(1025, @intFromPtr(buf), max, 0, 0, 0, 0);
+}
+
 pub fn waitpid(pid: isize, status: ?*u32, options: u32) isize {
     const status_ptr: u64 = if (status) |s| @intFromPtr(s) else 0;
     return syscall6(61, @bitCast(@as(u64, @intCast(pid))), status_ptr, options, 0, 0, 0);

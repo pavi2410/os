@@ -8,6 +8,7 @@ const user_exec = @import("../proc/exec.zig");
 const user_wait = @import("../proc/wait.zig");
 const vfs = @import("../fs/vfs.zig");
 const socket = @import("../net/socket.zig");
+const net_info = @import("../net/info.zig");
 const rtc = @import("../arch/x86_64/rtc.zig");
 const interrupts = @import("../arch/x86_64/interrupts.zig");
 
@@ -64,6 +65,8 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.send => sysSend(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
         numbers.recv => sysRecv(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
         numbers.bind => sysBind(frame.arg0, frame.arg1, frame.arg2),
+        numbers.getnetconfig => sysGetnetconfig(frame.arg0),
+        numbers.getneighbors => sysGetneighbors(frame.arg0, frame.arg1),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
         else => ENOSYS,
     };
@@ -422,6 +425,21 @@ fn errnoFromSocket(err: socket.SocketError) i64 {
 fn userSockaddrIn(ptr: u64) ?socket.SockaddrIn {
     if (ptr == 0) return null;
     return @as(*const socket.SockaddrIn, @ptrFromInt(ptr)).*;
+}
+
+fn sysGetnetconfig(buf_ptr: u64) i64 {
+    if (buf_ptr == 0) return EFAULT;
+    const out: *net_info.NetConfig = @ptrFromInt(buf_ptr);
+    net_info.fillConfig(out);
+    return 0;
+}
+
+fn sysGetneighbors(buf_ptr: u64, max: u64) i64 {
+    if (buf_ptr == 0 or max == 0) return EINVAL;
+    const cap: usize = @intCast(@min(max, 64));
+    const out: [*]net_info.NeighEntry = @ptrFromInt(buf_ptr);
+    const count = net_info.fillNeighbors(out[0..cap]);
+    return @intCast(count);
 }
 
 fn sysExit(status: u64) i64 {

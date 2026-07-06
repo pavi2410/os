@@ -12,6 +12,11 @@ const CacheEntry = struct {
     valid: bool = false,
 };
 
+pub const Neighbor = struct {
+    ip: ipv4.Addr,
+    mac: ethernet.Mac,
+};
+
 var cache: [cache_size]CacheEntry = [_]CacheEntry{.{}} ** cache_size;
 var next_slot: usize = 0;
 
@@ -46,6 +51,18 @@ fn resolveMac(ip: ipv4.Addr, src_mac: ethernet.Mac) ?ethernet.Mac {
 pub fn resetCache() void {
     for (&cache) |*entry| entry.* = .{};
     next_slot = 0;
+}
+
+pub fn listNeighbors(out: []Neighbor) usize {
+    var count: usize = 0;
+    for (&cache) |entry| {
+        if (!entry.valid) continue;
+        if (count >= out.len) break;
+        out[count].ip = entry.ip;
+        out[count].mac = entry.mac;
+        count += 1;
+    }
+    return count;
 }
 
 fn store(ip: ipv4.Addr, mac: ethernet.Mac) void {

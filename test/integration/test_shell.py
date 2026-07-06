@@ -122,6 +122,8 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
             "ping: 104.20.23.154 reply",
             case="ping off-subnet",
         )
+        run_case(shell, "ip addr", "10.0.2.15/24", case="ip addr")
+        run_case(shell, "ip route", "default via 10.0.2.2", case="ip route")
         pid_out = run_case(shell, "pid", case="pid")
         assert any(ch.isdigit() for ch in pid_out), f"pid: no digits in:\n{pid_out}"
         shell.assert_no_faults()

@@ -24,3 +24,5 @@ pub const recvfrom = 45;
 pub const send = 46;
 pub const recv = 47;
 pub const bind = 49;
+pub const getnetconfig = 1024;
+pub const getneighbors = 1025;
