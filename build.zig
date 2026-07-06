@@ -177,7 +177,18 @@ pub fn build(b: *std.Build) void {
 
     const run_physical_tests = b.addRunArtifact(physical_tests);
 
+    const icmp_test_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/net/icmp_test.zig"),
+        .target = b.graph.host,
+    });
+
+    const icmp_tests = b.addTest(.{
+        .root_module = icmp_test_mod,
+    });
+    const run_icmp_tests = b.addRunArtifact(icmp_tests);
+
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_memory_map_tests.step);
     test_step.dependOn(&run_physical_tests.step);
+    test_step.dependOn(&run_icmp_tests.step);
 }

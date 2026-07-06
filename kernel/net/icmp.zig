@@ -91,6 +91,7 @@ pub fn matchEchoReply(
     const payload_off = icmp_off + header_len;
     const frame_ip_end = ethernet.header_len + ip_total;
     if (payload_off > frame_ip_end or icmp_len < header_len) return null;
+    if (frame_ip_end > frame.len) return null;
 
     src_ip_out.* = ip.src;
     return frame[payload_off..frame_ip_end];
