@@ -17,3 +17,7 @@ pub const rmdir = 84;
 pub const getdents64 = 217;
 pub const clock_gettime = 228;
 pub const exit_group = 231;
+pub const socket = 41;
+pub const sendto = 44;
+pub const recvfrom = 45;
+pub const bind = 49;

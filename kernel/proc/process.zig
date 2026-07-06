@@ -33,11 +33,13 @@ pub const FdKind = enum {
     none,
     console,
     file,
+    socket,
 };
 
 pub const Fd = struct {
     kind: FdKind = .none,
     vfs_handle: u32 = 0,
+    socket_handle: u32 = 0,
 };
 
 pub const max_fds = 32;

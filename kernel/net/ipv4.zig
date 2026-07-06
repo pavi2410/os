@@ -4,6 +4,7 @@ pub const header_len = 20;
 pub const Addr = [addr_len]u8;
 
 pub const proto_icmp: u8 = 1;
+pub const proto_udp: u8 = 17;
 
 pub const Header = extern struct {
     version_ihl: u8,

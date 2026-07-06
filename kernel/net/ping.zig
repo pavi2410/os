@@ -1,11 +1,11 @@
 const serial = @import("../arch/x86_64/serial.zig");
-const arp = @import("arp.zig");
 const icmp = @import("icmp.zig");
 const ipv4 = @import("ipv4.zig");
+const resolve = @import("resolve.zig");
 const virtio_net = @import("../drivers/virtio_net.zig");
 
 /// QEMU user networking defaults.
-pub const guest_ip = ipv4.Addr{ 10, 0, 2, 15 };
+pub const guest_ip = resolve.guest_ip;
 pub const gateway_ip = ipv4.Addr{ 10, 0, 2, 2 };
 
 const ping_id: u16 = 0x4F53;
@@ -15,7 +15,7 @@ pub fn runSelfTest() void {
     if (!virtio_net.isReady()) return;
 
     const mac = virtio_net.macAddress();
-    const gw_mac = resolveGatewayMac(mac) orelse {
+    const gw_mac = resolve.resolve(gateway_ip, mac) orelse {
         serial.writeString("ping: ARP failed\r\n");
         return;
     };
@@ -45,21 +45,4 @@ pub fn runSelfTest() void {
         } else |_| {}
     }
     serial.writeString("ping: timeout\r\n");
-}
-
-fn resolveGatewayMac(src_mac: [virtio_net.mac_len]u8) ?[virtio_net.mac_len]u8 {
-    var frame: [virtio_net.max_frame_size]u8 = undefined;
-    const frame_len = arp.buildRequest(&frame, src_mac, guest_ip, gateway_ip);
-    virtio_net.sendFrame(frame[0..frame_len]) catch return null;
-
-    var recv_buf: [virtio_net.max_frame_size]u8 = undefined;
-    var attempt: usize = 0;
-    while (attempt < 5) : (attempt += 1) {
-        if (virtio_net.pollRecv(&recv_buf, 100_000)) |len| {
-            if (arp.senderMacFor(recv_buf[0..len], gateway_ip)) |resolved| {
-                return resolved;
-            }
-        } else |_| {}
-    }
-    return null;
 }
