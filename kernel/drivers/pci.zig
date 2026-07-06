@@ -5,6 +5,8 @@ const serial = @import("../arch/x86_64/serial.zig");
 pub const DeviceId = struct {
     pub const blk_modern: u16 = 0x1042;
     pub const blk_legacy: u16 = 0x1001;
+    pub const net_modern: u16 = 0x1041;
+    pub const net_legacy: u16 = 0x1000;
 };
 
 pub const Vendor = struct {

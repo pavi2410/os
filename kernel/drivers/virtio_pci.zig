@@ -206,6 +206,13 @@ pub fn findBlockDevice() ?*const pci.Device {
     return null;
 }
 
+pub fn findNetworkDevice() ?*const pci.Device {
+    if (pci.findDevice(pci.Vendor.virtio, pci.DeviceId.net_modern)) |dev| return dev;
+    if (pci.findDevice(pci.Vendor.virtio, pci.DeviceId.net_legacy)) |dev| return dev;
+    if (pci.findClass(pci.Class.network, 0x00)) |dev| return dev;
+    return null;
+}
+
 pub fn physFromVirt(virt: u64) ?u64 {
     const page = virt & ~@as(u64, paging.page_size - 1);
     const off = virt & (paging.page_size - 1);
