@@ -1,7 +1,6 @@
 const numbers = @import("numbers.zig");
 const process = @import("../proc/process.zig");
 const thread = @import("../proc/thread.zig");
-const tty = @import("../drivers/tty.zig");
 const user_fork = @import("../proc/fork.zig");
 const user_fork_ctx = @import("../proc/user_fork.zig");
 const user_exec = @import("../proc/exec.zig");
@@ -14,6 +13,7 @@ const abi_fs = @import("abi_fs");
 const abi_syscall = @import("abi_syscall");
 const errno = @import("errno.zig");
 const fdtab = @import("fd.zig");
+const fd_ops = @import("fd_ops.zig");
 const user = @import("user.zig");
 
 /// Matches the stack layout built by `syscall_entry` (callee-saved pushed first).
@@ -76,20 +76,7 @@ fn sysRead(fd: u64, buf_ptr: u64, count: u64) i64 {
 
     const slot = fdtab.currentSlot(fd) catch return errno.EBADF;
 
-    return switch (slot.kind) {
-        .console => {
-            if (fd != 0) return errno.EBADF;
-            const read_len = tty.get().read(buf) catch |err| switch (err) {
-                tty.TtyError.WouldBlock => return -4,
-            };
-            return @intCast(read_len);
-        },
-        .file => {
-            const n = vfs.read(slot.vfs_handle, buf) catch return errno.EIO;
-            return @intCast(n);
-        },
-        .socket, .none => errno.EBADF,
-    };
+    return fd_ops.read(fd, slot, buf);
 }
 
 fn sysWrite(fd: u64, buf_ptr: u64, count: u64) i64 {
@@ -99,20 +86,8 @@ fn sysWrite(fd: u64, buf_ptr: u64, count: u64) i64 {
     const len: usize = @intCast(@min(count, max_len));
     const buf = user.constBytes(buf_ptr, len) orelse return errno.EFAULT;
 
-    if (fd == 1 or fd == 2) {
-        const written = tty.get().write(buf);
-        return @intCast(written);
-    }
-
     const slot = fdtab.currentSlot(fd) catch return errno.EBADF;
-
-    return switch (slot.kind) {
-        .file => {
-            const n = vfs.write(slot.vfs_handle, buf) catch |err| return errno.fromVfs(err);
-            return @intCast(n);
-        },
-        .console, .socket, .none => errno.EBADF,
-    };
+    return fd_ops.write(fd, slot, buf);
 }
 
 fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
@@ -140,10 +115,7 @@ fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
 
 fn sysClose(fd: u64) i64 {
     const slot = fdtab.currentSlot(fd) catch return errno.EBADF;
-    if (slot.kind == .file) vfs.close(slot.vfs_handle);
-    if (slot.kind == .socket) socket.close(slot.socket_handle);
-    slot.* = .{};
-    return 0;
+    return fd_ops.close(slot);
 }
 
 fn sysStat(path_ptr: u64, stat_ptr: u64) i64 {
@@ -155,8 +127,7 @@ fn sysStat(path_ptr: u64, stat_ptr: u64) i64 {
 
 fn sysLseek(fd: u64, offset: i64, whence: u32) i64 {
     const slot = fdtab.expectFile(fd) catch return errno.EBADF;
-    const pos = vfs.lseek(slot.vfs_handle, offset, @enumFromInt(whence)) catch |err| return errno.fromVfs(err);
-    return @bitCast(@as(i64, @intCast(pos)));
+    return fd_ops.lseek(slot, offset, whence);
 }
 
 fn sysBrk(addr: u64) i64 {
@@ -217,10 +188,12 @@ fn sysGetdents64(fd: u64, buf_ptr: u64, count: u64) i64 {
     const cap_len: usize = @intCast(@min(count, max_len));
 
     var kbuf: [4096]u8 = undefined;
-    const n = vfs.getdents64(slot.vfs_handle, kbuf[0..cap_len]) catch |err| return errno.fromVfs(err);
+    const n = fd_ops.getdents64(slot, kbuf[0..cap_len]);
+    if (n < 0) return n;
+    const bytes: usize = @intCast(n);
 
-    const user_buf = user.bytes(buf_ptr, n) orelse return errno.EFAULT;
-    @memcpy(user_buf, kbuf[0..n]);
+    const user_buf = user.bytes(buf_ptr, bytes) orelse return errno.EFAULT;
+    @memcpy(user_buf, kbuf[0..bytes]);
     return @intCast(n);
 }
 
