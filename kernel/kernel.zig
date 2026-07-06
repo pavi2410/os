@@ -16,8 +16,7 @@ const scheduler = @import("proc/scheduler.zig");
 const process = @import("proc/process.zig");
 const tty = @import("drivers/tty.zig");
 const pci = @import("drivers/pci.zig");
-const virtio_blk = @import("drivers/virtio_blk.zig");
-const virtio_net = @import("drivers/virtio_net.zig");
+const driver_manager = @import("drivers/manager.zig");
 const udp_test = @import("net/udp_test.zig");
 const vfs = @import("fs/vfs.zig");
 const syscall = @import("syscall/entry.zig");
@@ -102,20 +101,12 @@ pub fn init(ctx: BootContext) void {
 }
 
 fn initNetwork() void {
-    virtio_net.init() catch {
-        hal.console.writeString("virtio-net not available\r\n");
-        return;
-    };
-    virtio_net.logStatus();
+    if (!driver_manager.initNetwork()) return;
     udp_test.runSelfTest();
 }
 
 fn initBlock() void {
-    virtio_blk.init() catch {
-        hal.console.writeString("virtio-blk not available\r\n");
-        return;
-    };
-    virtio_blk.logStatus();
+    if (!driver_manager.initBlock()) return;
     initVfs();
 }
 
