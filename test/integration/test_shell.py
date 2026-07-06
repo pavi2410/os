@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import socket
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -28,6 +32,23 @@ def run_case(shell: QemuShell, cmd: str, *needles: str, case: str | None = None)
     for needle in needles:
         assert_contains(window, needle, label)
     return window
+
+
+def free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+def wait_for_port(port: int) -> None:
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                return
+        except OSError:
+            time.sleep(0.05)
+    raise TimeoutError(f"server did not listen on port {port}")
 
 
 def test_shell_smoke_and_persistence(repo_root: Path) -> None:
@@ -123,3 +144,40 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         shell2.assert_no_faults()
     finally:
         shell2.close()
+
+
+def test_tcp_fetch_from_host(repo_root: Path, tmp_path: Path) -> None:
+    (tmp_path / "index.html").write_text("hello from host tcp\n", encoding="utf-8")
+    port = free_port()
+    server = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "http.server",
+            str(port),
+            "--bind",
+            "127.0.0.1",
+            "--directory",
+            str(tmp_path),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        wait_for_port(port)
+        shell = QemuShell(repo_root)
+        shell.start()
+        try:
+            shell.wait_ready()
+            run_case(
+                shell,
+                f"fetch 10.0.2.2 {port}",
+                "hello from host tcp",
+                case="fetch host tcp",
+            )
+            shell.assert_no_faults()
+        finally:
+            shell.close()
+    finally:
+        server.terminate()
+        server.wait(timeout=5)

@@ -3,12 +3,15 @@ const icmp = @import("icmp.zig");
 const ipv4 = @import("ipv4.zig");
 const link = @import("link.zig");
 const resolve = @import("resolve.zig");
+const tcp = @import("tcp.zig");
 const udp = @import("udp.zig");
 
 pub const AF_INET: u16 = 2;
 pub const SOCK_DGRAM: u16 = 2;
+pub const SOCK_STREAM: u16 = 1;
 
 pub const IPPROTO_ICMP: i32 = 1;
+pub const IPPROTO_TCP: i32 = 6;
 pub const IPPROTO_UDP: i32 = 17;
 
 pub const SocketError = error{
@@ -16,6 +19,7 @@ pub const SocketError = error{
     Unsupported,
     NotBound,
     NotFound,
+    NotConnected,
     NotReady,
     IoError,
     Timeout,
@@ -31,7 +35,17 @@ pub const SockaddrIn = extern struct {
 const Kind = enum {
     udp,
     icmp,
+    tcp,
 };
+
+const TcpState = enum {
+    closed,
+    syn_sent,
+    established,
+    peer_closed,
+};
+
+const rx_buf_size = 8192;
 
 const Socket = struct {
     in_use: bool = false,
@@ -40,22 +54,43 @@ const Socket = struct {
     icmp_id: u16 = 0,
     icmp_seq: u16 = 0,
     last_peer: ipv4.Addr = .{ 0, 0, 0, 0 },
+    tcp_state: TcpState = .closed,
+    remote_ip: ipv4.Addr = .{ 0, 0, 0, 0 },
+    remote_port: u16 = 0,
+    snd_isn: u32 = 0,
+    snd_nxt: u32 = 0,
+    rcv_nxt: u32 = 0,
+    rx_buf: [rx_buf_size]u8 = undefined,
+    rx_len: usize = 0,
 };
 
 const max_sockets = 16;
 const ephemeral_port_min: u16 = 49152;
+const max_tcp_segment = 1400;
+const connect_spins: usize = 500_000;
+const send_spins: usize = 500_000;
 
 var sockets: [max_sockets]Socket = [_]Socket{.{}} ** max_sockets;
 var next_ephemeral: u16 = ephemeral_port_min;
 var next_icmp_id: u16 = 0x4000;
+var next_isn: u32 = 0x12340000;
+var tcp_rx_scratch: [link.max_frame_len]u8 = undefined;
+var tcp_tx_frame: [link.max_frame_len]u8 = undefined;
 
 pub fn create(domain: u32, sock_type: u32, protocol: i32) SocketError!u32 {
-    if (domain != AF_INET or sock_type != SOCK_DGRAM) return SocketError.Unsupported;
+    if (domain != AF_INET) return SocketError.Unsupported;
     if (!link.isReady()) return SocketError.NotReady;
 
-    const kind: Kind = switch (protocol) {
-        IPPROTO_ICMP => .icmp,
-        0, IPPROTO_UDP => .udp,
+    const kind: Kind = switch (sock_type) {
+        SOCK_DGRAM => switch (protocol) {
+            IPPROTO_ICMP => .icmp,
+            0, IPPROTO_UDP => .udp,
+            else => return SocketError.Unsupported,
+        },
+        SOCK_STREAM => switch (protocol) {
+            0, IPPROTO_TCP => .tcp,
+            else => return SocketError.Unsupported,
+        },
         else => return SocketError.Unsupported,
     };
 
@@ -73,6 +108,7 @@ pub fn create(domain: u32, sock_type: u32, protocol: i32) SocketError!u32 {
                         break :blk id;
                     },
                 },
+                .tcp => .{ .in_use = true, .kind = .tcp },
             };
             return @intCast(i);
         }
@@ -82,6 +118,10 @@ pub fn create(domain: u32, sock_type: u32, protocol: i32) SocketError!u32 {
 
 pub fn close(handle: u32) void {
     if (handle >= max_sockets) return;
+    const sock = &sockets[handle];
+    if (sock.in_use and sock.kind == .tcp and sock.tcp_state == .established) {
+        tcpSendSegment(sock, sock.snd_nxt, sock.rcv_nxt, tcp.flag_fin | tcp.flag_ack, "") catch {};
+    }
     sockets[handle] = .{};
 }
 
@@ -90,6 +130,84 @@ pub fn bind(handle: u32, addr: *const SockaddrIn) SocketError!void {
     if (addr.family != AF_INET) return SocketError.Unsupported;
     if (sockets[handle].kind != .udp) return SocketError.Unsupported;
     sockets[handle].local_port = @byteSwap(addr.port_be);
+}
+
+pub fn connect(handle: u32, addr: *const SockaddrIn) SocketError!void {
+    if (handle >= max_sockets or !sockets[handle].in_use) return SocketError.NotFound;
+    const sock = &sockets[handle];
+    if (sock.kind != .tcp) return SocketError.Unsupported;
+    if (addr.family != AF_INET) return SocketError.Unsupported;
+    if (!link.isReady()) return SocketError.NotReady;
+    if (sock.tcp_state != .closed) return SocketError.IoError;
+
+    sock.remote_ip = addr.addr;
+    sock.remote_port = @byteSwap(addr.port_be);
+    sock.local_port = next_ephemeral;
+    next_ephemeral +%= 1;
+    if (next_ephemeral < 1024) next_ephemeral = ephemeral_port_min;
+
+    sock.snd_isn = next_isn;
+    next_isn +%= 65536;
+
+    try tcpSendSegment(sock, sock.snd_isn, 0, tcp.flag_syn, "");
+    sock.tcp_state = .syn_sent;
+
+    const seg = (try pollTcpSegment(sock, connect_spins)) orelse return SocketError.Timeout;
+
+    if (seg.flags & (tcp.flag_syn | tcp.flag_ack) != (tcp.flag_syn | tcp.flag_ack)) return SocketError.IoError;
+    if (seg.ack != sock.snd_isn + 1) return SocketError.IoError;
+
+    sock.rcv_nxt = seg.seq + 1;
+    sock.snd_nxt = sock.snd_isn + 1;
+    try tcpSendSegment(sock, sock.snd_nxt, sock.rcv_nxt, tcp.flag_ack, "");
+    sock.tcp_state = .established;
+}
+
+pub fn send(handle: u32, data: []const u8) SocketError!usize {
+    if (handle >= max_sockets or !sockets[handle].in_use) return SocketError.NotFound;
+    const sock = &sockets[handle];
+    if (sock.kind != .tcp) return SocketError.Unsupported;
+    if (sock.tcp_state != .established) return SocketError.NotConnected;
+    if (!link.isReady()) return SocketError.NotReady;
+
+    const chunk = @min(data.len, max_tcp_segment);
+    try tcpSendSegment(sock, sock.snd_nxt, sock.rcv_nxt, tcp.flag_ack | tcp.flag_psh, data[0..chunk]);
+    const expect_ack = sock.snd_nxt + @as(u32, @intCast(chunk));
+    sock.snd_nxt = expect_ack;
+
+    var spins: usize = 0;
+    while (spins < send_spins) : (spins += 1) {
+        const seg = pollTcpSegment(sock, 1) catch return SocketError.IoError;
+        if (seg) |s| {
+            try ingestTcpSegment(sock, s);
+            if (s.flags & tcp.flag_ack != 0 and s.ack >= expect_ack) return chunk;
+        }
+    }
+    return SocketError.Timeout;
+}
+
+pub fn recv(handle: u32, buf: []u8, max_spins: usize) SocketError!usize {
+    if (handle >= max_sockets or !sockets[handle].in_use) return SocketError.NotFound;
+    const sock = &sockets[handle];
+    if (sock.kind != .tcp) return SocketError.Unsupported;
+    if (sock.tcp_state != .established and sock.tcp_state != .peer_closed) return SocketError.NotConnected;
+    if (!link.isReady()) return SocketError.NotReady;
+
+    var spins: usize = 0;
+    while (spins < max_spins) : (spins += 1) {
+        if (sock.rx_len > 0) return drainRx(sock, buf);
+        if (sock.tcp_state == .peer_closed) return 0;
+
+        const seg = pollTcpSegment(sock, 1) catch return SocketError.IoError;
+        if (seg) |s| {
+            try ingestTcpSegment(sock, s);
+            if (sock.rx_len > 0) return drainRx(sock, buf);
+            if (sock.tcp_state == .peer_closed) return 0;
+            continue;
+        }
+        asm volatile ("sti; pause; cli" ::: .{ .memory = true });
+    }
+    return SocketError.Timeout;
 }
 
 pub fn sendto(
@@ -104,6 +222,7 @@ pub fn sendto(
     return switch (sockets[handle].kind) {
         .udp => try sendUdp(handle, data, dest),
         .icmp => try sendIcmp(handle, dest),
+        .tcp => SocketError.Unsupported,
     };
 }
 
@@ -171,6 +290,7 @@ pub fn recvfrom(
     return switch (sockets[handle].kind) {
         .udp => try recvUdp(handle, buf, src_out, max_spins),
         .icmp => try recvIcmp(handle, buf, src_out, max_spins),
+        .tcp => SocketError.Unsupported,
     };
 }
 
@@ -249,6 +369,76 @@ fn recvIcmp(
         return copy_len;
     }
     return SocketError.Timeout;
+}
+
+fn tcpSendSegment(sock: *Socket, seq: u32, ack: u32, flags: u8, payload: []const u8) SocketError!void {
+    const mac = link.localMac();
+    const dst_mac = resolve.resolve(sock.remote_ip, mac) orelse return SocketError.IoError;
+    const frame_len = tcp.build(
+        &tcp_tx_frame,
+        dst_mac,
+        mac,
+        config.guest_ip,
+        sock.remote_ip,
+        sock.local_port,
+        sock.remote_port,
+        seq,
+        ack,
+        flags,
+        payload,
+    );
+    link.transmitOrFail(tcp_tx_frame[0..frame_len]) catch return SocketError.IoError;
+}
+
+fn pollTcpSegment(sock: *const Socket, max_spins: usize) SocketError!?tcp.Segment {
+    var spins: usize = 0;
+    while (spins < max_spins) : (spins += 1) {
+        const len = link.receive(&tcp_rx_scratch) catch |err| switch (err) {
+            error.NoPacket => {
+                asm volatile ("sti; pause; cli" ::: .{ .memory = true });
+                continue;
+            },
+            else => return SocketError.IoError,
+        };
+        if (tcp.matchEndpoint(tcp_rx_scratch[0..len], sock.local_port, sock.remote_ip, sock.remote_port)) |seg| {
+            return seg;
+        }
+    }
+    return null;
+}
+
+fn ingestTcpSegment(sock: *Socket, seg: tcp.Segment) SocketError!void {
+    if (seg.flags & tcp.flag_rst != 0) return SocketError.IoError;
+
+    if (seg.payload.len > 0 and seg.seq == sock.rcv_nxt) {
+        const space = rx_buf_size - sock.rx_len;
+        const copy = @min(seg.payload.len, space);
+        if (copy > 0) {
+            @memcpy(sock.rx_buf[sock.rx_len .. sock.rx_len + copy], seg.payload[0..copy]);
+            sock.rx_len += copy;
+        }
+        sock.rcv_nxt +%= @intCast(seg.payload.len);
+        try tcpSendSegment(sock, sock.snd_nxt, sock.rcv_nxt, tcp.flag_ack, "");
+    }
+
+    if (seg.flags & tcp.flag_fin != 0) {
+        sock.rcv_nxt += 1;
+        try tcpSendSegment(sock, sock.snd_nxt, sock.rcv_nxt, tcp.flag_ack, "");
+        sock.tcp_state = .peer_closed;
+    }
+}
+
+fn drainRx(sock: *Socket, buf: []u8) usize {
+    const copy = @min(sock.rx_len, buf.len);
+    @memcpy(buf[0..copy], sock.rx_buf[0..copy]);
+    if (copy < sock.rx_len) {
+        var i: usize = 0;
+        while (i < sock.rx_len - copy) : (i += 1) {
+            sock.rx_buf[i] = sock.rx_buf[copy + i];
+        }
+    }
+    sock.rx_len -= copy;
+    return copy;
 }
 
 pub fn putSockaddrIn(out: *SockaddrIn, ip: ipv4.Addr, port_host: u16) void {

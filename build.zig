@@ -98,10 +98,24 @@ pub fn build(b: *std.Build) void {
     ping.root_module.addImport("freestanding_std", freestanding_std);
     const install_ping = b.addInstallArtifact(ping, user_install);
 
+    const fetch = b.addExecutable(.{
+        .name = "fetch",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("userspace/fetch/main.zig"),
+            .target = user_target,
+            .optimize = user_optimize,
+        }),
+    });
+    fetch.setLinkerScript(b.path("userspace/linker.ld"));
+    fetch.root_module.addImport("libc", user_libc);
+    fetch.root_module.addImport("freestanding_std", freestanding_std);
+    const install_fetch = b.addInstallArtifact(fetch, user_install);
+
     b.getInstallStep().dependOn(&install_hello.step);
     b.getInstallStep().dependOn(&install_shell.step);
     b.getInstallStep().dependOn(&install_dig.step);
     b.getInstallStep().dependOn(&install_ping.step);
+    b.getInstallStep().dependOn(&install_fetch.step);
 
     const limine_kernel_mod = b.createModule(.{
         .root_source_file = b.path("kernel/boot/limine.zig"),
@@ -187,8 +201,19 @@ pub fn build(b: *std.Build) void {
     });
     const run_icmp_tests = b.addRunArtifact(icmp_tests);
 
+    const tcp_test_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/net/tcp_test.zig"),
+        .target = b.graph.host,
+    });
+
+    const tcp_tests = b.addTest(.{
+        .root_module = tcp_test_mod,
+    });
+    const run_tcp_tests = b.addRunArtifact(tcp_tests);
+
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_memory_map_tests.step);
     test_step.dependOn(&run_physical_tests.step);
     test_step.dependOn(&run_icmp_tests.step);
+    test_step.dependOn(&run_tcp_tests.step);
 }

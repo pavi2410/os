@@ -81,7 +81,9 @@ pub fn execve(path: [*:0]const u8, argv: [*:null]?[*:0]const u8, envp: [*:null]?
 
 pub const AF_INET: u16 = 2;
 pub const SOCK_DGRAM: u16 = 2;
+pub const SOCK_STREAM: u16 = 1;
 pub const IPPROTO_ICMP: u32 = 1;
+pub const IPPROTO_TCP: u32 = 6;
 pub const IPPROTO_UDP: u32 = 17;
 
 pub const SockaddrIn = extern struct {
@@ -97,6 +99,18 @@ pub fn socket(domain: u32, sock_type: u32, protocol: u32) isize {
 
 pub fn bind(fd: u32, addr: *const SockaddrIn, addrlen: u32) isize {
     return syscall6(49, fd, @intFromPtr(addr), addrlen, 0, 0, 0);
+}
+
+pub fn connect(fd: u32, addr: *const SockaddrIn, addrlen: u32) isize {
+    return syscall6(42, fd, @intFromPtr(addr), addrlen, 0, 0, 0);
+}
+
+pub fn send(fd: u32, buf: [*]const u8, len: usize, flags: u32) isize {
+    return syscall6(46, fd, @intFromPtr(buf), len, flags, 0, 0);
+}
+
+pub fn recv(fd: u32, buf: [*]u8, len: usize, flags: u32) isize {
+    return syscall6(47, fd, @intFromPtr(buf), len, flags, 0, 0);
 }
 
 pub fn sendto(

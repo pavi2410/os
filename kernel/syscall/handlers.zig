@@ -58,8 +58,11 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.getdents64 => sysGetdents64(frame.arg0, frame.arg1, frame.arg2),
         numbers.clock_gettime => sysClockGettime(frame.arg0, frame.arg1),
         numbers.socket => sysSocket(frame.arg0, frame.arg1, frame.arg2),
+        numbers.connect => sysConnect(frame.arg0, frame.arg1, frame.arg2),
         numbers.sendto => sysSendto(frame.arg0, frame.arg1, frame.arg2, frame.arg3, frame.arg4, frame.arg5),
         numbers.recvfrom => sysRecvfrom(frame.arg0, frame.arg1, frame.arg2, frame.arg3, frame.arg4, frame.arg5),
+        numbers.send => sysSend(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
+        numbers.recv => sysRecv(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
         numbers.bind => sysBind(frame.arg0, frame.arg1, frame.arg2),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
         else => ENOSYS,
@@ -319,6 +322,49 @@ fn sysBind(sockfd: u64, addr_ptr: u64, addrlen: u64) i64 {
     return 0;
 }
 
+fn sysConnect(sockfd: u64, addr_ptr: u64, addrlen: u64) i64 {
+    _ = addrlen;
+    const proc = process.currentProcess() orelse return EBADF;
+    if (sockfd >= process.max_fds) return EBADF;
+    const slot = &proc.fds.fds[@intCast(sockfd)];
+    if (slot.kind != .socket) return EBADF;
+    const addr = userSockaddrIn(addr_ptr) orelse return EFAULT;
+    socket.connect(slot.socket_handle, &addr) catch |err| return errnoFromSocket(err);
+    return 0;
+}
+
+fn sysSend(sockfd: u64, buf_ptr: u64, len: u64, flags: u64) i64 {
+    _ = flags;
+    if (len == 0) return 0;
+    const proc = process.currentProcess() orelse return EBADF;
+    if (sockfd >= process.max_fds) return EBADF;
+    const slot = &proc.fds.fds[@intCast(sockfd)];
+    if (slot.kind != .socket) return EBADF;
+    const max_len: usize = 4096;
+    const copy_len: usize = @intCast(@min(len, max_len));
+    const buf: [*]const u8 = @ptrFromInt(buf_ptr);
+    const sent = socket.send(slot.socket_handle, buf[0..copy_len]) catch |err| {
+        return errnoFromSocket(err);
+    };
+    return @intCast(sent);
+}
+
+fn sysRecv(sockfd: u64, buf_ptr: u64, len: u64, flags: u64) i64 {
+    _ = flags;
+    if (len == 0) return 0;
+    const proc = process.currentProcess() orelse return EBADF;
+    if (sockfd >= process.max_fds) return EBADF;
+    const slot = &proc.fds.fds[@intCast(sockfd)];
+    if (slot.kind != .socket) return EBADF;
+    const max_len: usize = 4096;
+    const copy_len: usize = @intCast(@min(len, max_len));
+    const buf: [*]u8 = @ptrFromInt(buf_ptr);
+    const received = socket.recv(slot.socket_handle, buf[0..copy_len], 2_000_000) catch |err| {
+        return errnoFromSocket(err);
+    };
+    return @intCast(received);
+}
+
 fn sysSendto(sockfd: u64, buf_ptr: u64, len: u64, flags: u64, dest_ptr: u64, addrlen: u64) i64 {
     _ = flags;
     _ = addrlen;
@@ -366,6 +412,7 @@ fn errnoFromSocket(err: socket.SocketError) i64 {
     return switch (err) {
         socket.SocketError.Unsupported => EINVAL,
         socket.SocketError.NotFound, socket.SocketError.NotBound => EBADF,
+        socket.SocketError.NotConnected => -107, // ENOTCONN
         socket.SocketError.NotReady, socket.SocketError.IoError => -5,
         socket.SocketError.Timeout => -110, // ETIMEDOUT
         socket.SocketError.TooManySockets => EMFILE,
