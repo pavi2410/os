@@ -71,8 +71,23 @@ pub fn build(b: *std.Build) void {
 
     const install_hello = b.addInstallArtifact(hello, user_install);
     const install_shell = b.addInstallArtifact(shell, user_install);
+
+    const dig = b.addExecutable(.{
+        .name = "dig",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("userspace/dig/main.zig"),
+            .target = user_target,
+            .optimize = user_optimize,
+        }),
+    });
+    dig.setLinkerScript(b.path("userspace/linker.ld"));
+    dig.root_module.addImport("libc", user_libc);
+    dig.root_module.addImport("freestanding_std", freestanding_std);
+    const install_dig = b.addInstallArtifact(dig, user_install);
+
     b.getInstallStep().dependOn(&install_hello.step);
     b.getInstallStep().dependOn(&install_shell.step);
+    b.getInstallStep().dependOn(&install_dig.step);
 
     const limine_kernel_mod = b.createModule(.{
         .root_source_file = b.path("kernel/boot/limine.zig"),

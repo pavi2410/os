@@ -79,6 +79,48 @@ pub fn execve(path: [*:0]const u8, argv: [*:null]?[*:0]const u8, envp: [*:null]?
     return syscall6(59, @intFromPtr(path), @intFromPtr(argv), @intFromPtr(envp), 0, 0, 0);
 }
 
+pub const AF_INET: u16 = 2;
+pub const SOCK_DGRAM: u16 = 2;
+
+pub const SockaddrIn = extern struct {
+    family: u16,
+    port_be: u16,
+    addr: [4]u8,
+    zero: [8]u8 = .{0} ** 8,
+};
+
+pub fn socket(domain: u32, sock_type: u32, protocol: u32) isize {
+    return syscall6(41, domain, sock_type, protocol, 0, 0, 0);
+}
+
+pub fn bind(fd: u32, addr: *const SockaddrIn, addrlen: u32) isize {
+    return syscall6(49, fd, @intFromPtr(addr), addrlen, 0, 0, 0);
+}
+
+pub fn sendto(
+    fd: u32,
+    buf: [*]const u8,
+    len: usize,
+    flags: u32,
+    dest: *const SockaddrIn,
+    addrlen: u32,
+) isize {
+    return syscall6(44, fd, @intFromPtr(buf), len, flags, @intFromPtr(dest), addrlen);
+}
+
+pub fn recvfrom(
+    fd: u32,
+    buf: [*]u8,
+    len: usize,
+    flags: u32,
+    src: ?*SockaddrIn,
+    addrlen: ?*u32,
+) isize {
+    const src_ptr: u64 = if (src) |s| @intFromPtr(s) else 0;
+    const alen_ptr: u64 = if (addrlen) |a| @intFromPtr(a) else 0;
+    return syscall6(45, fd, @intFromPtr(buf), len, flags, src_ptr, alen_ptr);
+}
+
 pub fn waitpid(pid: isize, status: ?*u32, options: u32) isize {
     const status_ptr: u64 = if (status) |s| @intFromPtr(s) else 0;
     return syscall6(61, @bitCast(@as(u64, @intCast(pid))), status_ptr, options, 0, 0, 0);

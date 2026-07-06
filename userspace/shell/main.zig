@@ -1,5 +1,5 @@
 const freestanding_std = @import("freestanding_std");
-const argv = @import("argv.zig");
+const arg = @import("argv.zig");
 
 pub const std_options_debug_io = freestanding_std.std_options_debug_io;
 pub const std_options = freestanding_std.std_options;
@@ -28,7 +28,9 @@ fn writePrompt() void {
     io.writeStr("> ");
 }
 
-export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
+export fn main(argc: usize, raw_argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
+    _ = argc;
+    _ = raw_argv;
     io.writeStr("Simple shell ready. Type 'help'.\n");
 
     var line: [256]u8 = undefined;
@@ -38,7 +40,7 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
         const n = libc.syscall.read(0, &line, line.len);
         if (n <= 0) continue;
 
-        const parsed = argv.parse(&line, @intCast(n)) catch {
+        const parsed = arg.parse(&line, @intCast(n)) catch {
             io.writeStr("too many arguments\n");
             continue;
         };
@@ -75,7 +77,7 @@ export fn main() callconv(.{ .x86_64_sysv = .{} }) void {
         } else if (cmd.len > 0 and cmd[0] == '/') {
             io.writeStr("unknown command\n");
         } else {
-            cmd_run.run(cmd);
+            cmd_run.run(&parsed);
         }
     }
 }

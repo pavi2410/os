@@ -22,7 +22,7 @@ pub fn launch() void {
         serial.writeString("init process create failed\r\n");
         return;
     };
-    init_image = process.loadElf(init_proc.?, image_buf) catch {
+    init_image = process.loadElf(init_proc.?, image_buf, &.{programs.initShellPath()}) catch {
         serial.writeString("shell load failed\r\n");
         return;
     };

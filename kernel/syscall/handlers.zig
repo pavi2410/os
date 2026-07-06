@@ -192,11 +192,27 @@ fn sysFork(frame: *Frame) i64 {
 }
 
 fn sysExecve(path_ptr: u64, argv_ptr: u64, envp_ptr: u64) i64 {
-    _ = argv_ptr;
     _ = envp_ptr;
     const path = userCString(path_ptr) orelse return EFAULT;
-    user_exec.execve(path) catch |err| return errnoFromExecErr(err);
+    var argv_buf: [16][]const u8 = undefined;
+    const argv_count = readUserArgv(argv_ptr, &argv_buf) catch return EFAULT;
+    user_exec.execve(path, argv_buf[0..argv_count]) catch |err| return errnoFromExecErr(err);
     unreachable;
+}
+
+fn readUserArgv(argv_ptr: u64, out: [][]const u8) error{Fault}!usize {
+    if (argv_ptr == 0) return 0;
+    var count: usize = 0;
+    var idx: usize = 0;
+    while (idx < out.len) : (idx += 1) {
+        const slot_ptr: *const u64 = @ptrFromInt(argv_ptr + idx * 8);
+        const arg_ptr = slot_ptr.*;
+        if (arg_ptr == 0) break;
+        const arg = userCString(arg_ptr) orelse return error.Fault;
+        out[count] = arg;
+        count += 1;
+    }
+    return count;
 }
 
 fn errnoFromExecErr(err: user_exec.ExecError) i64 {

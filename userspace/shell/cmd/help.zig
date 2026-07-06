@@ -11,6 +11,7 @@ pub fn run() void {
     io.writeStr("  cd [path]  change working directory (default /)\n");
     io.writeStr("  pwd  print working directory\n");
     io.writeStr("  date  print RTC date and time (UTC)\n");
-    io.writeStr("Programs in /BIN: hello, ...\n");
+    io.writeStr("Programs in /BIN: hello, dig, ...\n");
+    io.writeStr("  dig [@server] name  DNS A lookup (default server 10.0.2.3)\n");
     io.writeStr("Paths may be absolute (/foo) or relative to the current directory.\n");
 }

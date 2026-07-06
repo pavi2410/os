@@ -286,8 +286,8 @@ pub fn destroy(proc: *Process) void {
     proc.destroy();
 }
 
-pub fn loadElf(proc: *Process, image: []const u8) user_loader.LoadError!user_loader.LoadedImage {
-    return user_loader.load(proc.address_space.cr3, image);
+pub fn loadElf(proc: *Process, image: []const u8, argv: []const []const u8) user_loader.LoadError!user_loader.LoadedImage {
+    return user_loader.load(proc.address_space.cr3, image, argv);
 }
 
 /// Drop all user mappings and allocate a fresh address space (for `execve`).

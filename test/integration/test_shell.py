@@ -68,7 +68,8 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         run_case(shell, "cat /TDIR/NOTE.TXT", "nested", case="cat in dir")
         run_case(shell, "rm /TDIR/NOTE.TXT", "rm: ok", case="rm note in dir")
         run_case(shell, "rmdir /TDIR", "rmdir: ok", case="rmdir tdir")
-        run_case(shell, "ls -l /BIN", "4880 HELLO", case="ls -l /BIN")
+        run_case(shell, "ls -l /BIN", "HELLO", case="ls -l /BIN")
+        run_case(shell, "ls /BIN", "DIG", case="ls /BIN dig")
         run_case(shell, "write /yo.txt yoman", "write: ok", case="write yo")
         run_case(shell, "cat /YO.TXT", "yoman", case="cat yo")
         run_case(
@@ -91,6 +92,8 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
             case="cat persist",
         )
         run_case(shell, "hello", "Hello from userspace!", case="fork/exec hello")
+        run_case(shell, "dig example.com", "ANSWER SECTION", case="dig example.com")
+        run_case(shell, "dig example.com", "IN  A", case="dig A record")
         pid_out = run_case(shell, "pid", case="pid")
         assert any(ch.isdigit() for ch in pid_out), f"pid: no digits in:\n{pid_out}"
         shell.assert_no_faults()

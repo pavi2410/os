@@ -1,3 +1,4 @@
+const argv_mod = @import("../argv.zig");
 const io = @import("../io.zig");
 const libc = @import("libc");
 
@@ -5,11 +6,13 @@ const bin_dir = "/BIN/";
 
 /// Path/argv in .bss so fork+exec does not rely on a parent stack frame.
 var exec_path: [128]u8 = undefined;
-var exec_argv: [2]?[*:0]const u8 = .{ null, null };
+var exec_arg_bufs: [argv_mod.max_args][128]u8 = undefined;
+var exec_argv: [argv_mod.max_args + 1]?[*:0]const u8 = .{null} ** (argv_mod.max_args + 1);
 var exec_envp: [1]?[*:0]const u8 = .{null};
 
-pub fn run(name: []const u8) void {
-    if (!formatBinPath(name, &exec_path)) {
+pub fn run(parsed: *const argv_mod.Parsed) void {
+    const cmd = parsed.cmd() orelse return;
+    if (!formatBinPath(cmd, &exec_path)) {
         io.writeStr("run failed\n");
         return;
     }
@@ -21,11 +24,11 @@ pub fn run(name: []const u8) void {
         return;
     }
 
-    // After fork the child resumes with a copied stack; compare getpid() to the
-    // pid we had before fork instead of relying on the fork return value alone.
     if (libc.syscall.getpid() != my_pid) {
-        exec_argv[0] = @ptrCast(&exec_path);
-        exec_argv[1] = null;
+        const argc = buildArgv(parsed) orelse {
+            libc.syscall.exit(1);
+        };
+        exec_argv[argc] = null;
         _ = libc.syscall.execve(@ptrCast(&exec_path), @ptrCast(&exec_argv), @ptrCast(&exec_envp));
         libc.syscall.exit(1);
     }
@@ -36,13 +39,29 @@ pub fn run(name: []const u8) void {
     }
 }
 
+fn buildArgv(parsed: *const argv_mod.Parsed) ?usize {
+    exec_argv[0] = @ptrCast(&exec_path);
+    var argc: usize = 1;
+
+    var i: usize = 1;
+    while (i < parsed.argc) : (i += 1) {
+        if (argc >= exec_argv.len - 1) return null;
+        const arg = parsed.args[i];
+        if (arg.len >= exec_arg_bufs[0].len) return null;
+        @memcpy(exec_arg_bufs[argc - 1][0..arg.len], arg);
+        exec_arg_bufs[argc - 1][arg.len] = 0;
+        exec_argv[argc] = @ptrCast(&exec_arg_bufs[argc - 1]);
+        argc += 1;
+    }
+    return argc;
+}
+
 fn toUpper(ch: u8) u8 {
     if (ch >= 'a' and ch <= 'z') return ch - 32;
     return ch;
 }
 
 /// Map a shell command name to `/BIN/NAME` (FAT 8.3 names are uppercase).
-/// There is no PATH yet — programs must live under /BIN on the disk.
 fn formatBinPath(name: []const u8, out: []u8) bool {
     var i: usize = 0;
     for (bin_dir) |ch| {
