@@ -1,7 +1,7 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
+const hal = @import("../hal.zig");
 const heap = @import("../mm/heap.zig");
 const init_shell = @import("init_shell.zig");
-const serial = @import("../arch/x86_64/serial.zig");
 const syscall_test = @import("../syscall/test.zig");
 const thread = @import("thread.zig");
 const std = @import("std");
@@ -69,7 +69,7 @@ pub fn init() void {
     thread.setCurrent(&bootstrap);
 
     idle_thread = thread.create(idleEntry, "idle", thread.default_stack_size) catch {
-        serial.writeString("idle thread create failed\r\n");
+        hal.console.writeString("idle thread create failed\r\n");
         cpu.haltForever();
     };
 
@@ -108,7 +108,7 @@ pub fn yield() void {
     const self = thread.currentThread() orelse return;
     if (self.state != .dead and self != idle_thread) {
         ready_queue.push(self) catch {
-            serial.writeString("ready queue push failed\r\n");
+            hal.console.writeString("ready queue push failed\r\n");
             cpu.haltForever();
         };
     }
@@ -116,11 +116,11 @@ pub fn yield() void {
 }
 
 pub fn start() noreturn {
-    serial.writeString("\r\n--- Scheduler ---\r\n");
+    hal.console.writeString("\r\n--- Scheduler ---\r\n");
 
     init_shell.launch();
 
-    serial.writeString("Enabling interrupts\r\n");
+    hal.console.writeString("Enabling interrupts\r\n");
     cpu.sti();
     schedule();
     cpu.haltForever();
@@ -147,14 +147,14 @@ fn idleEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
 
 fn demoThreadA() callconv(.{ .x86_64_sysv = .{} }) noreturn {
     while (true) {
-        serial.writeString("A");
+        hal.console.writeString("A");
         yieldIfRequested();
     }
 }
 
 fn demoThreadB() callconv(.{ .x86_64_sysv = .{} }) noreturn {
     while (true) {
-        serial.writeString("B");
+        hal.console.writeString("B");
         yieldIfRequested();
     }
 }

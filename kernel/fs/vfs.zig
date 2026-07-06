@@ -1,6 +1,6 @@
 const fat32 = @import("fat32.zig");
 const filesystem = @import("filesystem.zig");
-const serial = @import("../arch/x86_64/serial.zig");
+const hal = @import("../hal.zig");
 
 pub const VfsError = filesystem.Error || error{
     TooManyOpenFiles,
@@ -139,12 +139,12 @@ fn invalidateHandlesAt(id: filesystem.FileId) void {
 }
 
 pub fn logStatus() void {
-    serial.writeString("\r\n--- VFS ---\r\n");
+    hal.console.writeString("\r\n--- VFS ---\r\n");
     if (!isReady()) {
-        serial.writeString("FAT32 not mounted\r\n");
+        hal.console.writeString("FAT32 not mounted\r\n");
         return;
     }
-    serial.writeString("FAT32 mounted (read/write)\r\n");
+    hal.console.writeString("FAT32 mounted (read/write)\r\n");
 }
 
 pub fn selfTest() void {
@@ -152,16 +152,16 @@ pub fn selfTest() void {
 
     var buf: [64]u8 = undefined;
     const handle = open("/README.TXT", .{}) catch {
-        serial.writeString("vfs: /README.TXT not found\r\n");
+        hal.console.writeString("vfs: /README.TXT not found\r\n");
         return;
     };
     defer close(handle);
 
     const n = read(handle, &buf) catch {
-        serial.writeString("vfs read test failed\r\n");
+        hal.console.writeString("vfs read test failed\r\n");
         return;
     };
-    serial.printf("vfs: readme {d} bytes\r\n", .{n});
+    hal.console.printf("vfs: readme {d} bytes\r\n", .{n});
 }
 
 fn getHandle(handle: u32) VfsError!*Handle {

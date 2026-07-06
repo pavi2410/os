@@ -1,7 +1,7 @@
 const process = @import("process.zig");
 const programs = @import("programs.zig");
 const scheduler = @import("scheduler.zig");
-const serial = @import("../arch/x86_64/serial.zig");
+const hal = @import("../hal.zig");
 const thread = @import("thread.zig");
 const user_loader = @import("../mm/user_loader.zig");
 
@@ -10,7 +10,7 @@ var init_image: ?user_loader.LoadedImage = null;
 
 pub fn launch() void {
     const image_buf = programs.load(programs.initShellPath()) catch |err| {
-        serial.printf("shell not found on disk ({s}): {s} (run: mise run disk)\r\n", .{
+        hal.console.printf("shell not found on disk ({s}): {s} (run: mise run disk)\r\n", .{
             programs.initShellPath(),
             @errorName(err),
         });
@@ -19,20 +19,20 @@ pub fn launch() void {
     defer programs.free(image_buf);
 
     init_proc = process.create() catch {
-        serial.writeString("init process create failed\r\n");
+        hal.console.writeString("init process create failed\r\n");
         return;
     };
     init_image = process.loadElf(init_proc.?, image_buf, &.{programs.initShellPath()}) catch {
-        serial.writeString("shell load failed\r\n");
+        hal.console.writeString("shell load failed\r\n");
         return;
     };
 
     scheduler.spawn(initShellEntry, "init-shell") catch {
-        serial.writeString("init-shell spawn failed\r\n");
+        hal.console.writeString("init-shell spawn failed\r\n");
         return;
     };
 
-    serial.writeString("Starting shell\r\n");
+    hal.console.writeString("Starting shell\r\n");
 }
 
 fn initShellEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {

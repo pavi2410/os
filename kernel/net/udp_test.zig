@@ -1,5 +1,5 @@
-const serial = @import("../arch/x86_64/serial.zig");
 const config = @import("config.zig");
+const hal = @import("../hal.zig");
 const ipv4 = @import("ipv4.zig");
 const link = @import("link.zig");
 const resolve = @import("resolve.zig");
@@ -14,7 +14,7 @@ pub fn runSelfTest() void {
 
     const mac = link.localMac();
     const dns_mac = resolve.resolve(config.dns_ip, mac) orelse {
-        serial.writeString("udp: ARP failed\r\n");
+        hal.console.writeString("udp: ARP failed\r\n");
         return;
     };
 
@@ -33,7 +33,7 @@ pub fn runSelfTest() void {
         query[0..query_len],
     );
     link.transmitOrFail(frame[0..frame_len]) catch {
-        serial.writeString("udp: TX failed\r\n");
+        hal.console.writeString("udp: TX failed\r\n");
         return;
     };
 
@@ -45,13 +45,13 @@ pub fn runSelfTest() void {
             var src_port: u16 = 0;
             if (udp.match(recv_buf[0..len], test_src_port, &src_ip, &src_port)) |payload| {
                 if (ipv4.equal(src_ip, config.dns_ip) and src_port == dns_port and payload.len >= 12) {
-                    serial.printf("udp: DNS reply ({d} bytes)\r\n", .{payload.len});
+                    hal.console.printf("udp: DNS reply ({d} bytes)\r\n", .{payload.len});
                     return;
                 }
             }
         }
     }
-    serial.writeString("udp: timeout\r\n");
+    hal.console.writeString("udp: timeout\r\n");
 }
 
 fn buildExampleQuery(out: []u8) usize {

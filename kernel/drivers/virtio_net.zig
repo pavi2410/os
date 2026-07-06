@@ -1,4 +1,3 @@
-const serial = @import("../arch/x86_64/serial.zig");
 const hal = @import("../hal.zig");
 const virtual = @import("../mm/virtual.zig");
 const ethernet = @import("../net/ethernet.zig");
@@ -211,16 +210,16 @@ fn netError(err: NetError) net_device.Error {
 }
 
 pub fn logStatus() void {
-    serial.writeString("\r\n--- VirtIO Net ---\r\n");
+    hal.console.writeString("\r\n--- VirtIO Net ---\r\n");
     if (!ready) {
-        serial.writeString("Not available\r\n");
+        hal.console.writeString("Not available\r\n");
         return;
     }
     var mac_buf: [ethernet.format_len]u8 = undefined;
     if (ethernet.format(mac, &mac_buf)) |s| {
-        serial.printf("MAC: {s}\r\n", .{s});
+        hal.console.printf("MAC: {s}\r\n", .{s});
     }
-    serial.printf("RX slots: {d}, TX queue: {d}\r\n", .{ rx_slots, tx_queue.size });
+    hal.console.printf("RX slots: {d}, TX queue: {d}\r\n", .{ rx_slots, tx_queue.size });
 }
 
 fn setupRxSlots() NetError!void {

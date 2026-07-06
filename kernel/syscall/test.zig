@@ -1,11 +1,11 @@
 const numbers = @import("numbers.zig");
-const serial = @import("../arch/x86_64/serial.zig");
+const hal = @import("../hal.zig");
 const thread = @import("../proc/thread.zig");
 
 const msg = "syscall test ok\r\n";
 
 pub fn runInThread() void {
-    serial.writeString("\r\n--- Syscall test ---\r\n");
+    hal.console.writeString("\r\n--- Syscall test ---\r\n");
 
     const written = invokeSyscall(.{
         .nr = numbers.write,
@@ -15,11 +15,11 @@ pub fn runInThread() void {
     });
 
     if (written != @as(i64, @intCast(msg.len))) {
-        serial.printf("syscall write failed: {d}\r\n", .{written});
+        hal.console.printf("syscall write failed: {d}\r\n", .{written});
         return;
     }
 
-    serial.writeString("syscall write ok\r\n");
+    hal.console.writeString("syscall write ok\r\n");
 }
 
 /// Issue a syscall from ring 0; the entry stub returns via `jmp` for kernel callers.
@@ -49,6 +49,6 @@ fn invokeSyscall(args: struct {
 pub fn threadEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
     runInThread();
     _ = invokeSyscall(.{ .nr = numbers.exit });
-    serial.writeString("syscall exit returned unexpectedly\r\n");
+    hal.console.writeString("syscall exit returned unexpectedly\r\n");
     thread.exit();
 }

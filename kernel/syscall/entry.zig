@@ -1,7 +1,7 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
 const gdt = @import("../arch/x86_64/gdt.zig");
 const handlers = @import("handlers.zig");
-const serial = @import("../arch/x86_64/serial.zig");
+const hal = @import("../hal.zig");
 
 const EFER_MSR: u32 = 0xC0000080;
 const STAR_MSR: u32 = 0xC0000081;
@@ -101,5 +101,5 @@ pub fn init() void {
     cpu.wrmsr(LSTAR_MSR, @intFromPtr(&syscall_entry));
     cpu.wrmsr(SFMASK_MSR, SFMASK_IF);
 
-    serial.writeString("syscall/sysret entry configured (Linux x86_64 ABI)\r\n");
+    hal.console.writeString("syscall/sysret entry configured (Linux x86_64 ABI)\r\n");
 }

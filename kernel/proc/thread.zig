@@ -1,7 +1,7 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
 const gdt = @import("../arch/x86_64/gdt.zig");
 const heap = @import("../mm/heap.zig");
-const serial = @import("../arch/x86_64/serial.zig");
+const hal = @import("../hal.zig");
 
 const ActivateCr3Fn = *const fn (?*anyopaque) void;
 
@@ -172,7 +172,7 @@ pub fn exit() noreturn {
     if (on_exit) |handler| {
         handler();
     }
-    serial.writeString("\r\nthread exited without a scheduler\r\n");
+    hal.console.writeString("\r\nthread exited without a scheduler\r\n");
     cpu.haltForever();
 }
 
@@ -194,7 +194,7 @@ fn initContext(stack: [*]u8, stack_size: usize, entry: EntryFn) SavedContext {
 
 /// Cooperative ping-pong between bootstrap and a worker thread.
 pub fn runSwitchTest(switch_target: usize) void {
-    serial.writeString("\r\n--- Thread context switch test ---\r\n");
+    hal.console.writeString("\r\n--- Thread context switch test ---\r\n");
 
     var bootstrap = Thread{
         .id = 0,
@@ -210,7 +210,7 @@ pub fn runSwitchTest(switch_target: usize) void {
     switch_test_counter = 0;
 
     const worker = create(switchTestWorker, "switch-worker", default_stack_size) catch {
-        serial.writeString("thread create failed\r\n");
+        hal.console.writeString("thread create failed\r\n");
         cpu.haltForever();
     };
 
@@ -220,7 +220,7 @@ pub fn runSwitchTest(switch_target: usize) void {
         bootstrap.switchTo(worker);
     }
 
-    serial.printf("context switches: worker={d} bootstrap={d}\r\n", .{
+    hal.console.printf("context switches: worker={d} bootstrap={d}\r\n", .{
         switch_test_counter,
         bootstrap_switches,
     });

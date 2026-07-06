@@ -1,4 +1,4 @@
-const serial = @import("../arch/x86_64/serial.zig");
+const hal = @import("../hal.zig");
 const virtual = @import("../mm/virtual.zig");
 const block = @import("block.zig");
 const virtio_pci = @import("virtio_pci.zig");
@@ -112,13 +112,13 @@ fn blockError(err: BlkError) block.Error {
 }
 
 pub fn logStatus() void {
-    serial.writeString("\r\n--- VirtIO Block ---\r\n");
+    hal.console.writeString("\r\n--- VirtIO Block ---\r\n");
     if (!ready) {
-        serial.writeString("Not available\r\n");
+        hal.console.writeString("Not available\r\n");
         return;
     }
-    serial.printf("Queue size: {d}\r\n", .{queue.size});
-    serial.printf("Capacity: {d} sectors ({d} MiB)\r\n", .{
+    hal.console.printf("Queue size: {d}\r\n", .{queue.size});
+    hal.console.printf("Capacity: {d} sectors ({d} MiB)\r\n", .{
         capacity_sectors,
         (capacity_sectors * sector_size) / (1024 * 1024),
     });
@@ -132,14 +132,14 @@ pub fn selfTest() void {
 
     const sector = @as([*]u8, @ptrFromInt(test_sector_page))[0..sector_size];
     readSectors(0, sector) catch {
-        serial.writeString("virtio-blk read test failed\r\n");
+        hal.console.writeString("virtio-blk read test failed\r\n");
         return;
     };
 
     if (sector[510] == 0x55 and sector[511] == 0xAA) {
-        serial.writeString("virtio-blk sector 0 boot signature ok\r\n");
+        hal.console.writeString("virtio-blk sector 0 boot signature ok\r\n");
     } else {
-        serial.writeString("virtio-blk sector 0 read ok (no MBR signature)\r\n");
+        hal.console.writeString("virtio-blk sector 0 read ok (no MBR signature)\r\n");
     }
 }
 

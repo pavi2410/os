@@ -1,6 +1,6 @@
 const acpi_access = @import("../acpi/access.zig");
 const address = @import("../mm/address.zig");
-const serial = @import("../arch/x86_64/serial.zig");
+const hal = @import("../hal.zig");
 
 pub const DeviceId = struct {
     pub const blk_modern: u16 = 0x1042;
@@ -199,16 +199,16 @@ pub fn writeConfig32(addr: Addr, offset: u8, value: u32) void {
 }
 
 pub fn logDevices() void {
-    serial.writeString("\r\n--- PCI ---\r\n");
+    hal.console.writeString("\r\n--- PCI ---\r\n");
     if (use_mcfg) {
-        serial.printf("Config access: MCFG ({d} allocation(s))\r\n", .{mcfg_allocs.len});
+        hal.console.printf("Config access: MCFG ({d} allocation(s))\r\n", .{mcfg_allocs.len});
     } else {
-        serial.writeString("Config access: legacy I/O ports\r\n");
+        hal.console.writeString("Config access: legacy I/O ports\r\n");
     }
-    serial.printf("Devices found: {d}\r\n", .{device_count});
+    hal.console.printf("Devices found: {d}\r\n", .{device_count});
 
     for (devices()) |dev| {
-        serial.printf(
+        hal.console.printf(
             "  {x:0>2}:{x:0>2}.{d} {x:0>4}:{x:0>4} class {x:0>2}.{x:0>2}\r\n",
             .{
                 dev.bus,
