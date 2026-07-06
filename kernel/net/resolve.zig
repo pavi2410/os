@@ -15,7 +15,13 @@ const CacheEntry = struct {
 var cache: [cache_size]CacheEntry = [_]CacheEntry{.{}} ** cache_size;
 var next_slot: usize = 0;
 
+/// L2 next-hop MAC for reaching @p ip (ARP the host on-link, else the gateway).
 pub fn resolve(ip: ipv4.Addr, src_mac: ethernet.Mac) ?ethernet.Mac {
+    const next_hop = if (config.onGuestLan(ip)) ip else config.gateway_ip;
+    return resolveMac(next_hop, src_mac);
+}
+
+fn resolveMac(ip: ipv4.Addr, src_mac: ethernet.Mac) ?ethernet.Mac {
     for (&cache) |entry| {
         if (entry.valid and ipv4.equal(entry.ip, ip)) return entry.mac;
     }

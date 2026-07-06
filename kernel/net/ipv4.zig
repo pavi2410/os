@@ -26,6 +26,11 @@ pub fn equal(a: Addr, b: Addr) bool {
     return @as(u32, @bitCast(a)) == @as(u32, @bitCast(b));
 }
 
+pub fn sameSubnet(ip: Addr, network: Addr, mask: Addr) bool {
+    return (@as(u32, @bitCast(ip)) & @as(u32, @bitCast(mask))) ==
+        (@as(u32, @bitCast(network)) & @as(u32, @bitCast(mask)));
+}
+
 /// Writes dotted decimal into `buf`. Returns slice or null.
 pub fn format(addr: Addr, buf: []u8) ?[]const u8 {
     if (buf.len < format_len) return null;
