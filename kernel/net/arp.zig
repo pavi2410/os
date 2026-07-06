@@ -14,9 +14,9 @@ pub const Header = extern struct {
     hw_len: u8,
     proto_len: u8,
     opcode_be: u16,
-    sender_mac: [ethernet.mac_len]u8,
+    sender_mac: ethernet.Mac,
     sender_ip: [ipv4_len]u8,
-    target_mac: [ethernet.mac_len]u8,
+    target_mac: ethernet.Mac,
     target_ip: [ipv4_len]u8,
 };
 
@@ -26,14 +26,14 @@ pub fn opcodeHost(hdr: *const Header) u16 {
 
 pub fn buildRequest(
     out: []u8,
-    src_mac: [ethernet.mac_len]u8,
+    src_mac: ethernet.Mac,
     sender_ip: [ipv4_len]u8,
     target_ip: [ipv4_len]u8,
 ) usize {
     const frame_len = ethernet.min_frame_len;
     @memset(out[0..frame_len], 0);
 
-    ethernet.putHeader(out, ethernet.broadcast_mac, src_mac, ethernet.ethertype_arp);
+    ethernet.putHeader(out, ethernet.broadcast, src_mac, ethernet.ethertype_arp);
 
     const arp: *Header = @ptrCast(@alignCast(out[ethernet.header_len..].ptr));
     arp.hw_type_be = @byteSwap(hardware_ethernet);
@@ -57,7 +57,7 @@ pub fn isReply(frame: []const u8) bool {
 }
 
 /// ARP reply for @p ip: returns the sender hardware address (resolved MAC).
-pub fn senderMacFor(frame: []const u8, ip: [ipv4_len]u8) ?[ethernet.mac_len]u8 {
+pub fn senderMacFor(frame: []const u8, ip: [ipv4_len]u8) ?ethernet.Mac {
     if (!isReply(frame)) return null;
     const arp_hdr: *const Header = @ptrCast(@alignCast(frame[ethernet.header_len..].ptr));
     if (!ipEqual(arp_hdr.sender_ip, ip)) return null;

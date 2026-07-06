@@ -25,8 +25,8 @@ pub fn sequenceHost(hdr: *const Header) u16 {
 
 pub fn buildEchoRequest(
     out: []u8,
-    dst_mac: [ethernet.mac_len]u8,
-    src_mac: [ethernet.mac_len]u8,
+    dst_mac: ethernet.Mac,
+    src_mac: ethernet.Mac,
     src_ip: ipv4.Addr,
     dst_ip: ipv4.Addr,
     id: u16,

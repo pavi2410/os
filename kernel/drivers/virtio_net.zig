@@ -1,5 +1,6 @@
 const serial = @import("../arch/x86_64/serial.zig");
 const virtual = @import("../mm/virtual.zig");
+const ethernet = @import("../net/ethernet.zig");
 const virtio_pci = @import("virtio_pci.zig");
 
 pub const NetError = virtio_pci.VirtioError || error{
@@ -10,8 +11,7 @@ pub const NetError = virtio_pci.VirtioError || error{
     NoPacket,
 };
 
-pub const mac_len = 6;
-pub const max_frame_size = 1518;
+pub const max_frame_size = ethernet.max_frame_len;
 
 const VIRTIO_F_VERSION_1: u64 = 1 << 32;
 
@@ -77,7 +77,7 @@ const RxSlot = struct {
 
 var device: virtio_pci.Device = undefined;
 var ready = false;
-var mac: [mac_len]u8 = undefined;
+var mac: ethernet.Mac = undefined;
 
 var rx_queue: Queue = undefined;
 var tx_queue: Queue = undefined;
@@ -121,7 +121,7 @@ pub fn isReady() bool {
     return ready;
 }
 
-pub fn macAddress() [mac_len]u8 {
+pub fn macAddress() ethernet.Mac {
     return mac;
 }
 
@@ -224,10 +224,10 @@ pub fn logStatus() void {
         serial.writeString("Not available\r\n");
         return;
     }
-    serial.printf(
-        "MAC: {x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}\r\n",
-        .{ mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] },
-    );
+    var mac_buf: [ethernet.format_len]u8 = undefined;
+    if (ethernet.format(mac, &mac_buf)) |s| {
+        serial.printf("MAC: {s}\r\n", .{s});
+    }
     serial.printf("RX slots: {d}, TX queue: {d}\r\n", .{ rx_slots, tx_queue.size });
 }
 

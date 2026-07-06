@@ -1,13 +1,14 @@
 const arp = @import("arp.zig");
+const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 const virtio_net = @import("../drivers/virtio_net.zig");
 
 pub const guest_ip = ipv4.Addr{ 10, 0, 2, 15 };
 
-var cached_mac: ?[virtio_net.mac_len]u8 = null;
+var cached_mac: ?ethernet.Mac = null;
 var cached_ip: ipv4.Addr = .{ 0, 0, 0, 0 };
 
-pub fn resolve(ip: ipv4.Addr, src_mac: [virtio_net.mac_len]u8) ?[virtio_net.mac_len]u8 {
+pub fn resolve(ip: ipv4.Addr, src_mac: ethernet.Mac) ?ethernet.Mac {
     if (cached_mac) |mac| {
         if (ipv4.equal(cached_ip, ip)) return mac;
     }
