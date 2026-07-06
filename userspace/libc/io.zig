@@ -1,5 +1,6 @@
 const syscall = @import("syscall.zig");
 const format = @import("format.zig");
+const string = @import("string.zig");
 
 pub fn cstr(ptr: [*]u8) []const u8 {
     var len: usize = 0;
@@ -9,13 +10,7 @@ pub fn cstr(ptr: [*]u8) []const u8 {
     return ptr[0..256];
 }
 
-pub fn eql(a: []const u8, b: []const u8) bool {
-    if (a.len != b.len) return false;
-    for (a, b) |x, y| {
-        if (x != y) return false;
-    }
-    return true;
-}
+pub const eql = string.eql;
 
 pub fn writeStr(s: []const u8) void {
     _ = syscall.write(1, s.ptr, s.len);
@@ -33,6 +28,21 @@ pub fn writeChar(ch: u8) void {
 pub fn writeDecimal(n: usize) void {
     var buf: [20]u8 = undefined;
     const text = format.decimal(n, &buf) orelse return;
+    writeStr(text);
+}
+
+pub fn writeSignedDecimal(n: isize) void {
+    if (n < 0) {
+        writeChar('-');
+        writeDecimal(@intCast(-n));
+        return;
+    }
+    writeDecimal(@intCast(n));
+}
+
+pub fn writeMillis(us: u64) void {
+    var buf: [24]u8 = undefined;
+    const text = format.millis(us, &buf) orelse return;
     writeStr(text);
 }
 

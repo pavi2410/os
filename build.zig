@@ -142,11 +142,13 @@ pub fn build(b: *std.Build) void {
     curl.setLinkerScript(b.path("userspace/linker.ld"));
     curl.root_module.addImport("libc", user_libc);
     curl.root_module.addImport("freestanding_std", freestanding_std);
-    curl.root_module.addImport("target.zig", b.createModule(.{
+    const curl_target_user = b.createModule(.{
         .root_source_file = b.path("userspace/curl/target.zig"),
         .target = user_target,
         .optimize = user_optimize,
-    }));
+    });
+    curl_target_user.addImport("libc", user_libc);
+    curl.root_module.addImport("target.zig", curl_target_user);
     const install_curl = b.addInstallArtifact(curl, user_install);
 
     const ip = b.addExecutable(.{
@@ -345,38 +347,24 @@ pub fn build(b: *std.Build) void {
     });
     const run_tcp_tests = b.addRunArtifact(tcp_tests);
 
-    const curl_target_mod = b.createModule(.{
-        .root_source_file = b.path("userspace/curl/target.zig"),
+    const libc_ip_host = b.createModule(.{
+        .root_source_file = b.path("userspace/libc/ip.zig"),
         .target = b.graph.host,
     });
-
-    const curl_target_test_mod = b.createModule(.{
-        .root_source_file = b.path("test/userspace/curl_target_test.zig"),
+    const libc_format_host = b.createModule(.{
+        .root_source_file = b.path("userspace/libc/format.zig"),
         .target = b.graph.host,
     });
-    curl_target_test_mod.addImport("curl_target", curl_target_mod);
-
-    const curl_target_tests = b.addTest(.{
-        .root_module = curl_target_test_mod,
+    const libc_parse_host = b.createModule(.{
+        .root_source_file = b.path("userspace/libc/parse.zig"),
+        .target = b.graph.host,
     });
-    const run_curl_target_tests = b.addRunArtifact(curl_target_tests);
 
     const dns_codec_mod = b.createModule(.{
         .root_source_file = b.path("userspace/net/dns_codec.zig"),
         .target = b.graph.host,
     });
     dns_codec_mod.addImport("common_bytes", common_bytes_host);
-
-    const dns_codec_test_mod = b.createModule(.{
-        .root_source_file = b.path("test/userspace/dns_codec_test.zig"),
-        .target = b.graph.host,
-    });
-    dns_codec_test_mod.addImport("dns_codec", dns_codec_mod);
-
-    const dns_codec_tests = b.addTest(.{
-        .root_module = dns_codec_test_mod,
-    });
-    const run_dns_codec_tests = b.addRunArtifact(dns_codec_tests);
 
     const abi_syscall_host = b.createModule(.{
         .root_source_file = b.path("common/abi/syscall.zig"),
@@ -390,6 +378,39 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("common/abi/net.zig"),
         .target = b.graph.host,
     });
+
+    const libc_target_support_host = b.createModule(.{
+        .root_source_file = b.path("userspace/libc/target_support.zig"),
+        .target = b.graph.host,
+    });
+
+    const curl_target_mod = b.createModule(.{
+        .root_source_file = b.path("userspace/curl/target.zig"),
+        .target = b.graph.host,
+    });
+    curl_target_mod.addImport("libc", libc_target_support_host);
+
+    const curl_target_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/userspace/curl_target_test.zig"),
+        .target = b.graph.host,
+    });
+    curl_target_test_mod.addImport("curl_target", curl_target_mod);
+
+    const curl_target_tests = b.addTest(.{
+        .root_module = curl_target_test_mod,
+    });
+    const run_curl_target_tests = b.addRunArtifact(curl_target_tests);
+
+    const dns_codec_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/userspace/dns_codec_test.zig"),
+        .target = b.graph.host,
+    });
+    dns_codec_test_mod.addImport("dns_codec", dns_codec_mod);
+
+    const dns_codec_tests = b.addTest(.{
+        .root_module = dns_codec_test_mod,
+    });
+    const run_dns_codec_tests = b.addRunArtifact(dns_codec_tests);
 
     const abi_test_mod = b.createModule(.{
         .root_source_file = b.path("test/common/abi_test.zig"),
@@ -448,14 +469,6 @@ pub fn build(b: *std.Build) void {
     });
     const run_syscall_user_tests = b.addRunArtifact(syscall_user_tests);
 
-    const libc_ip_host = b.createModule(.{
-        .root_source_file = b.path("userspace/libc/ip.zig"),
-        .target = b.graph.host,
-    });
-    const libc_format_host = b.createModule(.{
-        .root_source_file = b.path("userspace/libc/format.zig"),
-        .target = b.graph.host,
-    });
     const time_math_host = b.createModule(.{
         .root_source_file = b.path("userspace/libc/time_math.zig"),
         .target = b.graph.host,
@@ -467,6 +480,7 @@ pub fn build(b: *std.Build) void {
     });
     libc_helpers_test_mod.addImport("libc_ip", libc_ip_host);
     libc_helpers_test_mod.addImport("libc_format", libc_format_host);
+    libc_helpers_test_mod.addImport("libc_parse", libc_parse_host);
 
     const libc_helpers_tests = b.addTest(.{
         .root_module = libc_helpers_test_mod,

@@ -1,6 +1,7 @@
 const std = @import("std");
 const ip = @import("libc_ip");
 const format = @import("libc_format");
+const parse = @import("libc_parse");
 
 test "IPv4 parser accepts valid dotted decimal" {
     var addr: [4]u8 = undefined;
@@ -34,4 +35,27 @@ test "decimal formatter handles zero and large values" {
     var buf: [20]u8 = undefined;
     try std.testing.expectEqualStrings("0", format.decimal(0, &buf).?);
     try std.testing.expectEqualStrings("123456", format.decimal(123456, &buf).?);
+}
+
+test "millis formatter writes fractional seconds" {
+    var buf: [24]u8 = undefined;
+    try std.testing.expectEqualStrings("0.000", format.millis(0, &buf).?);
+    try std.testing.expectEqualStrings("1.234", format.millis(1234, &buf).?);
+    try std.testing.expectEqualStrings("1000.001", format.millis(1_000_001, &buf).?);
+}
+
+test "parsePort accepts only decimal ports" {
+    try std.testing.expectEqual(@as(?u16, 80), parse.parsePort("80"));
+    try std.testing.expectEqual(@as(?u16, 8080), parse.parsePort("8080"));
+    try std.testing.expectEqual(@as(?u16, null), parse.parsePort(""));
+    try std.testing.expectEqual(@as(?u16, null), parse.parsePort("80x"));
+    try std.testing.expectEqual(@as(?u16, null), parse.parsePort("65536"));
+}
+
+test "parseDecimal accepts bounded counts" {
+    try std.testing.expectEqual(@as(?usize, 4), parse.parseDecimal("4", 16));
+    try std.testing.expectEqual(@as(?usize, 16), parse.parseDecimal("16", 16));
+    try std.testing.expectEqual(@as(?usize, null), parse.parseDecimal("17", 16));
+    try std.testing.expectEqual(@as(?usize, null), parse.parseDecimal("0", 16));
+    try std.testing.expectEqual(@as(?usize, 100), parse.parseDecimal("100", null));
 }

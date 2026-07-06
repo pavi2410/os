@@ -72,20 +72,6 @@ test "hostKind classifies IPv4 and hostnames" {
     try std.testing.expectEqual(target.HostKind.hostname, target.hostKind("example.com"));
 }
 
-test "ipv4Bytes accepts and rejects inputs" {
-    var ip: [4]u8 = undefined;
-    try std.testing.expect(target.ipv4Bytes("104.20.23.154", &ip));
-    try std.testing.expectEqual(@as(u8, 104), ip[0]);
-    try std.testing.expect(!target.ipv4Bytes("example.com", &ip));
-    try std.testing.expect(!target.ipv4Bytes("999.1.1.1", &ip));
-}
-
-test "parsePort accepts only decimal" {
-    try std.testing.expectEqual(@as(?u16, 80), target.parsePort("80"));
-    try std.testing.expectEqual(@as(?u16, null), target.parsePort(""));
-    try std.testing.expectEqual(@as(?u16, null), target.parsePort("80x"));
-}
-
 test "buildRequest formats HTTP/1.0 GET" {
     var out: [128]u8 = undefined;
     const len = target.buildRequest("example.com", "/bar", &out).?;
@@ -106,8 +92,6 @@ test "resolve flow: IPv4 literal needs no DNS" {
     var path: [128]u8 = undefined;
     const got = try target.parse("10.0.2.2", &norm, &host, &path);
     try std.testing.expectEqual(target.HostKind.ipv4, target.hostKind(got.host));
-    var ip: [4]u8 = undefined;
-    try std.testing.expect(target.ipv4Bytes(got.host, &ip));
 }
 
 test "resolve flow: hostname needs DNS" {
@@ -116,6 +100,4 @@ test "resolve flow: hostname needs DNS" {
     var path: [128]u8 = undefined;
     const got = try target.parse("http://example.com/", &norm, &host, &path);
     try std.testing.expectEqual(target.HostKind.hostname, target.hostKind(got.host));
-    var ip: [4]u8 = undefined;
-    try std.testing.expect(!target.ipv4Bytes(got.host, &ip));
 }

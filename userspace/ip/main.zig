@@ -46,7 +46,7 @@ fn cmdAddr() void {
     writeStr("    inet ");
     writeIpv4(cfg.ip);
     writeStr("/");
-    writeDecimal(libc.ip.maskPrefix(cfg.mask));
+    libc.io.writeDecimal(libc.ip.maskPrefix(cfg.mask));
     writeStr(" scope global ");
     writeStr(iface_name);
     writeStr("\n    link/ether ");
@@ -70,7 +70,7 @@ fn cmdRoute() void {
     writeStr("network ");
     writeIpv4(libc.ip.networkAddr(cfg.ip, cfg.mask));
     writeStr("/");
-    writeDecimal(libc.ip.maskPrefix(cfg.mask));
+    libc.io.writeDecimal(libc.ip.maskPrefix(cfg.mask));
     writeStr(" dev ");
     writeStr(iface_name);
     writeStr(" scope link\n");
@@ -103,10 +103,6 @@ fn writeIpv4(addr: [4]u8) void {
 fn writeMac(mac: [6]u8) void {
     var buf: [18]u8 = undefined;
     writeStr(libc.ip.formatMac(mac, &buf) orelse "??:??:??:??:??:??");
-}
-
-fn writeDecimal(n: u8) void {
-    libc.io.writeDecimal(n);
 }
 
 fn writeStr(s: []const u8) void {

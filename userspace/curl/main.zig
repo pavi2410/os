@@ -28,14 +28,14 @@ noinline fn run(argc: usize, argv: [*][*]u8) void {
 
     var port = parsed.port;
     if (argc >= 3) {
-        port = target.parsePort(libc.io.cstr(argv[2])) orelse {
+        port = libc.parse.parsePort(libc.io.cstr(argv[2])) orelse {
             writeStr("curl: bad port\n");
             libc.process.exit(1);
         };
     }
 
     var host_ip: [4]u8 = undefined;
-    if (target.ipv4Bytes(parsed.host, &host_ip)) {
+    if (libc.ip.parseIpv4(parsed.host, &host_ip)) {
         // literal IPv4
     } else if (!resolveName(parsed.host, &host_ip)) {
         writeStr("curl: could not resolve host\n");

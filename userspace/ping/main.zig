@@ -21,7 +21,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
                 writeStr("usage: ping [-c count] [ip]\n");
                 libc.process.exit(1);
             }
-            count = parseCount(libc.io.cstr(argv[argi])) orelse {
+            count = libc.parse.parseDecimal(libc.io.cstr(argv[argi]), max_count) orelse {
                 writeStr("ping: bad count\n");
                 libc.process.exit(1);
             };
@@ -130,47 +130,12 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
     libc.process.exit(1);
 }
 
-fn parseCount(s: []const u8) ?usize {
-    if (s.len == 0) return null;
-    var value: usize = 0;
-    for (s) |ch| {
-        if (ch < '0' or ch > '9') return null;
-        value = value * 10 + (ch - '0');
-        if (value > max_count) return null;
-    }
-    if (value == 0) return null;
-    return value;
-}
-
 fn writeDecimal(n: usize) void {
-    var buf: [20]u8 = undefined;
-    if (n == 0) {
-        writeStr("0");
-        return;
-    }
-    var value = n;
-    var len: usize = 0;
-    while (value > 0) : (len += 1) {
-        buf[len] = '0' + @as(u8, @truncate(value % 10));
-        value /= 10;
-    }
-    while (len > 0) {
-        len -= 1;
-        var ch: [1]u8 = .{buf[len]};
-        writeStr(&ch);
-    }
+    libc.io.writeDecimal(n);
 }
 
 fn writeMillis(us: u64) void {
-    writeDecimal(@intCast(us / 1000));
-    writeStr(".");
-    const frac: u16 = @intCast(us % 1000);
-    var buf: [3]u8 = .{
-        '0' + @as(u8, @intCast(frac / 100)),
-        '0' + @as(u8, @intCast((frac / 10) % 10)),
-        '0' + @as(u8, @intCast(frac % 10)),
-    };
-    writeStr(&buf);
+    libc.io.writeMillis(us);
 }
 
 fn monotonicUs() u64 {
