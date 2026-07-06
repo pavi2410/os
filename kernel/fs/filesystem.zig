@@ -1,0 +1,74 @@
+const abi_fs = @import("abi_fs");
+
+pub const Error = error{
+    NotReady,
+    InvalidBpb,
+    NotFound,
+    NotFile,
+    IsDirectory,
+    IoError,
+    NameTooLong,
+    PathTooLong,
+    BufferTooSmall,
+    Exists,
+    NoSpace,
+    NotEmpty,
+    TooManyOpenFiles,
+    BadHandle,
+    InvalidWhence,
+    ReadOnly,
+};
+
+pub const Whence = enum(u32) {
+    set = 0,
+    cur = 1,
+    end = 2,
+};
+
+pub const OpenFlags = struct {
+    read: bool = true,
+    write: bool = false,
+    create: bool = false,
+    truncate: bool = false,
+    append: bool = false,
+};
+
+pub const Stat = abi_fs.Stat;
+pub const S_IFREG = abi_fs.S_IFREG;
+pub const S_IFDIR = abi_fs.S_IFDIR;
+
+pub const FileId = struct {
+    a: u64 = 0,
+    b: u64 = 0,
+
+    pub fn eql(self: FileId, other: FileId) bool {
+        return self.a == other.a and self.b == other.b;
+    }
+};
+
+pub const OpenFile = struct {
+    id: FileId = .{},
+    start_cluster: u32 = 0,
+    size: u32 = 0,
+    attr: u8 = 0,
+    loc_cluster: u32 = 0,
+    loc_offset: u32 = 0,
+
+    pub fn isDirectory(self: OpenFile) bool {
+        return self.attr & 0x10 != 0;
+    }
+};
+
+pub const Ops = struct {
+    name: []const u8,
+    mount: *const fn () Error!void,
+    is_ready: *const fn () bool,
+    open: *const fn (path: []const u8, flags: OpenFlags) Error!OpenFile,
+    read: *const fn (file: OpenFile, offset: u64, buf: []u8) Error!usize,
+    write_at: *const fn (file: *OpenFile, offset: u64, buf: []const u8) Error!usize,
+    stat: *const fn (path: []const u8, out: *Stat) Error!void,
+    getdents64: *const fn (file: OpenFile, dir_skip: *usize, buf: []u8) Error!usize,
+    unlink: *const fn (path: []const u8) Error!?FileId,
+    mkdir: *const fn (path: []const u8) Error!void,
+    rmdir: *const fn (path: []const u8) Error!?FileId,
+};

@@ -1,6 +1,7 @@
 const std = @import("std");
 const acpi_access = @import("../acpi/access.zig");
 const block = @import("../drivers/block.zig");
+const filesystem = @import("filesystem.zig");
 
 pub const FatError = error{
     NotReady,
@@ -32,6 +33,20 @@ pub const DirLoc = struct {
 pub const OpenResult = struct {
     entry: Entry,
     loc: DirLoc,
+};
+
+pub const ops: filesystem.Ops = .{
+    .name = "fat32",
+    .mount = fsMount,
+    .is_ready = isMounted,
+    .open = fsOpen,
+    .read = fsRead,
+    .write_at = fsWriteAt,
+    .stat = fsStat,
+    .getdents64 = fsGetDents64,
+    .unlink = fsUnlink,
+    .mkdir = fsMkdir,
+    .rmdir = fsRmdir,
 };
 
 const Mount = struct {
@@ -767,6 +782,109 @@ fn writeSector(lba: u64, buf: []const u8) FatError!void {
 
 fn diskDevice() FatError!*const block.Device {
     return disk orelse block.default() orelse FatError.NotReady;
+}
+
+fn fsMount() filesystem.Error!void {
+    mount() catch |err| return fsError(err);
+}
+
+fn fsOpen(path: []const u8, flags: filesystem.OpenFlags) filesystem.Error!filesystem.OpenFile {
+    const opened: OpenResult = blk: {
+        if (lookup(path)) |entry| {
+            if (entry.attr & 0x10 != 0) {
+                if (flags.write or flags.create or flags.truncate) return filesystem.Error.IsDirectory;
+                if (!flags.read) return filesystem.Error.IsDirectory;
+                break :blk openDirectory(path) catch |err| return fsError(err);
+            }
+            break :blk openFile(path, flags.truncate) catch |err| return fsError(err);
+        } else |_| {
+            if (!flags.create) return filesystem.Error.NotFound;
+            break :blk createFile(path) catch |err| return fsError(err);
+        }
+    };
+    return toFsFile(opened);
+}
+
+fn fsRead(file: filesystem.OpenFile, offset: u64, buf: []u8) filesystem.Error!usize {
+    return read(fromFsFile(file).entry, offset, buf) catch |err| return fsError(err);
+}
+
+fn fsWriteAt(file: *filesystem.OpenFile, offset: u64, buf: []const u8) filesystem.Error!usize {
+    var opened = fromFsFile(file.*);
+    const n = writeAt(&opened, offset, buf) catch |err| return fsError(err);
+    file.* = toFsFile(opened);
+    return n;
+}
+
+fn fsStat(path: []const u8, out: *filesystem.Stat) filesystem.Error!void {
+    const entry = lookup(path) catch |err| return fsError(err);
+    out.* = .{};
+    out.st_mode = if (entry.attr & 0x10 != 0) filesystem.S_IFDIR | 0o755 else filesystem.S_IFREG | 0o644;
+    out.st_size = @intCast(entry.size);
+}
+
+fn fsGetDents64(file: filesystem.OpenFile, dir_skip: *usize, buf: []u8) filesystem.Error!usize {
+    return getDents64(file.start_cluster, dir_skip, buf) catch |err| return fsError(err);
+}
+
+fn fsUnlink(path: []const u8) filesystem.Error!?filesystem.FileId {
+    const loc = unlinkFile(path) catch |err| return fsError(err);
+    return fileId(loc);
+}
+
+fn fsMkdir(path: []const u8) filesystem.Error!void {
+    createDirectory(path) catch |err| return fsError(err);
+}
+
+fn fsRmdir(path: []const u8) filesystem.Error!?filesystem.FileId {
+    const loc = removeDirectory(path) catch |err| return fsError(err);
+    return fileId(loc);
+}
+
+fn toFsFile(opened: OpenResult) filesystem.OpenFile {
+    return .{
+        .id = fileId(opened.loc),
+        .start_cluster = opened.entry.start_cluster,
+        .size = opened.entry.size,
+        .attr = opened.entry.attr,
+        .loc_cluster = opened.loc.cluster,
+        .loc_offset = opened.loc.offset,
+    };
+}
+
+fn fromFsFile(file: filesystem.OpenFile) OpenResult {
+    return .{
+        .entry = .{
+            .start_cluster = file.start_cluster,
+            .size = file.size,
+            .attr = file.attr,
+        },
+        .loc = .{
+            .cluster = file.loc_cluster,
+            .offset = file.loc_offset,
+        },
+    };
+}
+
+fn fileId(loc: DirLoc) filesystem.FileId {
+    return .{ .a = loc.cluster, .b = loc.offset };
+}
+
+fn fsError(err: FatError) filesystem.Error {
+    return switch (err) {
+        FatError.NotReady => filesystem.Error.NotReady,
+        FatError.InvalidBpb => filesystem.Error.InvalidBpb,
+        FatError.NotFound => filesystem.Error.NotFound,
+        FatError.NotFile => filesystem.Error.NotFile,
+        FatError.IsDirectory => filesystem.Error.IsDirectory,
+        FatError.IoError => filesystem.Error.IoError,
+        FatError.NameTooLong => filesystem.Error.NameTooLong,
+        FatError.PathTooLong => filesystem.Error.PathTooLong,
+        FatError.BufferTooSmall => filesystem.Error.BufferTooSmall,
+        FatError.Exists => filesystem.Error.Exists,
+        FatError.NoSpace => filesystem.Error.NoSpace,
+        FatError.NotEmpty => filesystem.Error.NotEmpty,
+    };
 }
 
 fn writeU16Le(buf: []u8, off: usize, value: u16) void {

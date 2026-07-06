@@ -1,38 +1,24 @@
 const fat32 = @import("fat32.zig");
+const filesystem = @import("filesystem.zig");
 const serial = @import("../arch/x86_64/serial.zig");
-const abi_fs = @import("abi_fs");
 
-pub const VfsError = fat32.FatError || error{
+pub const VfsError = filesystem.Error || error{
     TooManyOpenFiles,
     BadHandle,
     InvalidWhence,
     ReadOnly,
 };
 
-pub const Whence = enum(u32) {
-    set = 0,
-    cur = 1,
-    end = 2,
-};
-
-pub const OpenFlags = struct {
-    read: bool = true,
-    write: bool = false,
-    create: bool = false,
-    truncate: bool = false,
-    append: bool = false,
-};
-
-pub const Stat = abi_fs.Stat;
+pub const Whence = filesystem.Whence;
+pub const OpenFlags = filesystem.OpenFlags;
+pub const Stat = filesystem.Stat;
 
 const max_handles = 16;
+const active_fs = fat32.ops;
 
 const Handle = struct {
     in_use: bool = false,
-    open: fat32.OpenResult = .{
-        .entry = .{ .start_cluster = 0, .size = 0, .attr = 0 },
-        .loc = .{ .cluster = 0, .offset = 0 },
-    },
+    open: filesystem.OpenFile = .{},
     offset: u64 = 0,
     writable: bool = false,
     is_directory: bool = false,
@@ -42,37 +28,25 @@ const Handle = struct {
 var handles: [max_handles]Handle = undefined;
 
 pub fn init() VfsError!void {
-    try fat32.mount();
+    try active_fs.mount();
 }
 
 pub fn isReady() bool {
-    return fat32.isMounted();
+    return active_fs.is_ready();
 }
 
 pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
-    const opened: fat32.OpenResult = blk: {
-        if (fat32.lookup(path)) |entry| {
-            if (entry.attr & 0x10 != 0) {
-                if (flags.write or flags.create or flags.truncate) return VfsError.IsDirectory;
-                if (!flags.read) return VfsError.IsDirectory;
-                break :blk try fat32.openDirectory(path);
-            }
-            break :blk try fat32.openFile(path, flags.truncate);
-        } else |_| {
-            if (!flags.create) return VfsError.NotFound;
-            break :blk try fat32.createFile(path);
-        }
-    };
+    const opened = try active_fs.open(path, flags);
 
     if (!flags.read and !flags.write) return VfsError.InvalidWhence;
     if (flags.truncate and !flags.write) return VfsError.ReadOnly;
 
-    const is_directory = opened.entry.attr & 0x10 != 0;
+    const is_directory = opened.isDirectory();
     const slot = allocHandle() orelse return VfsError.TooManyOpenFiles;
     handles[slot] = .{
         .in_use = true,
         .open = opened,
-        .offset = if (flags.append and !is_directory) opened.entry.size else 0,
+        .offset = if (flags.append and !is_directory) opened.size else 0,
         .writable = flags.write and !is_directory,
         .is_directory = is_directory,
         .dir_skip = 0,
@@ -88,7 +62,7 @@ pub fn close(handle: u32) void {
 pub fn read(handle: u32, buf: []u8) VfsError!usize {
     const h = try getHandle(handle);
     if (h.is_directory) return VfsError.NotFile;
-    const n = try fat32.read(h.open.entry, h.offset, buf);
+    const n = try active_fs.read(h.open, h.offset, buf);
     h.offset += n;
     return n;
 }
@@ -97,14 +71,14 @@ pub fn write(handle: u32, buf: []const u8) VfsError!usize {
     const h = try getHandle(handle);
     if (h.is_directory) return VfsError.IsDirectory;
     if (!h.writable) return VfsError.ReadOnly;
-    const n = try fat32.writeAt(&h.open, h.offset, buf);
+    const n = try active_fs.write_at(&h.open, h.offset, buf);
     h.offset += n;
     return n;
 }
 
 pub fn lseek(handle: u32, offset: i64, whence: Whence) VfsError!u64 {
     const h = try getHandle(handle);
-    const size: u64 = h.open.entry.size;
+    const size: u64 = h.open.size;
     const new_off: u64 = switch (whence) {
         .set => {
             if (offset < 0) return VfsError.InvalidWhence;
@@ -132,38 +106,33 @@ pub fn lseek(handle: u32, offset: i64, whence: Whence) VfsError!u64 {
 }
 
 pub fn stat(path: []const u8, out: *Stat) VfsError!void {
-    const entry = try fat32.lookup(path);
-    out.* = .{};
-    out.st_mode = if (entry.attr & 0x10 != 0) abi_fs.S_IFDIR | 0o755 else abi_fs.S_IFREG | 0o644;
-    out.st_size = @intCast(entry.size);
+    try active_fs.stat(path, out);
 }
 
 pub fn getdents64(handle: u32, buf: []u8) VfsError!usize {
     const h = try getHandle(handle);
     if (!h.is_directory) return VfsError.NotFile;
-    return fat32.getDents64(h.open.entry.start_cluster, &h.dir_skip, buf);
+    return active_fs.getdents64(h.open, &h.dir_skip, buf);
 }
 
 pub fn unlink(path: []const u8) VfsError!void {
-    const loc = try fat32.unlinkFile(path);
-    invalidateHandlesAt(loc);
+    if (try active_fs.unlink(path)) |id| invalidateHandlesAt(id);
 }
 
 pub fn mkdir(path: []const u8) VfsError!void {
-    try fat32.createDirectory(path);
+    try active_fs.mkdir(path);
 }
 
 pub fn rmdir(path: []const u8) VfsError!void {
-    const loc = try fat32.removeDirectory(path);
-    invalidateHandlesAt(loc);
+    if (try active_fs.rmdir(path)) |id| invalidateHandlesAt(id);
 }
 
-fn invalidateHandlesAt(loc: fat32.DirLoc) void {
+fn invalidateHandlesAt(id: filesystem.FileId) void {
     var i: u32 = 0;
     while (i < max_handles) : (i += 1) {
         if (!handles[i].in_use) continue;
         const h = &handles[i];
-        if (h.open.loc.cluster == loc.cluster and h.open.loc.offset == loc.offset) {
+        if (h.open.id.eql(id)) {
             handles[i] = .{};
         }
     }
@@ -182,11 +151,13 @@ pub fn selfTest() void {
     if (!isReady()) return;
 
     var buf: [64]u8 = undefined;
-    const entry = fat32.lookup("/README.TXT") catch {
+    const handle = open("/README.TXT", .{}) catch {
         serial.writeString("vfs: /README.TXT not found\r\n");
         return;
     };
-    const n = fat32.read(entry, 0, &buf) catch {
+    defer close(handle);
+
+    const n = read(handle, &buf) catch {
         serial.writeString("vfs read test failed\r\n");
         return;
     };

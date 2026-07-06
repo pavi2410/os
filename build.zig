@@ -369,6 +369,23 @@ pub fn build(b: *std.Build) void {
     });
     const run_abi_tests = b.addRunArtifact(abi_tests);
 
+    const filesystem_host_mod = b.createModule(.{
+        .root_source_file = b.path("kernel/fs/filesystem.zig"),
+        .target = b.graph.host,
+    });
+    filesystem_host_mod.addImport("abi_fs", abi_fs_host);
+
+    const filesystem_contract_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/kernel/filesystem_contract_test.zig"),
+        .target = b.graph.host,
+    });
+    filesystem_contract_test_mod.addImport("filesystem", filesystem_host_mod);
+
+    const filesystem_contract_tests = b.addTest(.{
+        .root_module = filesystem_contract_test_mod,
+    });
+    const run_filesystem_contract_tests = b.addRunArtifact(filesystem_contract_tests);
+
     const libc_ip_host = b.createModule(.{
         .root_source_file = b.path("userspace/libc/ip.zig"),
         .target = b.graph.host,
@@ -395,6 +412,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_physical_tests.step);
     test_step.dependOn(&run_device_registry_tests.step);
     test_step.dependOn(&run_virtio_queue_index_tests.step);
+    test_step.dependOn(&run_filesystem_contract_tests.step);
     test_step.dependOn(&run_icmp_tests.step);
     test_step.dependOn(&run_tcp_tests.step);
     test_step.dependOn(&run_curl_target_tests.step);
