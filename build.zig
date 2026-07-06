@@ -36,6 +36,11 @@ pub fn build(b: *std.Build) void {
         .target = user_target,
         .optimize = user_optimize,
     });
+    const common_bytes_user = b.createModule(.{
+        .root_source_file = b.path("common/bytes.zig"),
+        .target = user_target,
+        .optimize = user_optimize,
+    });
 
     const user_libc = b.createModule(.{
         .root_source_file = b.path("userspace/libc/mod.zig"),
@@ -51,6 +56,7 @@ pub fn build(b: *std.Build) void {
         .target = user_target,
         .optimize = user_optimize,
     });
+    dns_codec_user.addImport("common_bytes", common_bytes_user);
     user_libc.addImport("dns_codec", dns_codec_user);
 
     const freestanding_std = b.createModule(.{
@@ -193,6 +199,12 @@ pub fn build(b: *std.Build) void {
     kernel_mod.addImport("abi_syscall", abi_syscall_kernel);
     kernel_mod.addImport("abi_fs", abi_fs_kernel);
     kernel_mod.addImport("abi_net", abi_net_kernel);
+    const common_bytes_kernel = b.createModule(.{
+        .root_source_file = b.path("common/bytes.zig"),
+        .target = kernel_target,
+        .optimize = optimize,
+    });
+    kernel_mod.addImport("common_bytes", common_bytes_kernel);
 
     const time_unix_kernel = b.createModule(.{
         .root_source_file = b.path("common/time_unix.zig"),
@@ -321,6 +333,11 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("kernel/net/tcp_test.zig"),
         .target = b.graph.host,
     });
+    const common_bytes_host = b.createModule(.{
+        .root_source_file = b.path("common/bytes.zig"),
+        .target = b.graph.host,
+    });
+    tcp_test_mod.addImport("common_bytes", common_bytes_host);
 
     const tcp_tests = b.addTest(.{
         .root_module = tcp_test_mod,
@@ -347,6 +364,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("userspace/net/dns_codec.zig"),
         .target = b.graph.host,
     });
+    dns_codec_mod.addImport("common_bytes", common_bytes_host);
 
     const dns_codec_test_mod = b.createModule(.{
         .root_source_file = b.path("test/userspace/dns_codec_test.zig"),
@@ -384,6 +402,17 @@ pub fn build(b: *std.Build) void {
         .root_module = abi_test_mod,
     });
     const run_abi_tests = b.addRunArtifact(abi_tests);
+
+    const bytes_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/common/bytes_test.zig"),
+        .target = b.graph.host,
+    });
+    bytes_test_mod.addImport("common_bytes", common_bytes_host);
+
+    const bytes_tests = b.addTest(.{
+        .root_module = bytes_test_mod,
+    });
+    const run_bytes_tests = b.addRunArtifact(bytes_tests);
 
     const filesystem_host_mod = b.createModule(.{
         .root_source_file = b.path("kernel/fs/filesystem.zig"),
@@ -467,6 +496,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_curl_target_tests.step);
     test_step.dependOn(&run_dns_codec_tests.step);
     test_step.dependOn(&run_abi_tests.step);
+    test_step.dependOn(&run_bytes_tests.step);
     test_step.dependOn(&run_libc_helpers_tests.step);
     test_step.dependOn(&run_time_math_tests.step);
 }

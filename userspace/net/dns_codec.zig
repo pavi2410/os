@@ -1,4 +1,6 @@
 /// Pure DNS message helpers (no syscalls; host-testable).
+const bytes = @import("common_bytes");
+
 pub fn buildQuery(name: []const u8, out: []u8) !usize {
     if (out.len < 18) return error.BufferTooSmall;
     @memset(out[0..18], 0);
@@ -48,8 +50,8 @@ pub fn encodeName(name: []const u8, out: []u8) !usize {
 
 pub fn parseFirstA(pkt: []const u8, out: *[4]u8) bool {
     if (pkt.len < 12) return false;
-    const qdcount = readU16(pkt, 4);
-    const ancount = readU16(pkt, 6);
+    const qdcount = bytes.readU16Be(pkt, 4);
+    const ancount = bytes.readU16Be(pkt, 6);
     if (ancount == 0) return false;
 
     var off: usize = 12;
@@ -64,8 +66,8 @@ pub fn parseFirstA(pkt: []const u8, out: *[4]u8) bool {
     while (ai < ancount) : (ai += 1) {
         off = skipName(pkt, off) orelse return false;
         if (off + 10 > pkt.len) return false;
-        const rtype = readU16(pkt, off);
-        const rdlen = readU16(pkt, off + 8);
+        const rtype = bytes.readU16Be(pkt, off);
+        const rdlen = bytes.readU16Be(pkt, off + 8);
         off += 10;
         if (off + rdlen > pkt.len) return false;
 
@@ -89,8 +91,4 @@ fn skipName(pkt: []const u8, off: usize) ?usize {
         pos += 1 + len_byte;
     }
     return null;
-}
-
-fn readU16(pkt: []const u8, off: usize) u16 {
-    return (@as(u16, pkt[off]) << 8) | pkt[off + 1];
 }

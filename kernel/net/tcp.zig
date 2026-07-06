@@ -1,3 +1,4 @@
+const bytes = @import("common_bytes");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 
@@ -61,18 +62,15 @@ pub fn checksum(src_ip: ipv4.Addr, dst_ip: ipv4.Addr, tcp: []const u8) u16 {
     pseudo[8] = 0;
     pseudo[9] = ipv4.proto_tcp;
     const tcp_len: u16 = @intCast(tcp.len);
-    pseudo[10] = @truncate(tcp_len >> 8);
-    pseudo[11] = @truncate(tcp_len);
+    bytes.writeU16Be(&pseudo, 10, tcp_len);
 
     var sum: u32 = 0;
     inline for ([_]usize{ 0, 2, 4, 6, 8, 10 }) |off| {
-        const word = (@as(u32, pseudo[off]) << 8) | pseudo[off + 1];
-        sum += word;
+        sum += bytes.readU16Be(&pseudo, off);
     }
     var i: usize = 0;
     while (i + 1 < tcp.len) : (i += 2) {
-        const word = (@as(u32, tcp[i]) << 8) | tcp[i + 1];
-        sum += word;
+        sum += bytes.readU16Be(tcp, i);
     }
     if (i < tcp.len) {
         sum += @as(u32, tcp[i]) << 8;
@@ -106,15 +104,15 @@ pub fn build(
     ipv4.putHeader(out[ethernet.header_len..], src_ip, dst_ip, ipv4.proto_tcp, tcp_len);
 
     const tcp_off = ethernet.header_len + ipv4.header_len;
-    writeU16Be(out, tcp_off, src_port);
-    writeU16Be(out, tcp_off + 2, dst_port);
-    writeU32Be(out, tcp_off + 4, seq);
-    writeU32Be(out, tcp_off + 8, ack);
+    bytes.writeU16Be(out, tcp_off, src_port);
+    bytes.writeU16Be(out, tcp_off + 2, dst_port);
+    bytes.writeU32Be(out, tcp_off + 4, seq);
+    bytes.writeU32Be(out, tcp_off + 8, ack);
     out[tcp_off + 12] = 0x50; // 5 * 4 = 20 bytes
     out[tcp_off + 13] = flags;
-    writeU16Be(out, tcp_off + 14, default_window);
-    writeU16Be(out, tcp_off + 16, 0);
-    writeU16Be(out, tcp_off + 18, 0);
+    bytes.writeU16Be(out, tcp_off + 14, default_window);
+    bytes.writeU16Be(out, tcp_off + 16, 0);
+    bytes.writeU16Be(out, tcp_off + 18, 0);
 
     if (payload.len > 0) {
         @memcpy(out[tcp_off + header_len ..][0..payload.len], payload);
@@ -122,7 +120,7 @@ pub fn build(
 
     const tcp_slice = out[tcp_off .. tcp_off + tcp_len];
     const csum = checksum(src_ip, dst_ip, tcp_slice);
-    writeU16Be(out, tcp_off + 16, csum);
+    bytes.writeU16Be(out, tcp_off + 16, csum);
 
     return frame_len;
 }
@@ -130,12 +128,12 @@ pub fn build(
 pub fn parseSegment(frame: []const u8) ?Segment {
     if (frame.len < ethernet.header_len + ipv4.header_len + header_len) return null;
 
-    if (readU16Be(frame, 12) != ethernet.ethertype_ipv4) return null;
+    if (bytes.readU16Be(frame, 12) != ethernet.ethertype_ipv4) return null;
 
     const ip_off = ethernet.header_len;
     if (frame[ip_off + 9] != ipv4.proto_tcp) return null;
 
-    const ip_total = readU16Be(frame, ip_off + 2);
+    const ip_total = bytes.readU16Be(frame, ip_off + 2);
     if (ip_total < ipv4.header_len + header_len) return null;
     const frame_ip_end = ethernet.header_len + ip_total;
     if (frame_ip_end > frame.len) return null;
@@ -158,36 +156,13 @@ pub fn parseSegment(frame: []const u8) ?Segment {
     return .{
         .src_ip = src_ip,
         .dst_ip = dst_ip,
-        .src_port = readU16Be(frame, tcp_off),
-        .dst_port = readU16Be(frame, tcp_off + 2),
-        .seq = readU32Be(frame, tcp_off + 4),
-        .ack = readU32Be(frame, tcp_off + 8),
+        .src_port = bytes.readU16Be(frame, tcp_off),
+        .dst_port = bytes.readU16Be(frame, tcp_off + 2),
+        .seq = bytes.readU32Be(frame, tcp_off + 4),
+        .ack = bytes.readU32Be(frame, tcp_off + 8),
         .flags = frame[tcp_off + 13],
         .payload = frame[payload_off .. payload_off + payload_len],
     };
-}
-
-fn readU16Be(buf: []const u8, off: usize) u16 {
-    return (@as(u16, buf[off]) << 8) | @as(u16, buf[off + 1]);
-}
-
-fn readU32Be(buf: []const u8, off: usize) u32 {
-    return (@as(u32, buf[off]) << 24) |
-        (@as(u32, buf[off + 1]) << 16) |
-        (@as(u32, buf[off + 2]) << 8) |
-        @as(u32, buf[off + 3]);
-}
-
-fn writeU16Be(buf: []u8, off: usize, value: u16) void {
-    buf[off] = @truncate(value >> 8);
-    buf[off + 1] = @truncate(value);
-}
-
-fn writeU32Be(buf: []u8, off: usize, value: u32) void {
-    buf[off] = @truncate(value >> 24);
-    buf[off + 1] = @truncate(value >> 16);
-    buf[off + 2] = @truncate(value >> 8);
-    buf[off + 3] = @truncate(value);
 }
 
 pub fn matchEndpoint(
