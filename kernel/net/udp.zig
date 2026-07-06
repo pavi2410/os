@@ -1,3 +1,4 @@
+const view = @import("common_view");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 
@@ -42,7 +43,7 @@ pub fn build(
     ipv4.putHeader(out[ethernet.header_len..], src_ip, dst_ip, ipv4.proto_udp, udp_len);
 
     const udp_off = ethernet.header_len + ipv4.header_len;
-    const hdr: *Header = @ptrCast(@alignCast(out[udp_off..].ptr));
+    const hdr = view.mut(Header, out, udp_off).?;
     hdr.src_port_be = @byteSwap(src_port);
     hdr.dst_port_be = @byteSwap(dst_port);
     hdr.length_be = @byteSwap(udp_len);
@@ -54,16 +55,16 @@ pub fn build(
 
 pub fn payloadSlice(frame: []const u8) ?[]const u8 {
     if (frame.len < ethernet.header_len + ipv4.header_len + header_len) return null;
-    const eth: *const ethernet.Header = @ptrCast(@alignCast(frame.ptr));
+    const eth = view.get(ethernet.Header, frame, 0) orelse return null;
     if (ethernet.ethertypeHost(eth) != ethernet.ethertype_ipv4) return null;
 
-    const ip: *const ipv4.Header = @ptrCast(@alignCast(frame[ethernet.header_len..].ptr));
+    const ip = view.get(ipv4.Header, frame, ethernet.header_len) orelse return null;
     if (ip.protocol != ipv4.proto_udp) return null;
 
     const ip_total = ipv4.totalLengthHost(ip);
     if (ip_total < ipv4.header_len + header_len) return null;
 
-    const udp: *const Header = @ptrCast(@alignCast(frame[ethernet.header_len + ipv4.header_len ..].ptr));
+    const udp = view.get(Header, frame, ethernet.header_len + ipv4.header_len) orelse return null;
     const udp_total = lengthHost(udp);
     if (udp_total < header_len) return null;
     const payload_len = udp_total - header_len;
@@ -80,8 +81,8 @@ pub fn match(
     src_port_out: *u16,
 ) ?[]const u8 {
     const payload = payloadSlice(frame) orelse return null;
-    const ip: *const ipv4.Header = @ptrCast(@alignCast(frame[ethernet.header_len..].ptr));
-    const udp: *const Header = @ptrCast(@alignCast(frame[ethernet.header_len + ipv4.header_len ..].ptr));
+    const ip = view.get(ipv4.Header, frame, ethernet.header_len) orelse return null;
+    const udp = view.get(Header, frame, ethernet.header_len + ipv4.header_len) orelse return null;
     if (dstPortHost(udp) != local_port) return null;
     src_ip_out.* = ip.src;
     src_port_out.* = srcPortHost(udp);

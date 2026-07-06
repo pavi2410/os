@@ -1,3 +1,4 @@
+const view = @import("common_view");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 
@@ -42,7 +43,7 @@ pub fn buildEchoRequest(
     ipv4.putHeader(out[ethernet.header_len..], src_ip, dst_ip, ipv4.proto_icmp, icmp_len);
 
     const icmp_off = ethernet.header_len + ipv4.header_len;
-    const icmp: *Header = @ptrCast(@alignCast(out[icmp_off..].ptr));
+    const icmp = view.mut(Header, out, icmp_off).?;
     icmp.type = echo_request;
     icmp.code = 0;
     icmp.checksum_be = 0;
@@ -69,17 +70,17 @@ pub fn matchEchoReply(
 ) ?[]const u8 {
     if (frame.len < ethernet.header_len + ipv4.header_len + header_len) return null;
 
-    const eth: *const ethernet.Header = @ptrCast(@alignCast(frame.ptr));
+    const eth = view.get(ethernet.Header, frame, 0) orelse return null;
     if (ethernet.ethertypeHost(eth) != ethernet.ethertype_ipv4) return null;
 
-    const ip: *const ipv4.Header = @ptrCast(@alignCast(frame[ethernet.header_len..].ptr));
+    const ip = view.get(ipv4.Header, frame, ethernet.header_len) orelse return null;
     if (ip.protocol != ipv4.proto_icmp) return null;
 
     const ip_total = ipv4.totalLengthHost(ip);
     if (ip_total < ipv4.header_len + header_len) return null;
 
     const icmp_off = ethernet.header_len + ipv4.header_len;
-    const icmp: *const Header = @ptrCast(@alignCast(frame[icmp_off..].ptr));
+    const icmp = view.get(Header, frame, icmp_off) orelse return null;
     if (icmp.type != echo_reply) return null;
     if (icmp.code != 0) return null;
     if (identifierHost(icmp) != id) return null;

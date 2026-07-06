@@ -1,3 +1,4 @@
+const view = @import("common_view");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 
@@ -34,7 +35,7 @@ pub fn buildRequest(
 
     ethernet.putHeader(out, ethernet.broadcast, src_mac, ethernet.ethertype_arp);
 
-    const arp: *Header = @ptrCast(@alignCast(out[ethernet.header_len..].ptr));
+    const arp = view.mut(Header, out, ethernet.header_len).?;
     arp.hw_type_be = @byteSwap(hardware_ethernet);
     arp.proto_type_be = @byteSwap(ethernet.ethertype_ipv4);
     arp.hw_len = ethernet.mac_len;
@@ -49,16 +50,16 @@ pub fn buildRequest(
 
 pub fn isReply(frame: []const u8) bool {
     if (frame.len < ethernet.header_len + @sizeOf(Header)) return false;
-    const eth: *const ethernet.Header = @ptrCast(@alignCast(frame.ptr));
+    const eth = view.get(ethernet.Header, frame, 0) orelse return false;
     if (ethernet.ethertypeHost(eth) != ethernet.ethertype_arp) return false;
-    const arp_hdr: *const Header = @ptrCast(@alignCast(frame[ethernet.header_len..].ptr));
+    const arp_hdr = view.get(Header, frame, ethernet.header_len) orelse return false;
     return opcodeHost(arp_hdr) == op_reply;
 }
 
 /// ARP reply for @p ip: returns the sender hardware address (resolved MAC).
 pub fn senderMacFor(frame: []const u8, ip: ipv4.Addr) ?ethernet.Mac {
     if (!isReply(frame)) return null;
-    const arp_hdr: *const Header = @ptrCast(@alignCast(frame[ethernet.header_len..].ptr));
+    const arp_hdr = view.get(Header, frame, ethernet.header_len) orelse return null;
     if (!ipv4.equal(arp_hdr.sender_ip, ip)) return null;
     return arp_hdr.sender_mac;
 }

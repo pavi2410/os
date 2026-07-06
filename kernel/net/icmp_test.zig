@@ -1,4 +1,5 @@
 const std = @import("std");
+const view = @import("common_view");
 const ethernet = @import("ethernet.zig");
 const icmp = @import("icmp.zig");
 const ipv4 = @import("ipv4.zig");
@@ -11,7 +12,7 @@ test "matchEchoReply rejects inflated IP total length" {
     ipv4.putHeader(frame[ethernet.header_len..], .{ 10, 0, 2, 2 }, .{ 10, 0, 2, 15 }, ipv4.proto_icmp, 1500);
 
     const icmp_off = ethernet.header_len + ipv4.header_len;
-    const hdr: *icmp.Header = @ptrCast(@alignCast(frame[icmp_off..].ptr));
+    const hdr = view.mut(icmp.Header, &frame, icmp_off).?;
     hdr.type = icmp.echo_reply;
     hdr.code = 0;
     hdr.identifier_be = @byteSwap(@as(u16, 0x4000));

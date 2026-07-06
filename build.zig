@@ -41,6 +41,12 @@ pub fn build(b: *std.Build) void {
         .target = user_target,
         .optimize = user_optimize,
     });
+    const common_view_user = b.createModule(.{
+        .root_source_file = b.path("common/view.zig"),
+        .target = user_target,
+        .optimize = user_optimize,
+    });
+    abi_fs_user.addImport("common_view", common_view_user);
 
     const user_libc = b.createModule(.{
         .root_source_file = b.path("userspace/libc/mod.zig"),
@@ -207,7 +213,14 @@ pub fn build(b: *std.Build) void {
         .target = kernel_target,
         .optimize = optimize,
     });
+    const common_view_kernel = b.createModule(.{
+        .root_source_file = b.path("common/view.zig"),
+        .target = kernel_target,
+        .optimize = optimize,
+    });
+    abi_fs_kernel.addImport("common_view", common_view_kernel);
     kernel_mod.addImport("common_bytes", common_bytes_kernel);
+    kernel_mod.addImport("common_view", common_view_kernel);
 
     const time_unix_kernel = b.createModule(.{
         .root_source_file = b.path("common/time_unix.zig"),
@@ -326,6 +339,15 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("kernel/net/icmp_test.zig"),
         .target = b.graph.host,
     });
+    const common_bytes_host = b.createModule(.{
+        .root_source_file = b.path("common/bytes.zig"),
+        .target = b.graph.host,
+    });
+    const common_view_host = b.createModule(.{
+        .root_source_file = b.path("common/view.zig"),
+        .target = b.graph.host,
+    });
+    icmp_test_mod.addImport("common_view", common_view_host);
 
     const icmp_tests = b.addTest(.{
         .root_module = icmp_test_mod,
@@ -336,11 +358,8 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("kernel/net/tcp_test.zig"),
         .target = b.graph.host,
     });
-    const common_bytes_host = b.createModule(.{
-        .root_source_file = b.path("common/bytes.zig"),
-        .target = b.graph.host,
-    });
     tcp_test_mod.addImport("common_bytes", common_bytes_host);
+    tcp_test_mod.addImport("common_view", common_view_host);
 
     const tcp_tests = b.addTest(.{
         .root_module = tcp_test_mod,
@@ -374,6 +393,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("common/abi/fs.zig"),
         .target = b.graph.host,
     });
+    abi_fs_host.addImport("common_view", common_view_host);
     const abi_net_host = b.createModule(.{
         .root_source_file = b.path("common/abi/net.zig"),
         .target = b.graph.host,
@@ -435,6 +455,17 @@ pub fn build(b: *std.Build) void {
         .root_module = bytes_test_mod,
     });
     const run_bytes_tests = b.addRunArtifact(bytes_tests);
+
+    const view_test_mod = b.createModule(.{
+        .root_source_file = b.path("test/common/view_test.zig"),
+        .target = b.graph.host,
+    });
+    view_test_mod.addImport("common_view", common_view_host);
+
+    const view_tests = b.addTest(.{
+        .root_module = view_test_mod,
+    });
+    const run_view_tests = b.addRunArtifact(view_tests);
 
     const filesystem_host_mod = b.createModule(.{
         .root_source_file = b.path("kernel/fs/filesystem.zig"),
@@ -512,6 +543,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_dns_codec_tests.step);
     test_step.dependOn(&run_abi_tests.step);
     test_step.dependOn(&run_bytes_tests.step);
+    test_step.dependOn(&run_view_tests.step);
     test_step.dependOn(&run_libc_helpers_tests.step);
     test_step.dependOn(&run_time_math_tests.step);
 }

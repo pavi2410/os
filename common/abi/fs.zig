@@ -1,3 +1,5 @@
+const view = @import("common_view");
+
 pub const O_RDONLY: u32 = 0;
 pub const O_WRONLY: u32 = 0o1;
 pub const O_RDWR: u32 = 0o2;
@@ -60,7 +62,7 @@ pub const Dirent64Iterator = struct {
 
     pub fn next(self: *Dirent64Iterator) ?Dirent64Entry {
         if (self.off + dirent64_name_offset > self.data.len) return null;
-        const hdr: *const Dirent64 = @ptrCast(@alignCast(self.data.ptr + self.off));
+        const hdr = view.get(Dirent64, self.data, self.off) orelse return null;
         const reclen = hdr.d_reclen;
         if (reclen < dirent64_name_offset or self.off + reclen > self.data.len) return null;
 
@@ -81,7 +83,7 @@ pub const Dirent64Iterator = struct {
 pub fn writeDirent64(out: []u8, ino: u64, off: i64, d_type: u8, name: []const u8) void {
     const reclen = dirent64Reclen(name.len);
     @memset(out[0..reclen], 0);
-    const hdr: *Dirent64 = @ptrCast(@alignCast(out.ptr));
+    const hdr = view.mut(Dirent64, out, 0).?;
     hdr.d_ino = ino;
     hdr.d_off = off;
     hdr.d_reclen = @intCast(reclen);

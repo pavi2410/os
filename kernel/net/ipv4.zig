@@ -1,3 +1,5 @@
+const view = @import("common_view");
+
 pub const addr_len = 4;
 pub const header_len = 20;
 
@@ -90,7 +92,7 @@ pub fn putHeader(
     protocol: u8,
     payload_len: u16,
 ) void {
-    const ip: *Header = @ptrCast(@alignCast(buf.ptr));
+    const ip = view.mut(Header, buf, 0).?;
     ip.version_ihl = 0x45;
     ip.tos = 0;
     const total_len = header_len + payload_len;
