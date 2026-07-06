@@ -21,7 +21,7 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 
 **Next up** (see [docs/roadmap/](docs/roadmap/))
 
-Phase 5 networking polish: richer `ping` statistics and TCP/IP hardening.
+Phase 5 networking polish: TCP/IP hardening.
 
 ## 🚀 Goals
 
@@ -175,10 +175,10 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 * [x] Socket syscalls
 * [x] `ip addr`, `ip route`, `ip neigh`
 * [x] DNS-backed `curl`
+* [x] `ping` with multiple packets, RTT, packet loss, and summary stats
 
 **Phase 5 — next**
 
-* [ ] `ping` with multiple packets, RTT, packet loss, and summary stats
 * [ ] TCP/IP hardening under repeated userspace network activity
 
 ## 🔗 Links

@@ -12,6 +12,6 @@ Phased plan for kernel development after the UEFI bootloader. Complete phases in
 | 5 | [05-io-stack.md](05-io-stack.md) | I/O stack — filesystem and networking |
 | 6 | [06-smp-and-gui.md](06-smp-and-gui.md) | SMP and GUI |
 
-**Current focus:** Phase 5 — networking polish (`ping` stats, TCP/IP hardening).
+**Current focus:** Phase 5 — TCP/IP hardening.
 
 See also the high-level checklist in the [project README](../../README.md#-roadmap).

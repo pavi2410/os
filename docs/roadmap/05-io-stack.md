@@ -36,7 +36,7 @@
 - [x] Add socket syscalls: `socket`, `bind`, `connect`, `send`, `recv`, `sendto`, `recvfrom`, `close`
 - [x] Add network inspection syscalls for `ip addr`, `ip route`, and `ip neigh`
 - [x] Userland tests: `ping`, DNS (`dig`/codec), and HTTP GET over TCP via `curl`
-- [ ] Improve `ping` output with multiple packets, RTT, packet loss, and summary stats
+- [x] Improve `ping` output with multiple packets, RTT, packet loss, and summary stats
 
 ---
 

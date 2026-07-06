@@ -115,11 +115,13 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         run_case(shell, "hello", "Hello from userspace!", case="fork/exec hello")
         run_case(shell, "dig example.com", "ANSWER SECTION", case="dig example.com")
         run_case(shell, "dig example.com", "IN  A", case="dig A record")
-        run_case(shell, "ping", "ping: 10.0.2.2 reply", case="ping gateway")
+        ping_out = run_case(shell, "ping -c 2", "ping: 10.0.2.2 reply seq=1", case="ping gateway")
+        assert_contains(ping_out, "2 packets transmitted, 2 received, 0% packet loss", "ping stats")
+        assert_contains(ping_out, "rtt min/avg/max", "ping rtt stats")
         run_case(
             shell,
-            "ping 104.20.23.154",
-            "ping: 104.20.23.154 reply",
+            "ping -c 2 104.20.23.154",
+            "ping: 104.20.23.154 reply seq=1",
             case="ping off-subnet",
         )
         run_case(shell, "ip addr", "10.0.2.15/24", case="ip addr")
