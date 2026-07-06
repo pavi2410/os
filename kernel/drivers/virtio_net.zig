@@ -1,4 +1,5 @@
 const serial = @import("../arch/x86_64/serial.zig");
+const arp = @import("../net/arp.zig");
 const virtual = @import("../mm/virtual.zig");
 const virtio_pci = @import("virtio_pci.zig");
 
@@ -11,7 +12,7 @@ pub const NetError = virtio_pci.VirtioError || error{
 };
 
 pub const mac_len = 6;
-pub const max_frame_size = 1514;
+pub const max_frame_size = 1518;
 
 const VIRTIO_F_VERSION_1: u64 = 1 << 32;
 
@@ -28,6 +29,7 @@ const NetHdr = extern struct {
     gso_size: u16,
     csum_start: u16,
     csum_offset: u16,
+    num_buffers: u16, // present when VIRTIO_F_VERSION_1 is negotiated
 };
 
 const Desc = extern struct {
@@ -39,6 +41,7 @@ const Desc = extern struct {
 
 const max_queue_size = 256;
 const rx_slots = 8;
+const rx_descs_per_slot = 2;
 
 const AvailRing = extern struct {
     flags: u16,
@@ -68,8 +71,6 @@ const Queue = struct {
     avail_idx: u16,
     last_used_idx: u16,
 };
-
-const rx_frame_offset: usize = 64;
 
 const RxSlot = struct {
     page: *align(4096) [4096]u8,
@@ -102,9 +103,7 @@ pub fn init() NetError!void {
     tx_header = @ptrFromInt(tx_header_virt);
     tx_frame = @ptrFromInt(tx_frame_virt);
 
-    try setupRxSlots();
     device.setDriverOk();
-    device.notifyQueue(rx_queue_index);
 
     const lo = device.readDevice32(0);
     const hi = device.readDevice32(4);
@@ -115,6 +114,7 @@ pub fn init() NetError!void {
     mac[4] = @truncate(hi);
     mac[5] = @truncate(hi >> 8);
 
+    try setupRxSlots();
     ready = true;
 }
 
@@ -137,6 +137,7 @@ pub fn sendFrame(frame: []const u8) NetError!void {
         .gso_size = 0,
         .csum_start = 0,
         .csum_offset = 0,
+        .num_buffers = 0,
     };
     @memcpy(tx_frame[0..frame.len], frame);
 
@@ -163,7 +164,7 @@ pub fn sendFrame(frame: []const u8) NetError!void {
     tx_queue.avail_ring.idx = tx_queue.avail_idx;
 
     device.notifyQueue(tx_queue_index);
-    try waitUsed(&tx_queue, tx_queue_index);
+    try waitUsed(&tx_queue);
 }
 
 fn usedIdx(queue: *const Queue) u16 {
@@ -183,17 +184,16 @@ pub fn recvFrame(buf: []u8) NetError!usize {
     asm volatile ("" ::: .{ .memory = true });
     const used = rx_queue.used_ring.ring[rx_queue.last_used_idx % rx_queue.size];
     const desc_index = @as(usize, @intCast(used.id));
-    const slot_index = desc_index / 2;
+    if (desc_index % rx_descs_per_slot != 0) return NetError.IoError;
+    const slot_index = desc_index / rx_descs_per_slot;
     if (slot_index >= rx_slots) return NetError.IoError;
 
     const total_len = used.len;
-    const frame_len = if (total_len > @sizeOf(NetHdr))
-        total_len - @sizeOf(NetHdr)
-    else
-        total_len;
+    const frame_off = @sizeOf(NetHdr);
+    const frame_len: usize = if (total_len > frame_off) total_len - frame_off else total_len;
     if (frame_len == 0 or frame_len > max_frame_size) return NetError.IoError;
 
-    @memcpy(buf[0..frame_len], rx_slots_storage[slot_index].page[rx_frame_offset..][0..frame_len]);
+    @memcpy(buf[0..frame_len], rx_slots_storage[slot_index].page[frame_off..][0..frame_len]);
     try resubmitRxSlot(slot_index);
 
     rx_queue.last_used_idx +%= 1;
@@ -235,9 +235,10 @@ pub fn logStatus() void {
 pub fn selfTest() void {
     if (!ready) return;
 
-    const target_ip = [_]u8{ 10, 0, 2, 2 };
+    const guest_ip = [_]u8{ 10, 0, 2, 15 };
+    const gateway_ip = [_]u8{ 10, 0, 2, 2 };
     var frame: [max_frame_size]u8 = undefined;
-    const frame_len = buildArpRequest(mac, target_ip, &frame);
+    const frame_len = arp.buildRequest(&frame, mac, guest_ip, gateway_ip);
     sendFrame(frame[0..frame_len]) catch {
         serial.writeString("virtio-net TX failed\r\n");
         return;
@@ -246,7 +247,11 @@ pub fn selfTest() void {
 
     var recv_buf: [max_frame_size]u8 = undefined;
     if (pollRecv(&recv_buf, 100_000)) |len| {
-        serial.printf("virtio-net RX ok ({d} bytes)\r\n", .{len});
+        if (arp.isReply(recv_buf[0..len])) {
+            serial.printf("virtio-net ARP reply ({d} bytes)\r\n", .{len});
+        } else {
+            serial.printf("virtio-net RX frame ({d} bytes)\r\n", .{len});
+        }
     } else |_| {
         serial.writeString("virtio-net RX timeout\r\n");
     }
@@ -287,9 +292,9 @@ fn setupRxSlots() NetError!void {
 fn queueRxSlot(slot: usize) NetError!void {
     const page_virt = @intFromPtr(rx_slots_storage[slot].page);
     const header_phys = virtio_pci.physFromVirt(page_virt) orelse return NetError.IoError;
-    const frame_phys = virtio_pci.physFromVirt(page_virt + rx_frame_offset) orelse return NetError.IoError;
+    const frame_phys = virtio_pci.physFromVirt(page_virt + @sizeOf(NetHdr)) orelse return NetError.IoError;
 
-    const desc_base: u16 = @intCast(slot * 2);
+    const desc_base: u16 = @intCast(slot * rx_descs_per_slot);
     rx_queue.desc_table[desc_base] = .{
         .addr = header_phys,
         .len = @sizeOf(NetHdr),
@@ -315,7 +320,7 @@ fn resubmitRxSlot(slot: usize) NetError!void {
     device.notifyQueue(rx_queue_index);
 }
 
-fn waitUsed(queue: *Queue, queue_index: u16) NetError!void {
+fn waitUsed(queue: *Queue) NetError!void {
     var spins: usize = 0;
     while (usedIdx(queue) == queue.last_used_idx) {
         device.ackInterrupt();
@@ -328,34 +333,4 @@ fn waitUsed(queue: *Queue, queue_index: u16) NetError!void {
     _ = queue.used_ring.ring[queue.last_used_idx % queue.size];
     queue.last_used_idx +%= 1;
     device.ackInterrupt();
-    _ = queue_index;
-}
-
-fn buildArpRequest(src_mac: [mac_len]u8, target_ip: [4]u8, out: *[max_frame_size]u8) usize {
-    const frame_len: usize = 60; // minimum Ethernet frame size (excluding FCS)
-    @memset(out[0..frame_len], 0);
-
-    // Ethernet header
-    for (0..6) |i| out[i] = 0xFF; // broadcast
-    @memcpy(out[6..12], &src_mac);
-    out[12] = 0x08;
-    out[13] = 0x06;
-
-    // ARP payload
-    out[14] = 0x00;
-    out[15] = 0x01; // Ethernet
-    out[16] = 0x08;
-    out[17] = 0x00; // IPv4
-    out[18] = mac_len;
-    out[19] = 4;
-    out[20] = 0x00;
-    out[21] = 0x01; // request
-    @memcpy(out[22..28], &src_mac);
-    out[28] = 10;
-    out[29] = 0;
-    out[30] = 2;
-    out[31] = 15; // QEMU user-net guest IP hint
-    @memcpy(out[38..42], &target_ip);
-
-    return frame_len;
 }
