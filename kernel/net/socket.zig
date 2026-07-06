@@ -1,3 +1,4 @@
+const config = @import("config.zig");
 const ipv4 = @import("ipv4.zig");
 const resolve = @import("resolve.zig");
 const udp = @import("udp.zig");
@@ -85,7 +86,7 @@ pub fn sendto(
         &frame,
         dst_mac,
         mac,
-        resolve.guest_ip,
+        config.guest_ip,
         dst_ip,
         sock.local_port,
         dst_port,

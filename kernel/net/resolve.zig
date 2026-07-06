@@ -1,9 +1,8 @@
 const arp = @import("arp.zig");
+const config = @import("config.zig");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 const virtio_net = @import("../drivers/virtio_net.zig");
-
-pub const guest_ip = ipv4.Addr{ 10, 0, 2, 15 };
 
 var cached_mac: ?ethernet.Mac = null;
 var cached_ip: ipv4.Addr = .{ 0, 0, 0, 0 };
@@ -14,7 +13,7 @@ pub fn resolve(ip: ipv4.Addr, src_mac: ethernet.Mac) ?ethernet.Mac {
     }
 
     var frame: [virtio_net.max_frame_size]u8 = undefined;
-    const frame_len = arp.buildRequest(&frame, src_mac, guest_ip, ip);
+    const frame_len = arp.buildRequest(&frame, src_mac, config.guest_ip, ip);
     virtio_net.sendFrame(frame[0..frame_len]) catch return null;
 
     var recv_buf: [virtio_net.max_frame_size]u8 = undefined;
