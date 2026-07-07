@@ -15,7 +15,7 @@ from shell_session import QemuShell, assert_cat_exact, assert_contains, sync_dis
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def repo_root() -> Path:
     iso = ROOT / "zig-out" / "os.iso"
     disk = ROOT / "zig-out" / "disk.img"
@@ -51,103 +51,170 @@ def wait_for_port(port: int) -> None:
     raise TimeoutError(f"server did not listen on port {port}")
 
 
-def test_shell_smoke_and_persistence(repo_root: Path) -> None:
+@pytest.fixture(scope="module")
+def shell_session(repo_root: Path) -> QemuShell:
     shell = QemuShell(repo_root)
     shell.start()
-    try:
-        shell.wait_ready()
-        assert_contains(shell.log, QemuShell.READY, "boot")
+    shell.wait_ready()
+    yield shell
+    shell.close()
 
+
+class TestShellBoot:
+    def test_boot_ready(self, shell_session: QemuShell) -> None:
+        assert_contains(shell_session.log, QemuShell.READY, "boot")
+
+
+class TestShellBuiltins:
+    def test_help(self, shell_session: QemuShell) -> None:
         run_case(
-            shell,
+            shell_session,
             "help",
             "Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir, rmdir, cd, pwd, date",
             case="help",
         )
-        run_case(shell, "pwd", "/", case="pwd root")
-        date_out = run_case(shell, "date", case="date")
+
+    def test_pwd_root(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "pwd", "/", case="pwd root")
+
+    def test_date(self, shell_session: QemuShell) -> None:
+        date_out = run_case(shell_session, "date", case="date")
         if "-" not in date_out or ":" not in date_out or "UTC" not in date_out:
             raise AssertionError(f"date: unexpected output:\n{date_out}")
-        run_case(shell, "echo hello from echo", "hello from echo", case="echo")
+
+    def test_echo(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "echo hello from echo", "hello from echo", case="echo")
+
+    def test_cat_readme(self, shell_session: QemuShell) -> None:
         run_case(
-            shell,
+            shell_session,
             "cat /README.TXT",
             "Hello from FAT on virtio-blk",
             case="cat readme",
         )
-        run_case(shell, "ls", "README.TXT", case="ls root")
-        run_case(shell, "ls /BIN", "SHELL", case="ls /BIN")
-        mkdir_out = shell.run("mkdir /TDIR")
+
+    def test_ls_root(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "ls", "README.TXT", case="ls root")
+
+    def test_ls_bin(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "ls /BIN", "SHELL", case="ls /BIN")
+
+    def test_pid(self, shell_session: QemuShell) -> None:
+        pid_out = run_case(shell_session, "pid", case="pid")
+        assert any(ch.isdigit() for ch in pid_out), f"pid: no digits in:\n{pid_out}"
+
+
+class TestShellFilesystem:
+    def test_mkdir_cd_write_cat(self, shell_session: QemuShell) -> None:
+        mkdir_out = shell_session.run("mkdir /TDIR")
         if "mkdir: ok" not in mkdir_out and "mkdir: failed" not in mkdir_out:
             raise AssertionError(f"mkdir: unexpected output:\n{mkdir_out}")
-        run_case(shell, "cd /TDIR", case="cd tdir")
-        run_case(shell, "pwd", "/TDIR", case="pwd tdir")
-        run_case(shell, "write NOTE.TXT nested", "write: ok", case="write relative")
-        run_case(shell, "cat NOTE.TXT", "nested", case="cat relative")
-        run_case(shell, "cd ..", case="cd parent")
-        run_case(shell, "pwd", "/", case="pwd after cd ..")
-        run_case(shell, "cat /TDIR/NOTE.TXT", "nested", case="cat in dir")
-        run_case(shell, "rm /TDIR/NOTE.TXT", "rm: ok", case="rm note in dir")
-        run_case(shell, "rmdir /TDIR", "rmdir: ok", case="rmdir tdir")
-        run_case(shell, "ls -l /BIN", "SHELL", case="ls -l /BIN")
-        run_case(shell, "ls /BIN", "DIG", case="ls /BIN dig")
-        run_case(shell, "write /yo.txt yoman", "write: ok", case="write yo")
-        run_case(shell, "cat /YO.TXT", "yoman", case="cat yo")
+        run_case(shell_session, "cd /TDIR", case="cd tdir")
+        run_case(shell_session, "pwd", "/TDIR", case="pwd tdir")
+        run_case(shell_session, "write NOTE.TXT nested", "write: ok", case="write relative")
+        run_case(shell_session, "cat NOTE.TXT", "nested", case="cat relative")
+        run_case(shell_session, "cd ..", case="cd parent")
+        run_case(shell_session, "pwd", "/", case="pwd after cd ..")
+        run_case(shell_session, "cat /TDIR/NOTE.TXT", "nested", case="cat in dir")
+
+    def test_rm_rmdir(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "rm /TDIR/NOTE.TXT", "rm: ok", case="rm note in dir")
+        run_case(shell_session, "rmdir /TDIR", "rmdir: ok", case="rmdir tdir")
+
+    def test_ls_long_bin(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "ls -l /BIN", "SHELL", case="ls -l /BIN")
+        run_case(shell_session, "ls /BIN", "DIG", case="ls /BIN dig")
+
+    def test_write_and_cat(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "write /yo.txt yoman", "write: ok", case="write yo")
+        run_case(shell_session, "cat /YO.TXT", "yoman", case="cat yo")
         run_case(
-            shell,
+            shell_session,
             "write /TEST.TXT persisted on disk!",
             "write: ok",
             case="write persist",
         )
+
+    def test_append(self, shell_session: QemuShell) -> None:
         append_path = "/SMKAPP.TXT"
-        run_case(shell, f"write {append_path} first", "write: ok", case="append truncate")
-        run_case(shell, f"write -a {append_path} second", "write: ok", case="append 2")
-        append_out = run_case(shell, f"cat {append_path}", case="cat append")
+        run_case(shell_session, f"write {append_path} first", "write: ok", case="append truncate")
+        run_case(shell_session, f"write -a {append_path} second", "write: ok", case="append 2")
+        append_out = run_case(shell_session, f"cat {append_path}", case="cat append")
         assert_cat_exact(append_out, append_path, "firstsecond", "cat append")
-        run_case(shell, f"rm {append_path}", "rm: ok", case="rm append")
-        run_case(shell, f"cat {append_path}", "cat: open failed", case="cat removed")
+        run_case(shell_session, f"rm {append_path}", "rm: ok", case="rm append")
+        run_case(shell_session, f"cat {append_path}", "cat: open failed", case="cat removed")
         run_case(
-            shell,
+            shell_session,
             "cat /TEST.TXT",
             "persisted on disk!",
             case="cat persist",
         )
-        run_case(shell, "lscpu", "Architecture:", case="fork/exec lscpu")
-        run_case(shell, "dig example.com", "ANSWER SECTION", case="dig example.com")
-        run_case(shell, "dig example.com", "IN  A", case="dig A record")
-        ping_out = run_case(shell, "ping -c 2", "ping: 10.0.2.2 reply seq=1", case="ping gateway")
+
+
+class TestShellPrograms:
+    def test_lscpu(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "lscpu", "Architecture:", case="fork/exec lscpu")
+
+    def test_dig(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "dig example.com", "ANSWER SECTION", case="dig example.com")
+        run_case(shell_session, "dig example.com", "IN  A", case="dig A record")
+
+    def test_ping_gateway(self, shell_session: QemuShell) -> None:
+        ping_out = run_case(
+            shell_session,
+            "ping -c 2",
+            "ping: 10.0.2.2 reply seq=1",
+            case="ping gateway",
+        )
         assert_contains(ping_out, "2 packets transmitted, 2 received, 0% packet loss", "ping stats")
         assert_contains(ping_out, "rtt min/avg/max", "ping rtt stats")
+
+    def test_ping_off_subnet(self, shell_session: QemuShell) -> None:
         run_case(
-            shell,
+            shell_session,
             "ping -c 2 104.20.23.154",
             "ping: 104.20.23.154 reply seq=1",
             case="ping off-subnet",
         )
-        run_case(shell, "ip addr", "10.0.2.15/24", case="ip addr")
-        run_case(shell, "ip route", "default via 10.0.2.2", case="ip route")
-        pid_out = run_case(shell, "pid", case="pid")
-        assert any(ch.isdigit() for ch in pid_out), f"pid: no digits in:\n{pid_out}"
-        shell.assert_no_faults()
-    finally:
-        shell.close()
 
+    def test_ip(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "ip addr", "10.0.2.15/24", case="ip addr")
+        run_case(shell_session, "ip route", "default via 10.0.2.2", case="ip route")
+
+    def test_no_faults(self, shell_session: QemuShell) -> None:
+        shell_session.assert_no_faults()
+
+
+@pytest.fixture(scope="module")
+def persisted_disk(repo_root: Path, shell_session: QemuShell) -> Path:
+    shell_session.assert_no_faults()
     sync_disk(repo_root)
+    return repo_root
 
-    shell2 = QemuShell(repo_root)
-    shell2.start()
-    try:
-        shell2.wait_ready()
-        run_case(shell2, "cat /YO.TXT", "yoman", case="persist cat yo")
+
+@pytest.fixture(scope="module")
+def rebooted_shell(persisted_disk: Path) -> QemuShell:
+    shell = QemuShell(persisted_disk)
+    shell.start()
+    shell.wait_ready()
+    yield shell
+    shell.close()
+
+
+class TestShellPersistence:
+    def test_persist_cat_yo(self, rebooted_shell: QemuShell) -> None:
+        run_case(rebooted_shell, "cat /YO.TXT", "yoman", case="persist cat yo")
+
+    def test_persist_cat_test(self, rebooted_shell: QemuShell) -> None:
         run_case(
-            shell2,
+            rebooted_shell,
             "cat /TEST.TXT",
             "persisted on disk!",
             case="persist cat test",
         )
-        shell2.assert_no_faults()
-    finally:
-        shell2.close()
+
+    def test_no_faults_after_reboot(self, rebooted_shell: QemuShell) -> None:
+        rebooted_shell.assert_no_faults()
 
 
 def test_tcp_curl_from_host(repo_root: Path, tmp_path: Path) -> None:

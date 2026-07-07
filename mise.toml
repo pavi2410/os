@@ -76,7 +76,7 @@ sources = [
   "scripts/qemu.py",
   "scripts/create_disk.py",
 ]
-run = "uv run pytest test/integration -v"
+run = "uv run pytest test/integration/test_shell.py -v"
 
 [tasks."test-in-guest"]
 description = "Boot the OS and verify kernel/userspace TAP self-tests"
