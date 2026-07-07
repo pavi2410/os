@@ -1,9 +1,10 @@
 const cpu = @import("cpu.zig");
+const exc_frame = @import("frame.zig");
 const gdt = @import("gdt.zig");
 const interrupts = @import("interrupts.zig");
 const std = @import("std");
 
-pub const ExceptionFrame = interrupts.Frame;
+pub const ExceptionFrame = exc_frame.Frame;
 
 const IdtEntry = extern struct {
     offset_low: u16,
@@ -25,6 +26,8 @@ const irq_vector_end: usize = 48;
 
 var idt: [256]IdtEntry = undefined;
 
+extern fn isr_0() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_6() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn isr_8() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn isr_13() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn isr_14() callconv(.{ .x86_64_sysv = .{} }) void;
@@ -50,6 +53,22 @@ extern fn isr_47() callconv(.{ .x86_64_sysv = .{} }) void;
 
 comptime {
     asm (
+        \\.global isr_0
+        \\.type isr_0, @function
+        \\isr_0:
+        \\  cli
+        \\  push $0
+        \\  push $0
+        \\  jmp exception_stub
+        \\
+        \\.global isr_6
+        \\.type isr_6, @function
+        \\isr_6:
+        \\  cli
+        \\  push $0
+        \\  push $6
+        \\  jmp exception_stub
+        \\
         \\.global isr_8
         \\.type isr_8, @function
         \\isr_8:
@@ -217,6 +236,8 @@ pub fn init() void {
         setHandler(vector, isr_default, 0);
     }
     const ist = gdt.exception_ist;
+    setHandler(0, isr_0, ist);
+    setHandler(6, isr_6, ist);
     setHandler(8, isr_8, ist);
     setHandler(13, isr_13, ist);
     setHandler(14, isr_14, ist);

@@ -227,6 +227,12 @@ pub fn build(b: *std.Build) void {
     syscall_user_test_mod.addImport("syscall_user", syscall_user_host_mod);
     const run_syscall_user_tests = helpers.runHostTest(b, syscall_user_test_mod);
 
+    const crash_util_host_mod = helpers.hostModule(b, "kernel/proc/crash_util.zig");
+
+    const crash_test_mod = helpers.hostTestModule(b, "test/kernel/crash_test.zig");
+    crash_test_mod.addImport("crash_util", crash_util_host_mod);
+    const run_crash_tests = helpers.runHostTest(b, crash_test_mod);
+
     const time_math_host = helpers.hostModule(b, "userspace/ulib/time_math.zig");
 
     const ulib_helpers_test_mod = helpers.hostTestModule(b, "test/userspace/ulib_helpers_test.zig");
@@ -248,6 +254,7 @@ pub fn build(b: *std.Build) void {
         run_virtio_descriptor_tests,
         run_filesystem_contract_tests,
         run_syscall_user_tests,
+        run_crash_tests,
         run_icmp_tests,
         run_tcp_tests,
         run_curl_target_tests,
