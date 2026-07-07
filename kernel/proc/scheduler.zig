@@ -135,7 +135,7 @@ fn schedule() void {
 
 fn exitCurrent() noreturn {
     yield();
-    cpu.haltForever();
+    while (true) cpu.hlt();
 }
 
 fn idleEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {

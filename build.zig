@@ -52,6 +52,10 @@ pub fn build(b: *std.Build) void {
     const install_hello = helpers.addUserProgram(b, user_deps, "hello", "userspace/hello/main.zig", user_install);
     const install_ping = helpers.addUserProgram(b, user_deps, "ping", "userspace/ping/main.zig", user_install);
     const install_ip = helpers.addUserProgram(b, user_deps, "ip", "userspace/ip/main.zig", user_install);
+    const install_lscpu = helpers.addUserProgram(b, user_deps, "lscpu", "userspace/lscpu/main.zig", user_install);
+    const install_lspci = helpers.addUserProgram(b, user_deps, "lspci", "userspace/lspci/main.zig", user_install);
+    const install_lsblk = helpers.addUserProgram(b, user_deps, "lsblk", "userspace/lsblk/main.zig", user_install);
+    const install_lsmem = helpers.addUserProgram(b, user_deps, "lsmem", "userspace/lsmem/main.zig", user_install);
 
     const shell = b.addExecutable(.{
         .name = "shell",
@@ -91,6 +95,10 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_ping.step);
     b.getInstallStep().dependOn(&install_curl.step);
     b.getInstallStep().dependOn(&install_ip.step);
+    b.getInstallStep().dependOn(&install_lscpu.step);
+    b.getInstallStep().dependOn(&install_lspci.step);
+    b.getInstallStep().dependOn(&install_lsblk.step);
+    b.getInstallStep().dependOn(&install_lsmem.step);
 
     const limine_kernel_mod = helpers.exeModule(b, "kernel/boot/limine.zig", kernel_target, optimize);
 

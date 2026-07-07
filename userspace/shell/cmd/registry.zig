@@ -77,10 +77,14 @@ pub fn printHelp() void {
         }
     }
 
-    io.writeStr("Programs in /BIN: hello, dig, ping, curl, ip, ...\n");
+    io.writeStr("Programs in /BIN: hello, dig, ping, curl, ip, lscpu, lspci, lsblk, lsmem, ...\n");
     io.writeStr("  dig [@server] name  DNS A lookup (default server 10.0.2.3)\n");
     io.writeStr("  ping [host]  ICMP echo (default 10.0.2.2)\n");
     io.writeStr("  curl <url|host> [port]  HTTP GET (resolves hostnames via DNS)\n");
     io.writeStr("  ip <addr|route|neigh>  show addresses, routes, or neighbors\n");
+    io.writeStr("  lscpu  show CPU information\n");
+    io.writeStr("  lspci  list PCI devices\n");
+    io.writeStr("  lsblk  list block devices\n");
+    io.writeStr("  lsmem  list physical memory regions\n");
     io.writeStr("Paths may be absolute (/foo) or relative to the current directory.\n");
 }

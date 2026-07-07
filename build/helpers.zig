@@ -24,6 +24,7 @@ pub const AbiBundle = struct {
     syscall: *std.Build.Module,
     fs: *std.Build.Module,
     net: *std.Build.Module,
+    hw: *std.Build.Module,
 
     pub fn create(
         b: *std.Build,
@@ -34,6 +35,7 @@ pub const AbiBundle = struct {
             .syscall = exeModule(b, "common/abi/syscall.zig", target, optimize),
             .fs = exeModule(b, "common/abi/fs.zig", target, optimize),
             .net = exeModule(b, "common/abi/net.zig", target, optimize),
+            .hw = exeModule(b, "common/abi/hw.zig", target, optimize),
         };
     }
 
@@ -41,6 +43,7 @@ pub const AbiBundle = struct {
         mod.addImport("abi_syscall", self.syscall);
         mod.addImport("abi_fs", self.fs);
         mod.addImport("abi_net", self.net);
+        mod.addImport("abi_hw", self.hw);
     }
 
     pub fn attachFsView(self: AbiBundle, view: *std.Build.Module) void {

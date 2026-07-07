@@ -9,6 +9,7 @@ pub const parse = @import("parse.zig");
 pub const process = @import("process.zig");
 pub const string = @import("string.zig");
 pub const time = @import("time.zig");
+pub const hw = @import("hw.zig");
 
 comptime {
     _ = @import("start.zig");

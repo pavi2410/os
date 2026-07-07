@@ -8,6 +8,7 @@ const user_wait = @import("../proc/wait.zig");
 const vfs = @import("../fs/vfs.zig");
 const socket = @import("../net/socket.zig");
 const net_info = @import("../net/info.zig");
+const hw_info = @import("../hw/info.zig");
 const hal = @import("../hal.zig");
 const abi_fs = @import("abi_fs");
 const abi_syscall = @import("abi_syscall");
@@ -15,6 +16,8 @@ const errno = @import("errno.zig");
 const fdtab = @import("fd.zig");
 const fd_ops = @import("fd_ops.zig");
 const user = @import("user.zig");
+const copy_out = @import("copy_out.zig");
+const std = @import("std");
 
 /// Matches the stack layout built by `syscall_entry` (callee-saved pushed first).
 pub const Frame = extern struct {
@@ -63,6 +66,10 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.bind => sysBind(frame.arg0, frame.arg1, frame.arg2),
         numbers.getnetconfig => sysGetnetconfig(frame.arg0),
         numbers.getneighbors => sysGetneighbors(frame.arg0, frame.arg1),
+        numbers.getcpuinfo => sysGetcpuinfo(frame.arg0),
+        numbers.getpcidevices => sysGetpcidevices(frame.arg0, frame.arg1),
+        numbers.getblockdevices => sysGetblockdevices(frame.arg0, frame.arg1),
+        numbers.getmemregions => sysGetmemregions(frame.arg0, frame.arg1),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
         else => errno.ENOSYS,
     };
@@ -321,6 +328,41 @@ fn sysGetneighbors(buf_ptr: u64, max: u64) i64 {
     const cap: usize = @intCast(@min(max, 64));
     const out = user.slice(net_info.NeighEntry, buf_ptr, cap) orelse return errno.EFAULT;
     const count = net_info.fillNeighbors(out);
+    return @intCast(count);
+}
+
+fn sysGetcpuinfo(buf_ptr: u64) i64 {
+    if (buf_ptr == 0) return errno.EFAULT;
+    var info: hw_info.CpuInfo = undefined;
+    hw_info.fillCpuInfo(&info);
+    copy_out.copyOut(buf_ptr, std.mem.asBytes(&info)) catch return errno.EFAULT;
+    return 0;
+}
+
+fn sysGetpcidevices(buf_ptr: u64, max: u64) i64 {
+    if (buf_ptr == 0 or max == 0) return errno.EINVAL;
+    const cap: usize = @intCast(@min(max, 64));
+    var buf: [64]hw_info.PciDeviceInfo = undefined;
+    const count = hw_info.fillPciDevices(buf[0..cap]);
+    copy_out.copyOut(buf_ptr, std.mem.sliceAsBytes(buf[0..count])) catch return errno.EFAULT;
+    return @intCast(count);
+}
+
+fn sysGetblockdevices(buf_ptr: u64, max: u64) i64 {
+    if (buf_ptr == 0 or max == 0) return errno.EINVAL;
+    const cap: usize = @intCast(@min(max, 8));
+    var buf: [8]hw_info.BlockDeviceInfo = undefined;
+    const count = hw_info.fillBlockDevices(buf[0..cap]);
+    copy_out.copyOut(buf_ptr, std.mem.sliceAsBytes(buf[0..count])) catch return errno.EFAULT;
+    return @intCast(count);
+}
+
+fn sysGetmemregions(buf_ptr: u64, max: u64) i64 {
+    if (buf_ptr == 0 or max == 0) return errno.EINVAL;
+    const cap: usize = @intCast(@min(max, 256));
+    var buf: [256]hw_info.MemRegionInfo = undefined;
+    const count = hw_info.fillMemRegions(buf[0..cap]);
+    copy_out.copyOut(buf_ptr, std.mem.sliceAsBytes(buf[0..count])) catch return errno.EFAULT;
     return @intCast(count);
 }
 

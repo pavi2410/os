@@ -12,13 +12,17 @@ pub fn millis(us: u64, out: []u8) ?[]const u8 {
 }
 
 pub fn decimal(n: usize, out: []u8) ?[]const u8 {
+    return decimalU64(n, out);
+}
+
+pub fn decimalU64(n: u64, out: []u8) ?[]const u8 {
     if (out.len == 0) return null;
     if (n == 0) {
         out[0] = '0';
         return out[0..1];
     }
 
-    var tmp: [20]u8 = undefined;
+    var tmp: [24]u8 = undefined;
     var value = n;
     var len: usize = 0;
     while (value > 0) : (len += 1) {

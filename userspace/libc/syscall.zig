@@ -2,6 +2,7 @@
 const abi_syscall = @import("abi_syscall");
 const abi_fs = @import("abi_fs");
 const abi_net = @import("abi_net");
+const abi_hw = @import("abi_hw");
 
 pub fn exit(status: u32) noreturn {
     _ = syscall6(abi_syscall.exit, status, 0, 0, 0, 0, 0);
@@ -128,6 +129,27 @@ pub fn getnetconfig(out: *NetConfig) isize {
 
 pub fn getneighbors(buf: [*]NeighEntry, max: usize) isize {
     return syscall6(abi_syscall.getneighbors, @intFromPtr(buf), max, 0, 0, 0, 0);
+}
+
+pub const CpuInfo = abi_hw.CpuInfo;
+pub const PciDeviceInfo = abi_hw.PciDeviceInfo;
+pub const BlockDeviceInfo = abi_hw.BlockDeviceInfo;
+pub const MemRegionInfo = abi_hw.MemRegionInfo;
+
+pub fn getcpuinfo(out: *CpuInfo) isize {
+    return syscall6(abi_syscall.getcpuinfo, @intFromPtr(out), 0, 0, 0, 0, 0);
+}
+
+pub fn getpcidevices(buf: [*]PciDeviceInfo, max: usize) isize {
+    return syscall6(abi_syscall.getpcidevices, @intFromPtr(buf), max, 0, 0, 0, 0);
+}
+
+pub fn getblockdevices(buf: [*]BlockDeviceInfo, max: usize) isize {
+    return syscall6(abi_syscall.getblockdevices, @intFromPtr(buf), max, 0, 0, 0, 0);
+}
+
+pub fn getmemregions(buf: [*]MemRegionInfo, max: usize) isize {
+    return syscall6(abi_syscall.getmemregions, @intFromPtr(buf), max, 0, 0, 0, 0);
 }
 
 pub fn waitpid(pid: isize, status: ?*u32, options: u32) isize {

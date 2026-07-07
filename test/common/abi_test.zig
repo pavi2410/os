@@ -1,5 +1,6 @@
 const std = @import("std");
 const abi_fs = @import("abi_fs");
+const abi_hw = @import("abi_hw");
 const abi_net = @import("abi_net");
 const abi_syscall = @import("abi_syscall");
 
@@ -9,6 +10,7 @@ test "syscall numbers stay Linux-compatible for implemented calls" {
     try std.testing.expectEqual(@as(comptime_int, 57), abi_syscall.fork);
     try std.testing.expectEqual(@as(comptime_int, 228), abi_syscall.clock_gettime);
     try std.testing.expectEqual(@as(comptime_int, 1024), abi_syscall.getnetconfig);
+    try std.testing.expectEqual(@as(comptime_int, 1029), abi_syscall.getmemregions);
 }
 
 test "filesystem ABI layouts match syscall handlers" {
@@ -40,4 +42,19 @@ test "network ABI sockaddr uses big-endian port" {
     try std.testing.expectEqual(@as(u8, 10), addr.addr[0]);
     try std.testing.expectEqual(@as(usize, 16), @sizeOf(abi_net.SockaddrIn));
     try std.testing.expectEqual(@as(usize, 22), @sizeOf(abi_net.NetConfig));
+}
+
+test "hardware ABI layouts match syscall handlers" {
+    try std.testing.expectEqual(@as(usize, 92), @sizeOf(abi_hw.CpuInfo));
+    try std.testing.expectEqual(@as(usize, 0), @offsetOf(abi_hw.CpuInfo, "vendor"));
+    try std.testing.expectEqual(@as(usize, 16), @offsetOf(abi_hw.CpuInfo, "brand"));
+    try std.testing.expectEqual(@as(usize, 80), @offsetOf(abi_hw.CpuInfo, "logical_cpus"));
+
+    try std.testing.expectEqual(@as(usize, 32), @sizeOf(abi_hw.BlockDeviceInfo));
+    try std.testing.expectEqual(@as(usize, 0), @offsetOf(abi_hw.BlockDeviceInfo, "name"));
+    try std.testing.expectEqual(@as(usize, 16), @offsetOf(abi_hw.BlockDeviceInfo, "sector_size"));
+    try std.testing.expectEqual(@as(usize, 24), @offsetOf(abi_hw.BlockDeviceInfo, "capacity_sectors"));
+
+    try std.testing.expectEqual(@as(usize, 14), @sizeOf(abi_hw.PciDeviceInfo));
+    try std.testing.expectEqual(@as(usize, 24), @sizeOf(abi_hw.MemRegionInfo));
 }

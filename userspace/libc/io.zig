@@ -13,6 +13,7 @@ pub fn cstr(ptr: [*]u8) []const u8 {
 pub const eql = string.eql;
 
 pub fn writeStr(s: []const u8) void {
+    if (s.len == 0) return;
     _ = syscall.write(1, s.ptr, s.len);
 }
 
@@ -29,6 +30,20 @@ pub fn writeDecimal(n: usize) void {
     var buf: [20]u8 = undefined;
     const text = format.decimal(n, &buf) orelse return;
     writeStr(text);
+}
+
+pub fn writeU32(n: u32) void {
+    writeDecimal(@intCast(n));
+}
+
+pub fn writeU64(n: u64) void {
+    var buf: [24]u8 = undefined;
+    const text = format.decimalU64(n, &buf) orelse return;
+    writeStr(text);
+}
+
+pub fn writeU8(n: u8) void {
+    writeDecimal(n);
 }
 
 pub fn writeSignedDecimal(n: isize) void {

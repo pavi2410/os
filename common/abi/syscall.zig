@@ -28,6 +28,10 @@ pub const exit_group = 231;
 /// OS-specific inspection syscalls.
 pub const getnetconfig = 1024;
 pub const getneighbors = 1025;
+pub const getcpuinfo = 1026;
+pub const getpcidevices = 1027;
+pub const getblockdevices = 1028;
+pub const getmemregions = 1029;
 
 pub const CLOCK_REALTIME: u32 = 0;
 pub const CLOCK_MONOTONIC: u32 = 1;
