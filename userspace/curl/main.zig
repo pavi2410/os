@@ -31,14 +31,21 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8
     }
 
     var host_ip: [4]u8 = undefined;
-    if (ulib.ip.parseIpv4(parsed.host, &host_ip)) {
-        // literal IPv4
-    } else if (!resolveName(parsed.host, &host_ip)) {
-        ulib.io.writeStr("curl: could not resolve host\n");
-        return 1;
-    }
+    const resolved_ip: *const [4]u8 = switch (parsed.host) {
+        .ipv4 => |addr| blk: {
+            host_ip = addr;
+            break :blk &host_ip;
+        },
+        .hostname => |name| blk: {
+            if (!resolveName(name, &host_ip)) {
+                ulib.io.writeStr("curl: could not resolve host\n");
+                return 1;
+            }
+            break :blk &host_ip;
+        },
+    };
 
-    return httpGet(parsed.host, &host_ip, port, parsed.path);
+    return httpGet(parsed.authority, resolved_ip, port, parsed.path);
 }
 
 fn resolveName(name: []const u8, out: *[4]u8) bool {

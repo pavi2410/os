@@ -19,9 +19,11 @@ test "parse accepts bare IPv4" {
     var host: [128]u8 = undefined;
     var path: [128]u8 = undefined;
     const got = try target.parse("10.0.2.2", &norm, &host, &path);
-    try std.testing.expectEqualStrings("10.0.2.2", got.host);
+    try std.testing.expectEqualStrings("10.0.2.2", got.authority);
     try std.testing.expectEqual(@as(u16, 80), got.port);
     try std.testing.expectEqualStrings("/", got.path);
+    try std.testing.expect(got.host == .ipv4);
+    try std.testing.expectEqualSlices(u8, &.{ 10, 0, 2, 2 }, &got.host.ipv4);
 }
 
 test "parse accepts IPv4 with explicit port" {
@@ -29,7 +31,7 @@ test "parse accepts IPv4 with explicit port" {
     var host: [128]u8 = undefined;
     var path: [128]u8 = undefined;
     const got = try target.parse("10.0.2.2:8080", &norm, &host, &path);
-    try std.testing.expectEqualStrings("10.0.2.2", got.host);
+    try std.testing.expectEqualStrings("10.0.2.2", got.authority);
     try std.testing.expectEqual(@as(u16, 8080), got.port);
 }
 
@@ -38,8 +40,9 @@ test "parse strips http scheme and keeps path" {
     var host: [128]u8 = undefined;
     var path: [128]u8 = undefined;
     const got = try target.parse("http://example.com/foo", &norm, &host, &path);
-    try std.testing.expectEqualStrings("example.com", got.host);
+    try std.testing.expectEqualStrings("example.com", got.authority);
     try std.testing.expectEqualStrings("/foo", got.path);
+    try std.testing.expect(got.host == .hostname);
 }
 
 test "parse strips http scheme port and path" {
@@ -47,7 +50,7 @@ test "parse strips http scheme port and path" {
     var host: [128]u8 = undefined;
     var path: [128]u8 = undefined;
     const got = try target.parse("http://example.com:8080/bar", &norm, &host, &path);
-    try std.testing.expectEqualStrings("example.com", got.host);
+    try std.testing.expectEqualStrings("example.com", got.authority);
     try std.testing.expectEqual(@as(u16, 8080), got.port);
     try std.testing.expectEqualStrings("/bar", got.path);
 }
@@ -67,9 +70,14 @@ test "parse rejects path overflow" {
     try std.testing.expectError(target.ParseError.PathTooLong, target.parse(long_path, &norm, &host, &path));
 }
 
-test "hostKind classifies IPv4 and hostnames" {
-    try std.testing.expectEqual(target.HostKind.ipv4, target.hostKind("10.0.2.2"));
-    try std.testing.expectEqual(target.HostKind.hostname, target.hostKind("example.com"));
+test "parseHost classifies IPv4 and hostnames" {
+    const ipv4 = target.parseHost("10.0.2.2");
+    try std.testing.expect(ipv4 == .ipv4);
+    try std.testing.expectEqualSlices(u8, &.{ 10, 0, 2, 2 }, &ipv4.ipv4);
+
+    const hostname = target.parseHost("example.com");
+    try std.testing.expect(hostname == .hostname);
+    try std.testing.expectEqualStrings("example.com", hostname.hostname);
 }
 
 test "buildRequest formats HTTP/1.0 GET" {
@@ -91,7 +99,7 @@ test "resolve flow: IPv4 literal needs no DNS" {
     var host: [128]u8 = undefined;
     var path: [128]u8 = undefined;
     const got = try target.parse("10.0.2.2", &norm, &host, &path);
-    try std.testing.expectEqual(target.HostKind.ipv4, target.hostKind(got.host));
+    try std.testing.expect(got.host == .ipv4);
 }
 
 test "resolve flow: hostname needs DNS" {
@@ -99,5 +107,6 @@ test "resolve flow: hostname needs DNS" {
     var host: [128]u8 = undefined;
     var path: [128]u8 = undefined;
     const got = try target.parse("http://example.com/", &norm, &host, &path);
-    try std.testing.expectEqual(target.HostKind.hostname, target.hostKind(got.host));
+    try std.testing.expect(got.host == .hostname);
+    try std.testing.expectEqualStrings("example.com", got.host.hostname);
 }

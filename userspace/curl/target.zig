@@ -2,8 +2,14 @@ const ulib = @import("ulib");
 
 pub const default_port: u16 = 80;
 
+pub const Host = union(enum) {
+    ipv4: [4]u8,
+    hostname: []const u8,
+};
+
 pub const Target = struct {
-    host: []const u8,
+    authority: []const u8,
+    host: Host,
     path: []const u8,
     port: u16,
 };
@@ -15,11 +21,6 @@ pub const ParseError = error{
     PathTooLong,
 };
 
-pub const HostKind = enum {
-    ipv4,
-    hostname,
-};
-
 const http_prefix = "http://";
 
 /// If `input` has no `://` scheme, writes `http://` + input into `norm_buf`.
@@ -29,6 +30,12 @@ pub fn normalizeUrl(input: []const u8, norm_buf: []u8) ?[]const u8 {
     @memcpy(norm_buf[0..http_prefix.len], http_prefix);
     @memcpy(norm_buf[http_prefix.len..][0..input.len], input);
     return norm_buf[0 .. http_prefix.len + input.len];
+}
+
+pub fn parseHost(text: []const u8) Host {
+    var addr: [4]u8 = undefined;
+    if (ulib.ip.parseIpv4(text, &addr)) return .{ .ipv4 = addr };
+    return .{ .hostname = text };
 }
 
 pub fn parse(input: []const u8, norm_buf: []u8, host_buf: []u8, path_buf: []u8) ParseError!Target {
@@ -52,7 +59,7 @@ pub fn parse(input: []const u8, norm_buf: []u8, host_buf: []u8, path_buf: []u8) 
     }
     if (host_len == 0 or host_len >= host_buf.len) return error.HostTooLong;
     @memcpy(host_buf[0..host_len], authority[0..host_len]);
-    const host = host_buf[0..host_len];
+    const host_text = host_buf[0..host_len];
 
     const path = path_slice: {
         if (path_src.len == 0 or ulib.string.eql(path_src, "/")) {
@@ -64,13 +71,12 @@ pub fn parse(input: []const u8, norm_buf: []u8, host_buf: []u8, path_buf: []u8) 
         break :path_slice path_buf[0..path_src.len];
     };
 
-    return .{ .host = host, .path = path, .port = port };
-}
-
-pub fn hostKind(host: []const u8) HostKind {
-    var addr: [4]u8 = undefined;
-    if (ulib.ip.parseIpv4(host, &addr)) return .ipv4;
-    return .hostname;
+    return .{
+        .authority = host_text,
+        .host = parseHost(host_text),
+        .path = path,
+        .port = port,
+    };
 }
 
 pub fn buildRequest(host: []const u8, path: []const u8, out: []u8) ?usize {
