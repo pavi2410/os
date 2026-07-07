@@ -14,33 +14,29 @@ export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) 
 
     var info: ulib.hw.CpuInfo = undefined;
     if (ulib.hw.getcpuinfo(&info) < 0) {
-        writeStr("lscpu: getcpuinfo failed\n");
+        ulib.io.writeStr("lscpu: getcpuinfo failed\n");
         ulib.process.exit(1);
     }
 
-    writeStr("Architecture:        x86_64\n");
-    writeStr("Vendor ID:           ");
-    writeStr(ulib.hw.zstr(info.vendor[0..]));
-    writeStr("\n");
-    writeStr("CPU family:          ");
+    ulib.io.writeStr("Architecture:        x86_64\n");
+    ulib.io.writeStr("Vendor ID:           ");
+    ulib.io.writeStr(ulib.hw.zstr(info.vendor[0..]));
+    ulib.io.writeStr("\n");
+    ulib.io.writeStr("CPU family:          ");
     ulib.io.writeU8(info.family);
-    writeStr("\nModel:               ");
+    ulib.io.writeStr("\nModel:               ");
     ulib.io.writeU8(info.model);
-    writeStr("\nStepping:            ");
+    ulib.io.writeStr("\nStepping:            ");
     ulib.io.writeU8(info.stepping);
-    writeStr("\nModel name:          ");
-    writeStr(ulib.hw.zstr(info.brand[0..]));
-    writeStr("\nAPIC ID:             ");
+    ulib.io.writeStr("\nModel name:          ");
+    ulib.io.writeStr(ulib.hw.zstr(info.brand[0..]));
+    ulib.io.writeStr("\nAPIC ID:             ");
     ulib.io.writeU8(info.apic_id);
-    writeStr("\nCPU(s):              ");
+    ulib.io.writeStr("\nCPU(s):              ");
     ulib.io.writeU32(info.logical_cpus);
-    writeStr("\nIOAPIC count:        ");
+    ulib.io.writeStr("\nIOAPIC count:        ");
     ulib.io.writeU32(info.ioapic_count);
-    writeStr("\n");
+    ulib.io.writeStr("\n");
 
     ulib.process.exit(0);
-}
-
-fn writeStr(s: []const u8) void {
-    ulib.io.writeStr(s);
 }

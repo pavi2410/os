@@ -15,20 +15,20 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
     var argi: usize = 1;
     while (argi < argc) : (argi += 1) {
         const arg = ulib.io.cstr(argv[argi]);
-        if (ulib.io.eql(arg, "-c")) {
+        if (ulib.string.eql(arg, "-c")) {
             argi += 1;
             if (argi >= argc) {
-                writeStr("usage: ping [-c count] [ip]\n");
+                ulib.io.writeStr("usage: ping [-c count] [ip]\n");
                 ulib.process.exit(1);
             }
             count = ulib.parse.parseDecimal(ulib.io.cstr(argv[argi]), max_count) orelse {
-                writeStr("ping: bad count\n");
+                ulib.io.writeStr("ping: bad count\n");
                 ulib.process.exit(1);
             };
             continue;
         }
         if (!ulib.ip.parseIpv4(arg, &host)) {
-            writeStr("ping: bad address\n");
+            ulib.io.writeStr("ping: bad address\n");
             ulib.process.exit(1);
         }
     }
@@ -39,15 +39,15 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         ulib.net.IPPROTO_ICMP,
     );
     if (fd < 0) {
-        writeStr("ping: socket failed\n");
+        ulib.io.writeStr("ping: socket failed\n");
         ulib.process.exit(1);
     }
 
     var ip_buf: [16]u8 = undefined;
     const ip_str = ulib.ip.formatIpv4(host, &ip_buf) orelse "?";
-    writeStr("PING ");
-    writeStr(ip_str);
-    writeStr(" 32 data bytes\n");
+    ulib.io.writeStr("PING ");
+    ulib.io.writeStr(ip_str);
+    ulib.io.writeStr(" 32 data bytes\n");
 
     var dest = ulib.net.sockaddrIn(host, 0);
 
@@ -60,7 +60,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
     var rtt_sum_us: u64 = 0;
 
     while (transmitted < count) : (transmitted += 1) {
-        const start = monotonicUs();
+        const start = ulib.time.monotonicUs();
         if (ulib.net.sendto(
             @intCast(fd),
             &empty,
@@ -68,7 +68,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
             0,
             &dest,
         ) < 0) {
-            writeStr("ping: send failed\n");
+            ulib.io.writeStr("ping: send failed\n");
             ulib.process.exit(1);
         }
 
@@ -81,71 +81,51 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
             null,
         );
         if (n < 0) {
-            writeStr("ping: ");
-            writeStr(ip_str);
-            writeStr(" timeout seq=");
-            writeDecimal(transmitted);
-            writeStr("\n");
+            ulib.io.writeStr("ping: ");
+            ulib.io.writeStr(ip_str);
+            ulib.io.writeStr(" timeout seq=");
+            ulib.io.writeDecimal(transmitted);
+            ulib.io.writeStr("\n");
             continue;
         }
 
-        const elapsed_us = elapsedSinceUs(start);
+        const elapsed_us = ulib.time.elapsedUs(start, ulib.time.monotonicUs());
         if (received == 0 or elapsed_us < rtt_min_us) rtt_min_us = elapsed_us;
         if (elapsed_us > rtt_max_us) rtt_max_us = elapsed_us;
         rtt_sum_us += elapsed_us;
         received += 1;
 
-        writeStr("ping: ");
-        writeStr(ip_str);
-        writeStr(" reply seq=");
-        writeDecimal(transmitted);
-        writeStr(" bytes=");
-        writeDecimal(@intCast(n));
-        writeStr(" time=");
-        writeMillis(elapsed_us);
-        writeStr(" ms\n");
+        ulib.io.writeStr("ping: ");
+        ulib.io.writeStr(ip_str);
+        ulib.io.writeStr(" reply seq=");
+        ulib.io.writeDecimal(transmitted);
+        ulib.io.writeStr(" bytes=");
+        ulib.io.writeDecimal(@intCast(n));
+        ulib.io.writeStr(" time=");
+        ulib.io.writeMillis(elapsed_us);
+        ulib.io.writeStr(" ms\n");
     }
 
-    writeStr("\n--- ");
-    writeStr(ip_str);
-    writeStr(" ping statistics ---\n");
-    writeDecimal(transmitted);
-    writeStr(" packets transmitted, ");
-    writeDecimal(received);
-    writeStr(" received, ");
-    writeDecimal(if (transmitted == 0) 0 else ((transmitted - received) * 100) / transmitted);
-    writeStr("% packet loss\n");
+    ulib.io.writeStr("\n--- ");
+    ulib.io.writeStr(ip_str);
+    ulib.io.writeStr(" ping statistics ---\n");
+    ulib.io.writeDecimal(transmitted);
+    ulib.io.writeStr(" packets transmitted, ");
+    ulib.io.writeDecimal(received);
+    ulib.io.writeStr(" received, ");
+    ulib.io.writeDecimal(if (transmitted == 0) 0 else ((transmitted - received) * 100) / transmitted);
+    ulib.io.writeStr("% packet loss\n");
 
     if (received > 0) {
-        writeStr("rtt min/avg/max = ");
-        writeMillis(rtt_min_us);
-        writeStr("/");
-        writeMillis(rtt_sum_us / received);
-        writeStr("/");
-        writeMillis(rtt_max_us);
-        writeStr(" ms\n");
+        ulib.io.writeStr("rtt min/avg/max = ");
+        ulib.io.writeMillis(rtt_min_us);
+        ulib.io.writeStr("/");
+        ulib.io.writeMillis(rtt_sum_us / received);
+        ulib.io.writeStr("/");
+        ulib.io.writeMillis(rtt_max_us);
+        ulib.io.writeStr(" ms\n");
         ulib.process.exit(0);
     }
 
     ulib.process.exit(1);
-}
-
-fn writeDecimal(n: usize) void {
-    ulib.io.writeDecimal(n);
-}
-
-fn writeMillis(us: u64) void {
-    ulib.io.writeMillis(us);
-}
-
-fn monotonicUs() u64 {
-    return ulib.time.monotonicUs();
-}
-
-fn elapsedSinceUs(start: u64) u64 {
-    return ulib.time.elapsedUs(start, monotonicUs());
-}
-
-fn writeStr(s: []const u8) void {
-    ulib.io.writeStr(s);
 }

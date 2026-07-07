@@ -16,20 +16,20 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
 
 noinline fn run(argc: usize, argv: [*][*]u8) void {
     if (argc < 2) {
-        writeStr("usage: curl <url|host> [port]\n");
+        ulib.io.writeStr("usage: curl <url|host> [port]\n");
         ulib.process.exit(1);
     }
 
     const arg = ulib.io.cstr(argv[1]);
     const parsed = target.parse(arg, &norm_buf, &host_buf, &path_buf) catch {
-        writeStr("curl: bad url\n");
+        ulib.io.writeStr("curl: bad url\n");
         ulib.process.exit(1);
     };
 
     var port = parsed.port;
     if (argc >= 3) {
         port = ulib.parse.parsePort(ulib.io.cstr(argv[2])) orelse {
-            writeStr("curl: bad port\n");
+            ulib.io.writeStr("curl: bad port\n");
             ulib.process.exit(1);
         };
     }
@@ -38,7 +38,7 @@ noinline fn run(argc: usize, argv: [*][*]u8) void {
     if (ulib.ip.parseIpv4(parsed.host, &host_ip)) {
         // literal IPv4
     } else if (!resolveName(parsed.host, &host_ip)) {
-        writeStr("curl: could not resolve host\n");
+        ulib.io.writeStr("curl: could not resolve host\n");
         ulib.process.exit(1);
     }
 
@@ -56,20 +56,20 @@ noinline fn httpGet(host: []const u8, ip: *const [4]u8, port: u16, path: []const
         ulib.net.IPPROTO_TCP,
     );
     if (fd < 0) {
-        writeStr("curl: socket failed\n");
+        ulib.io.writeStr("curl: socket failed\n");
         ulib.process.exit(1);
     }
 
     var dest = ulib.net.sockaddrIn(ip.*, port);
 
     if (ulib.net.connect(@intCast(fd), &dest) < 0) {
-        writeStr("curl: connect failed\n");
+        ulib.io.writeStr("curl: connect failed\n");
         ulib.process.exit(1);
     }
 
     var request: [256]u8 = undefined;
     const request_len = target.buildRequest(host, path, &request) orelse {
-        writeStr("curl: request too large\n");
+        ulib.io.writeStr("curl: request too large\n");
         ulib.process.exit(1);
     };
     sendPart(@intCast(fd), request[0..request_len]);
@@ -79,31 +79,27 @@ noinline fn httpGet(host: []const u8, ip: *const [4]u8, port: u16, path: []const
         const n = ulib.net.recv(@intCast(fd), &recv_buf, recv_buf.len, 0);
         if (n == 0) break;
         if (n < 0) {
-            writeStr("curl: recv failed\n");
+            ulib.io.writeStr("curl: recv failed\n");
             ulib.process.exit(1);
         }
         const chunk = recv_buf[0..@intCast(n)];
         if (!got_body) {
             if (target.findBodyStart(chunk)) |body| {
                 got_body = true;
-                writeStr(body);
+                ulib.io.writeStr(body);
             }
         } else {
-            writeStr(chunk);
+            ulib.io.writeStr(chunk);
         }
     }
 
-    if (!got_body) writeStr("\n");
+    if (!got_body) ulib.io.writeStr("\n");
     ulib.process.exit(0);
 }
 
 fn sendPart(fd: u32, bytes: []const u8) void {
     if (ulib.net.send(fd, bytes.ptr, bytes.len, 0) < 0) {
-        writeStr("curl: send failed\n");
+        ulib.io.writeStr("curl: send failed\n");
         ulib.process.exit(1);
     }
-}
-
-fn writeStr(s: []const u8) void {
-    ulib.io.writeStr(s);
 }

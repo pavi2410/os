@@ -18,7 +18,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         if (arg.len == 0) continue;
         if (arg[0] == '@') {
             if (!ulib.ip.parseIpv4(arg[1..], &dns_addr)) {
-                writeStr("dig: bad server address\n");
+                ulib.io.writeStr("dig: bad server address\n");
                 ulib.process.exit(1);
             }
             continue;
@@ -28,19 +28,19 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
     }
 
     const qname = name orelse {
-        writeStr("usage: dig [@server] name\n");
+        ulib.io.writeStr("usage: dig [@server] name\n");
         ulib.process.exit(1);
     };
 
     var query: [256]u8 = undefined;
     const query_len = dns_codec.buildQuery(qname, &query) catch {
-        writeStr("dig: bad name\n");
+        ulib.io.writeStr("dig: bad name\n");
         ulib.process.exit(1);
     };
 
     const fd = ulib.net.socket(ulib.net.AF_INET, ulib.net.SOCK_DGRAM, 0);
     if (fd < 0) {
-        writeStr("dig: socket failed\n");
+        ulib.io.writeStr("dig: socket failed\n");
         ulib.process.exit(1);
     }
 
@@ -53,7 +53,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         0,
         &dest,
     ) < 0) {
-        writeStr("dig: send failed\n");
+        ulib.io.writeStr("dig: send failed\n");
         ulib.process.exit(1);
     }
 
@@ -67,7 +67,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         null,
     );
     if (n < 12) {
-        writeStr("dig: timeout\n");
+        ulib.io.writeStr("dig: timeout\n");
         ulib.process.exit(1);
     }
 
@@ -76,28 +76,28 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
 }
 
 fn printResult(qname: []const u8, pkt: []const u8) void {
-    writeStr("\n; <<>> OS dig <<>> ");
-    writeStr(qname);
-    writeStr("\n;; QUESTION SECTION:\n;");
-    writeStr(qname);
-    writeStr(".            IN  A\n");
+    ulib.io.writeStr("\n; <<>> OS dig <<>> ");
+    ulib.io.writeStr(qname);
+    ulib.io.writeStr("\n;; QUESTION SECTION:\n;");
+    ulib.io.writeStr(qname);
+    ulib.io.writeStr(".            IN  A\n");
 
     if (dns_codec.answerCount(pkt) == 0) {
-        writeStr(";; ANSWER SECTION: (none)\n");
+        ulib.io.writeStr(";; ANSWER SECTION: (none)\n");
         return;
     }
 
-    writeStr("\n;; ANSWER SECTION:\n");
+    ulib.io.writeStr("\n;; ANSWER SECTION:\n");
 
     var iter = dns_codec.answers(pkt) orelse return;
     while (iter.next()) |answer| {
         if (answer.rtype == 1 and answer.rdata.len == 4) {
             var name_buf: [128]u8 = undefined;
             const shown = dns_codec.formatName(pkt, answer.name_off, &name_buf) orelse qname;
-            writeStr(shown);
-            writeStr(".    IN  A  ");
+            ulib.io.writeStr(shown);
+            ulib.io.writeStr(".    IN  A  ");
             writeIpv4(answer.rdata);
-            writeStr("\n");
+            ulib.io.writeStr("\n");
         }
     }
 }
@@ -106,9 +106,5 @@ fn writeIpv4(addr: []const u8) void {
     if (addr.len < 4) return;
     const ip: [4]u8 = .{ addr[0], addr[1], addr[2], addr[3] };
     var buf: [16]u8 = undefined;
-    writeStr(ulib.ip.formatIpv4(ip, &buf) orelse "?");
-}
-
-fn writeStr(s: []const u8) void {
-    ulib.io.writeStr(s);
+    ulib.io.writeStr(ulib.ip.formatIpv4(ip, &buf) orelse "?");
 }

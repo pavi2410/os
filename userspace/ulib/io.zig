@@ -1,6 +1,5 @@
 const syscall = @import("syscall.zig");
 const format = @import("format.zig");
-const string = @import("string.zig");
 
 pub fn cstr(ptr: [*]u8) []const u8 {
     var len: usize = 0;
@@ -9,8 +8,6 @@ pub fn cstr(ptr: [*]u8) []const u8 {
     }
     return ptr[0..256];
 }
-
-pub const eql = string.eql;
 
 pub fn writeStr(s: []const u8) void {
     if (s.len == 0) return;
