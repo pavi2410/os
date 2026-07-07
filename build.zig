@@ -44,28 +44,12 @@ pub fn build(b: *std.Build) void {
         .std_root = std_root,
     };
 
-    const linux_target = b.resolveTargetQuery(.{
-        .cpu_arch = .x86_64,
-        .os_tag = .linux,
-        .abi = .gnu,
-    });
-    const abi_linux = helpers.AbiBundle.create(b, linux_target, user_optimize);
-    const linux_ulib = helpers.exeModule(b, "userspace/ulib/mod.zig", linux_target, user_optimize);
-    abi_linux.attachTo(linux_ulib);
-    const linux_std_root = helpers.exeModule(b, "userspace/std_root.zig", linux_target, user_optimize);
-    const linux_deps = helpers.UserDeps{
-        .target = linux_target,
-        .optimize = user_optimize,
-        .ulib = linux_ulib,
-        .std_root = linux_std_root,
-    };
-
     const user_bin_dir: std.Build.InstallDir = .{ .custom = "userspace/bin" };
     const user_install = std.Build.Step.InstallArtifact.Options{
         .dest_dir = .{ .override = user_bin_dir },
     };
 
-    const install_ping = helpers.addLinuxUserProgram(b, linux_deps, "ping", "userspace/ping/main.zig", user_install);
+    const install_ping = helpers.addUserProgram(b, user_deps, "ping", "userspace/ping/main.zig", user_install);
     const install_ip = helpers.addUserProgram(b, user_deps, "ip", "userspace/ip/main.zig", user_install);
     const install_lscpu = helpers.addUserProgram(b, user_deps, "lscpu", "userspace/lscpu/main.zig", user_install);
     const install_lspci = helpers.addUserProgram(b, user_deps, "lspci", "userspace/lspci/main.zig", user_install);

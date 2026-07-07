@@ -2,30 +2,26 @@ const std_root = @import("std_root");
 pub const std_options_debug_io = std_root.std_options_debug_io;
 pub const std_options = std_root.std_options;
 
-const std = @import("std");
-const linux = std.os.linux;
 const ulib = @import("ulib");
 
 const default_host = [4]u8{ 10, 0, 2, 2 };
 const default_count: usize = 4;
 const max_count: usize = 16;
 
-/// Linux-target ping using `std.os.linux` sockets and `std.fmt` for output.
-pub fn main(init: std.process.Init.Minimal) void {
+export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
     var host = default_host;
     var count = default_count;
 
-    const argv = init.args.vector;
     var argi: usize = 1;
-    while (argi < argv.len) : (argi += 1) {
-        const arg = std.mem.span(argv[argi]);
-        if (std.mem.eql(u8, arg, "-c")) {
+    while (argi < argc) : (argi += 1) {
+        const arg = ulib.io.cstr(argv[argi]);
+        if (ulib.io.eql(arg, "-c")) {
             argi += 1;
-            if (argi >= argv.len) {
+            if (argi >= argc) {
                 writeStr("usage: ping [-c count] [ip]\n");
                 ulib.process.exit(1);
             }
-            count = ulib.parse.parseDecimal(std.mem.span(argv[argi]), max_count) orelse {
+            count = ulib.parse.parseDecimal(ulib.io.cstr(argv[argi]), max_count) orelse {
                 writeStr("ping: bad count\n");
                 ulib.process.exit(1);
             };
@@ -37,12 +33,15 @@ pub fn main(init: std.process.Init.Minimal) void {
         }
     }
 
-    const fd_rc = linux.socket(linux.AF.INET, linux.SOCK.DGRAM, linux.IPPROTO.ICMP);
-    if (@as(isize, @bitCast(fd_rc)) < 0) {
+    const fd = ulib.net.socket(
+        ulib.net.AF_INET,
+        ulib.net.SOCK_DGRAM,
+        ulib.net.IPPROTO_ICMP,
+    );
+    if (fd < 0) {
         writeStr("ping: socket failed\n");
         ulib.process.exit(1);
     }
-    const fd: i32 = @intCast(fd_rc);
 
     var ip_buf: [16]u8 = undefined;
     const ip_str = ulib.ip.formatIpv4(host, &ip_buf) orelse "?";
@@ -50,10 +49,7 @@ pub fn main(init: std.process.Init.Minimal) void {
     writeStr(ip_str);
     writeStr(" 32 data bytes\n");
 
-    var dest = linux.sockaddr.in{
-        .port = 0,
-        .addr = @bitCast(host),
-    };
+    var dest = ulib.net.sockaddrIn(host, 0);
 
     const empty: [0]u8 = .{};
     var reply: [64]u8 = undefined;
@@ -65,14 +61,26 @@ pub fn main(init: std.process.Init.Minimal) void {
 
     while (transmitted < count) : (transmitted += 1) {
         const start = monotonicUs();
-        const send_rc = linux.sendto(fd, &empty, 0, 0, @ptrCast(&dest), @sizeOf(linux.sockaddr.in));
-        if (@as(isize, @bitCast(send_rc)) < 0) {
+        if (ulib.net.sendto(
+            @intCast(fd),
+            &empty,
+            0,
+            0,
+            &dest,
+        ) < 0) {
             writeStr("ping: send failed\n");
             ulib.process.exit(1);
         }
 
-        const recv_rc = linux.recvfrom(fd, &reply, reply.len, 0, null, null);
-        if (@as(isize, @bitCast(recv_rc)) < 0) {
+        const n = ulib.net.recvfrom(
+            @intCast(fd),
+            &reply,
+            reply.len,
+            0,
+            null,
+            null,
+        );
+        if (n < 0) {
             writeStr("ping: ");
             writeStr(ip_str);
             writeStr(" timeout seq=");
@@ -80,7 +88,6 @@ pub fn main(init: std.process.Init.Minimal) void {
             writeStr("\n");
             continue;
         }
-        const n: usize = @intCast(recv_rc);
 
         const elapsed_us = elapsedSinceUs(start);
         if (received == 0 or elapsed_us < rtt_min_us) rtt_min_us = elapsed_us;
@@ -93,7 +100,7 @@ pub fn main(init: std.process.Init.Minimal) void {
         writeStr(" reply seq=");
         writeDecimal(transmitted);
         writeStr(" bytes=");
-        writeDecimal(n);
+        writeDecimal(@intCast(n));
         writeStr(" time=");
         writeMillis(elapsed_us);
         writeStr(" ms\n");
@@ -124,17 +131,11 @@ pub fn main(init: std.process.Init.Minimal) void {
 }
 
 fn writeDecimal(n: usize) void {
-    var buf: [24]u8 = undefined;
-    const text = std.fmt.bufPrint(&buf, "{d}", .{n}) catch return;
-    writeStr(text);
+    ulib.io.writeDecimal(n);
 }
 
 fn writeMillis(us: u64) void {
-    var buf: [24]u8 = undefined;
-    const ms = us / 1000;
-    const frac: u16 = @intCast(us % 1000);
-    const text = std.fmt.bufPrint(&buf, "{d}.{d:0>3}", .{ ms, frac }) catch return;
-    writeStr(text);
+    ulib.io.writeMillis(us);
 }
 
 fn monotonicUs() u64 {
@@ -146,6 +147,5 @@ fn elapsedSinceUs(start: u64) u64 {
 }
 
 fn writeStr(s: []const u8) void {
-    if (s.len == 0) return;
-    _ = linux.write(linux.STDOUT_FILENO, s.ptr, s.len);
+    ulib.io.writeStr(s);
 }

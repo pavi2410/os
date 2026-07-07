@@ -84,21 +84,6 @@ pub fn addUserProgram(
     return b.addInstallArtifact(exe, install_opts);
 }
 
-pub fn addLinuxUserProgram(
-    b: *std.Build,
-    linux_deps: UserDeps,
-    name: []const u8,
-    main_path: []const u8,
-    install_opts: std.Build.Step.InstallArtifact.Options,
-) *std.Build.Step.InstallArtifact {
-    const exe = b.addExecutable(.{
-        .name = name,
-        .root_module = exeModule(b, main_path, linux_deps.target, linux_deps.optimize),
-    });
-    wireUserExe(b, exe, linux_deps);
-    return b.addInstallArtifact(exe, install_opts);
-}
-
 pub fn runHostTest(b: *std.Build, root: *std.Build.Module) *std.Build.Step.Run {
     return b.addRunArtifact(b.addTest(.{ .root_module = root }));
 }
