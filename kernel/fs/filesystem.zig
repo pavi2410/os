@@ -51,13 +51,18 @@ pub const Whence = enum(u32) {
     end = 2,
 };
 
-pub const OpenFlags = struct {
+pub const OpenFlags = packed struct(u8) {
     read: bool = true,
     write: bool = false,
     create: bool = false,
     truncate: bool = false,
     append: bool = false,
+    _: u3 = 0,
 };
+
+comptime {
+    if (@sizeOf(OpenFlags) != 1) @compileError("OpenFlags must fit in one byte");
+}
 
 pub const Stat = abi_fs.Stat;
 pub const S_IFREG = abi_fs.S_IFREG;

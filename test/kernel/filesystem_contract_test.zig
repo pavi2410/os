@@ -31,3 +31,20 @@ test "errnoCode maps filesystem errors to linux errno values" {
     try std.testing.expectEqual(@as(i64, -13), filesystem.errnoCode(filesystem.Error.ReadOnly));
     try std.testing.expectEqual(@as(i64, -22), filesystem.errnoCode(filesystem.Error.NameTooLong));
 }
+
+test "open flags pack into a single byte" {
+    try std.testing.expectEqual(@as(usize, 1), @sizeOf(filesystem.OpenFlags));
+
+    const flags = filesystem.OpenFlags{
+        .read = true,
+        .write = true,
+        .create = true,
+        .truncate = false,
+        .append = true,
+    };
+    try std.testing.expect(flags.read);
+    try std.testing.expect(flags.write);
+    try std.testing.expect(flags.create);
+    try std.testing.expect(!flags.truncate);
+    try std.testing.expect(flags.append);
+}
