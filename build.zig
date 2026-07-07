@@ -57,6 +57,29 @@ pub fn build(b: *std.Build) void {
     const install_lsblk = helpers.addUserProgram(b, user_deps, "lsblk", "userspace/lsblk/main.zig", user_install);
     const install_lsmem = helpers.addUserProgram(b, user_deps, "lsmem", "userspace/lsmem/main.zig", user_install);
 
+    const common_tap_user = helpers.exeModule(b, "common/tap.zig", user_target, user_optimize);
+    const utest_tap = helpers.exeModule(b, "userspace/utest/tap.zig", user_target, user_optimize);
+    utest_tap.addImport("ulib", user_ulib);
+    utest_tap.addImport("common_tap", common_tap_user);
+
+    const utest = b.addExecutable(.{
+        .name = "utest",
+        .root_module = helpers.exeModule(b, "userspace/utest/main.zig", user_target, user_optimize),
+    });
+    utest.setLinkerScript(b.path("userspace/linker.ld"));
+    utest.root_module.link_libc = false;
+    utest.root_module.addImport("ulib", user_ulib);
+    utest.root_module.addImport("std_root", std_root);
+    utest.root_module.addImport("common_bytes", common_bytes_user);
+    utest.root_module.addImport("dns_codec", dns_codec_user);
+    utest.root_module.addImport("utest_tap", utest_tap);
+    const utest_tests = helpers.exeModule(b, "userspace/utest/tests.zig", user_target, user_optimize);
+    utest_tests.addImport("common_bytes", common_bytes_user);
+    utest_tests.addImport("dns_codec", dns_codec_user);
+    utest_tests.addImport("utest_tap", utest_tap);
+    utest.root_module.addImport("tests", utest_tests);
+    const install_utest = b.addInstallArtifact(utest, user_install);
+
     const shell = b.addExecutable(.{
         .name = "shell",
         .root_module = helpers.exeModule(b, "userspace/shell/main.zig", user_target, user_optimize),
@@ -101,6 +124,7 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_lspci.step);
     b.getInstallStep().dependOn(&install_lsblk.step);
     b.getInstallStep().dependOn(&install_lsmem.step);
+    b.getInstallStep().dependOn(&install_utest.step);
 
     const limine_kernel_mod = helpers.exeModule(b, "kernel/boot/limine.zig", kernel_target, optimize);
 
@@ -119,6 +143,7 @@ pub fn build(b: *std.Build) void {
     abi_kernel.attachTo(kernel_mod);
     kernel_mod.addImport("common_bytes", common_bytes_kernel);
     kernel_mod.addImport("common_view", common_view_kernel);
+    kernel_mod.addImport("common_tap", helpers.exeModule(b, "common/tap.zig", kernel_target, optimize));
     kernel_mod.addImport("time_unix", helpers.exeModule(b, "common/time_unix.zig", kernel_target, optimize));
 
     const kernel = b.addExecutable(.{

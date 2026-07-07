@@ -2,7 +2,6 @@ const cpu = @import("../arch/x86_64/cpu.zig");
 const hal = @import("../hal.zig");
 const heap = @import("../mm/heap.zig");
 const init_shell = @import("init_shell.zig");
-const syscall_test = @import("../syscall/test.zig");
 const thread = @import("thread.zig");
 const std = @import("std");
 

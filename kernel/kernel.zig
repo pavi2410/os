@@ -17,7 +17,7 @@ const process = @import("proc/process.zig");
 const tty = @import("drivers/tty.zig");
 const pci = @import("drivers/pci.zig");
 const driver_manager = @import("drivers/manager.zig");
-const udp_test = @import("net/udp_test.zig");
+const tap_suite = @import("boot/tap_suite.zig");
 const vfs = @import("fs/vfs.zig");
 const syscall = @import("syscall/entry.zig");
 const thread = @import("proc/thread.zig");
@@ -102,7 +102,6 @@ pub fn init(ctx: BootContext) void {
 
 fn initNetwork() void {
     if (!driver_manager.initNetwork()) return;
-    udp_test.runSelfTest();
 }
 
 fn initBlock() void {
@@ -116,7 +115,6 @@ fn initVfs() void {
         return;
     };
     vfs.logStatus();
-    vfs.selfTest();
 }
 
 fn initPci(rsdp_virt: u64) void {
@@ -317,5 +315,6 @@ fn printMemoryMap() void {
 }
 
 pub fn run() noreturn {
+    tap_suite.run();
     scheduler.start();
 }

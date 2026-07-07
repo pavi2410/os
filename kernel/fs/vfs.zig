@@ -147,23 +147,6 @@ pub fn logStatus() void {
     hal.console.writeString("FAT32 mounted (read/write)\r\n");
 }
 
-pub fn selfTest() void {
-    if (!isReady()) return;
-
-    var buf: [64]u8 = undefined;
-    const handle = open("/README.TXT", .{}) catch {
-        hal.console.writeString("vfs: /README.TXT not found\r\n");
-        return;
-    };
-    defer close(handle);
-
-    const n = read(handle, &buf) catch {
-        hal.console.writeString("vfs read test failed\r\n");
-        return;
-    };
-    hal.console.printf("vfs: readme {d} bytes\r\n", .{n});
-}
-
 fn getHandle(handle: u32) VfsError!*Handle {
     if (handle >= max_handles or !handles[handle].in_use) return VfsError.BadHandle;
     return &handles[handle];

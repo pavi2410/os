@@ -1,5 +1,4 @@
 const config = @import("config.zig");
-const hal = @import("../hal.zig");
 const ipv4 = @import("ipv4.zig");
 const link = @import("link.zig");
 const resolve = @import("resolve.zig");
@@ -9,14 +8,11 @@ pub const dns_port: u16 = 53;
 
 const test_src_port: u16 = 42000;
 
-pub fn runSelfTest() void {
-    if (!link.isReady()) return;
+pub fn dnsReplyOk() bool {
+    if (!link.isReady()) return false;
 
     const mac = link.localMac();
-    const dns_mac = resolve.resolve(config.dns_ip, mac) orelse {
-        hal.console.writeString("udp: ARP failed\r\n");
-        return;
-    };
+    const dns_mac = resolve.resolve(config.dns_ip, mac) orelse return false;
 
     var query: [32]u8 = undefined;
     const query_len = buildExampleQuery(&query);
@@ -32,10 +28,7 @@ pub fn runSelfTest() void {
         dns_port,
         query[0..query_len],
     );
-    link.transmitOrFail(frame[0..frame_len]) catch {
-        hal.console.writeString("udp: TX failed\r\n");
-        return;
-    };
+    link.transmitOrFail(frame[0..frame_len]) catch return false;
 
     var recv_buf: [link.max_frame_len]u8 = undefined;
     var attempt: usize = 0;
@@ -45,13 +38,12 @@ pub fn runSelfTest() void {
             var src_port: u16 = 0;
             if (udp.match(recv_buf[0..len], test_src_port, &src_ip, &src_port)) |payload| {
                 if (ipv4.equal(src_ip, config.dns_ip) and src_port == dns_port and payload.len >= 12) {
-                    hal.console.printf("udp: DNS reply ({d} bytes)\r\n", .{payload.len});
-                    return;
+                    return true;
                 }
             }
         }
     }
-    hal.console.writeString("udp: timeout\r\n");
+    return false;
 }
 
 fn buildExampleQuery(out: []u8) usize {

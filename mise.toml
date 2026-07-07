@@ -6,7 +6,7 @@ uv = "latest"
 [tasks.build]
 description = "Build kernel and userspace binaries"
 sources = ["build.zig", "build.zig.zon", "kernel/**/*", "userspace/**/*"]
-outputs = ["zig-out/bin/kernel", "zig-out/userspace/bin/shell", "zig-out/userspace/bin/dig", "zig-out/userspace/bin/ping", "zig-out/userspace/bin/curl", "zig-out/userspace/bin/ip", "zig-out/userspace/bin/lscpu", "zig-out/userspace/bin/lspci", "zig-out/userspace/bin/lsblk", "zig-out/userspace/bin/lsmem"]
+outputs = ["zig-out/bin/kernel", "zig-out/userspace/bin/shell", "zig-out/userspace/bin/dig", "zig-out/userspace/bin/ping", "zig-out/userspace/bin/curl", "zig-out/userspace/bin/ip", "zig-out/userspace/bin/lscpu", "zig-out/userspace/bin/lspci", "zig-out/userspace/bin/lsblk", "zig-out/userspace/bin/lsmem", "zig-out/userspace/bin/utest"]
 run = "zig build"
 
 [tasks."uv-sync"]
@@ -77,6 +77,23 @@ sources = [
   "scripts/create_disk.py",
 ]
 run = "uv run pytest test/integration -v"
+
+[tasks."test-in-guest"]
+description = "Boot the OS and verify kernel/userspace TAP self-tests"
+depends = ["iso", "disk"]
+sources = [
+  "pyproject.toml",
+  "uv.lock",
+  "test/integration/**/*",
+  "config/qemu.ini",
+  "config/qemu-uefi.ini",
+  "scripts/qemu.py",
+  "scripts/create_disk.py",
+  "common/tap.zig",
+  "kernel/boot/tap_suite.zig",
+  "userspace/utest/**/*",
+]
+run = "uv run pytest test/integration/test_in_guest.py -v"
 
 [tasks."kill-qemu"]
 description = "Stop any QEMU instance booting this project's ISO"
