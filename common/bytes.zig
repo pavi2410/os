@@ -32,6 +32,10 @@ pub fn readU32Le(buf: []const u8, off: usize) u32 {
         (@as(u32, buf[off + 3]) << 24);
 }
 
+pub fn readU64Le(buf: []const u8, off: usize) u64 {
+    return @as(u64, readU32Le(buf, off)) | (@as(u64, readU32Le(buf, off + 4)) << 32);
+}
+
 pub fn writeU16Le(buf: []u8, off: usize, value: u16) void {
     buf[off] = @truncate(value);
     buf[off + 1] = @truncate(value >> 8);

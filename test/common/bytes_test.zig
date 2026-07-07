@@ -19,6 +19,7 @@ test "little endian integer helpers" {
 
     try std.testing.expectEqual(@as(u16, 0x1234), bytes.readU16Le(&buf, 1));
     try std.testing.expectEqual(@as(u32, 0x89AB_CDEF), bytes.readU32Le(&buf, 3));
+    try std.testing.expectEqual(@as(u64, 0x1122_3344_5566_7788), bytes.readU64Le(&.{ 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11 }, 0));
     try std.testing.expectEqual(@as(u8, 0x34), buf[1]);
     try std.testing.expectEqual(@as(u8, 0x89), buf[6]);
 }

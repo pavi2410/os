@@ -1,4 +1,5 @@
 const access = @import("access.zig");
+const bytes = @import("common_bytes");
 
 pub const IoApic = struct {
     id: u8,
@@ -28,15 +29,16 @@ pub fn parse(rsdp_virt: u64) ParseError!Info {
 
     const madt_phys = access.findTablePhys(root_phys, .{ 'A', 'P', 'I', 'C' }) orelse return ParseError.MadtNotFound;
     const madt = access.physBytes(madt_phys);
-    const length = access.readU32(madt, 4);
+    const length = bytes.readU32Le(madt[0..8], 4);
+    const madt_bytes = madt[0..length];
 
-    var local_apic_address: u64 = access.readU32(madt, access.sdt_header_size);
+    var local_apic_address: u64 = bytes.readU32Le(madt_bytes, access.sdt_header_size);
     var ioapic_count: usize = 0;
 
     var offset: usize = madt_header_size;
     while (offset + 2 <= length) {
-        const entry_type = madt[offset];
-        const entry_len = madt[offset + 1];
+        const entry_type = madt_bytes[offset];
+        const entry_len = madt_bytes[offset + 1];
         if (entry_len < 2) break;
         if (offset + entry_len > length) break;
 
@@ -48,9 +50,9 @@ pub fn parse(rsdp_virt: u64) ParseError!Info {
                 }
                 if (ioapic_count >= max_ioapics) return ParseError.TooManyIoApics;
                 ioapic_storage[ioapic_count] = .{
-                    .id = madt[offset + 2],
-                    .address = access.readU32(madt, offset + 4),
-                    .gsi_base = access.readU32(madt, offset + 8),
+                    .id = madt_bytes[offset + 2],
+                    .address = bytes.readU32Le(madt_bytes, offset + 4),
+                    .gsi_base = bytes.readU32Le(madt_bytes, offset + 8),
                 };
                 ioapic_count += 1;
             },
@@ -59,7 +61,7 @@ pub fn parse(rsdp_virt: u64) ParseError!Info {
                     offset += entry_len;
                     continue;
                 }
-                local_apic_address = access.readU64(madt, offset + 4);
+                local_apic_address = bytes.readU64Le(madt_bytes, offset + 4);
             },
             else => {},
         }
