@@ -28,43 +28,76 @@ Automated coverage is cheaper than manual QEMU bisection.
 - [x] ABI layout tests in [`test/common/abi_test.zig`](../../test/common/abi_test.zig) (fs, net, hw structs)
 - [ ] Expand hw ABI tests: every field offset documented in [`common/abi/hw.zig`](../../common/abi/hw.zig) comptime block
 - [ ] Syscall number tests stay in sync with [`docs/syscall-abi.md`](../syscall-abi.md)
-- [ ] Host test for [`kernel/syscall/user.zig`](../../kernel/syscall/user.zig) helpers (existing [`syscall_user_test`](../../test/kernel/syscall_user_test.zig))
+- [x] Host test for [`kernel/syscall/user.zig`](../../kernel/syscall/user.zig) helpers ([`syscall_user_test`](../../test/kernel/syscall_user_test.zig), wired in `build.zig`)
 - [ ] Optional: host-parse golden files for `/proc`-style text (prep for phase 11)
+
+### In-guest TAP tests (QEMU + pytest, target codegen)
+
+- [x] Shared TAP writer: [`common/tap.zig`](../../common/tap.zig)
+- [x] Kernel boot suite: [`kernel/boot/tap_suite.zig`](../../kernel/boot/tap_suite.zig) (VFS readme read, UDP/DNS reply, physical pages free)
+- [x] Userspace runner: [`userspace/utest/`](../../userspace/utest/) on `/BIN/utest` (bytes + dns_codec cases)
+- [x] TAP parser + pytest: [`test/integration/tap_parser.py`](../../test/integration/tap_parser.py), [`test/integration/test_in_guest.py`](../../test/integration/test_in_guest.py)
+- [x] `mise run test-in-guest` task (depends on `iso` + `disk`; one boot for kernel TAP, one for `utest`)
+- [ ] Extend `/BIN/utest` with more modules (view, ulib helpers, dirent64 wire layout)
+- [ ] Ring-3 syscall smoke via `utest` or a dedicated `/BIN/*` helper (bootstrap ring-0 `syscall` crashes QEMU)
 
 ### Integration tests (QEMU + pytest)
 
 - [x] Shell smoke test: [`test/integration/test_shell.py`](../../test/integration/test_shell.py)
-- [ ] Cover `lscpu` — expect `AuthenticAMD` or `GenuineIntel`, `Architecture: x86_64`
+- [x] Per-case pytest reporting (class-scoped `shell_session`; one QEMU boot for smoke, one for persistence)
+- [~] Cover `lscpu` — test exists (`Architecture:`) but does not yet assert vendor string; **currently fails** (QEMU dies after `lscpu` output)
 - [ ] Cover `lspci` — at least one PCI line (`class` field)
 - [ ] Cover `lsblk` — `virtio-blk` and size column
 - [ ] Cover `lsmem` — header + at least one memory region line
-- [ ] Cover `fork/exec` via `lscpu` (already partially there; keep after hello removal)
-- [ ] Document required workflow: `zig build test && zig build && mise run iso && mise run disk` before `test-shell`
+- [~] Cover `fork/exec` via `lscpu` — test present; blocked on `lscpu` crash above
+- [x] Document required workflow (see [Pre-merge checklist](#pre-merge-checklist) below)
 
 ### Build and CI gate
 
-- [ ] `mise run test` — host unit tests (already exists)
-- [ ] `mise run test-shell` — integration gate before merging syscall/VFS/userspace changes
-- [ ] Optional CI job (GitHub Actions): build + host tests + integration on push
+- [x] `mise run test` — host unit tests (`zig build test`)
+- [x] `mise run test-in-guest` — kernel + userspace TAP gate
+- [x] `mise run test-shell` — shell integration task (defined; **not fully green** until `lscpu` crash is fixed)
+- [ ] Optional CI job (GitHub Actions): build + host tests + `test-in-guest` + `test-shell` on push
 
 ### Kernel self-tests (optional, medium effort)
 
-- [ ] Syscall round-trip thread at ring 3 (extend [`kernel/syscall/test.zig`](../../kernel/syscall/test.zig) pattern)
+- [~] Boot-time self-checks — replaced ad-hoc VFS/UDP log lines with structured TAP in `tap_suite` (see in-guest section)
+- [ ] Syscall round-trip thread at ring 3 (extend [`kernel/syscall/test.zig`](../../kernel/syscall/test.zig) pattern; ring-0 bootstrap caller is unsafe)
 - [ ] Smoke `getcpuinfo` / `getblockdevices` from a kernel-launched user thread
+
+---
+
+## Pre-merge checklist
+
+Run on a clean tree before merging syscall, VFS, or userspace changes:
+
+```bash
+mise run test              # host unit tests (fast)
+mise run build
+mise run iso
+mise run disk
+mise run test-in-guest     # kernel TAP + /BIN/utest (target codegen)
+mise run test-shell        # shell smoke + disk persistence
+```
+
+If integration tests fail after code changes, rebuild ISO and disk — stale artifacts can mask kernel/userspace skew.
 
 ---
 
 ## Acceptance criteria
 
 1. **`zig build test` passes** on a clean tree and covers all shared ABI structs used across the user/kernel boundary.
-2. **`mise run test-shell` passes** after a full rebuild (kernel + userspace + ISO + disk).
-3. **A deliberate ABI break** (e.g. reordering a field in `common/abi/hw.zig` without updating tests) fails at compile time or in integration tests — not silently at runtime in QEMU.
-4. **Contributors have a documented pre-merge checklist** in the README or this file.
+2. **`mise run test-in-guest` passes** after a full rebuild (kernel + userspace + ISO + disk).
+3. **`mise run test-shell` passes** after a full rebuild — **currently blocked** on post-`lscpu` QEMU crash; fix before calling phase 6 done.
+4. **A deliberate ABI break** (e.g. reordering a field in `common/abi/hw.zig` without updating tests) fails at compile time or in integration tests — not silently at runtime in QEMU.
+5. **Contributors use the pre-merge checklist** above (also linked from README when phase 6 closes).
 
 ---
 
 ## Notes
 
+- **Three layers:** host unit tests (fast, ABI/logic) → in-guest TAP (target codegen, serial parse) → shell integration (end-to-end behavior).
 - Integration tests are the safety net for copy-out syscalls, ELF loading, and codegen quirks host tests cannot see.
 - Prefer adding a test over adding debug prints in the kernel.
-- Keep tests fast: one QEMU session per test module where possible (existing `QemuShell` pattern).
+- Keep tests fast: one QEMU session per pytest module where possible (`QemuShell` + module-scoped fixtures).
+- TAP output uses `--- TAP kernel ---` / `--- TAP kernel end ---` markers so pytest can extract kernel results from mixed serial logs.
