@@ -21,7 +21,7 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 
 **Next up** (see [docs/roadmap/](docs/roadmap/))
 
-Phase 5 networking polish: TCP/IP hardening.
+Phase 6 — testing, COW fork, process environment (IPC/cwd/init/devfs), virtual memory, ext2/tmpfs, procfs, preemption, SMP, and GUI.
 
 ## 🚀 Goals
 
@@ -159,27 +159,39 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 | 1 — Page tables | Done | Higher-half kernel |
 | 2 — Memory | Done | Physical, virtual, and heap allocators |
 | 3 — Kernel runtime | Done | APIC, timer, threads, scheduler, syscalls |
-| 4 — Userspace | Done | ELF loader, TTY, shell, programs on FAT disk |
-| 5 — I/O stack | In progress | VirtIO-blk, FAT32 read/write, VirtIO-net, sockets, `ip`, DNS, and `curl` |
-| 6 — SMP and GUI | Planned | Multicore, framebuffer, window manager |
+| 4 — Userspace | Done | ELF loader, TTY, shell, fork/exec |
+| 5 — I/O stack | Done | VirtIO, FAT32, TCP/UDP, sockets, `ip`/`curl`/`dig`, hw tools |
+| 6 — Testing | **Next** | ABI tests, shell integration tests, CI gate |
+| 7 — COW fork | Planned | Shared mappings, write fault promotion |
+| 8 — Process env | Planned | Signals, pipes, cwd, env, PATH, init, devfs, TTY |
+| 9 — Virtual memory | Planned | `mmap`, page cache, demand paging, W^X |
+| 10 — Filesystems | Planned | ext2, `mount`, tmpfs, permissions, rename/symlink |
+| 11 — procfs/sysfs | Planned | `/proc`, `/sys`; retire hw snapshot syscalls |
+| 12 — Preemption | Planned | Involuntary timer preemption (SMP gate) |
+| 13 — SMP | Planned | Multicore bring-up, ACPI, SMP-safe kernel |
+| 14 — GUI | Planned | Framebuffer, input, minimal window manager |
 
-**Phase 5 — done**
+Full details and recommended order: [docs/roadmap/README.md](docs/roadmap/README.md).
 
-* [x] VirtIO-blk read/write
-* [x] FAT32 read/write, create, truncate, append
-* [x] Install user programs on the FAT disk (`/BIN/*`)
-* [x] Shell file builtins with persistence across reboot
-* [x] `cd`/`pwd`
-* [x] VirtIO-net driver
-* [x] ARP, IPv4, UDP, ICMP echo, minimal TCP
-* [x] Socket syscalls
-* [x] `ip addr`, `ip route`, `ip neigh`
-* [x] DNS-backed `curl`
-* [x] `ping` with multiple packets, RTT, packet loss, and summary stats
+**Phase 5 — completed**
 
-**Phase 5 — next**
+* [x] VirtIO-blk read/write, FAT32 read/write/create/append
+* [x] User programs on FAT disk (`/BIN/*`), shell file builtins, `cd`/`pwd`
+* [x] VirtIO-net, ARP/IPv4/UDP/ICMP, minimal TCP client
+* [x] Socket syscalls; `ip`, `ping`, `dig`, `curl`
+* [x] Hardware tools: `lscpu`, `lspci`, `lsblk`, `lsmem` (interim syscalls → procfs in phase 11)
 
-* [ ] TCP/IP hardening under repeated userspace network activity
+**Deferred**
+
+* [ ] TCP/IP hardening under load (minimal TCP is enough for now)
+* [ ] ext4, btrfs, ZFS (ext2 is the next on-disk FS — phase 10)
+* [ ] `poll`, `listen`/`accept`, pthreads, dynamic linking — see roadmap deferred backlog
+
+**Phase 6 — next**
+
+* [ ] Integration tests for `lscpu`, `lspci`, `lsblk`, `lsmem`
+* [ ] Expand ABI layout tests; document rebuild-before-QEMU workflow
+* [ ] Optional CI: `zig build test` + `mise run test-shell`
 
 ## 🔗 Links
 

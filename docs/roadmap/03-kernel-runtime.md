@@ -46,6 +46,6 @@
 ## Notes
 
 - SMP is out of scope here; design with per-CPU data in mind but run single-core first.
-- **Preemption (deferred):** The LAPIC timer sets `preempt_requested`; threads honor it at `yieldIfRequested()` boundaries. That is timer-quantum *cooperative* scheduling, not involuntary preemption from the IRQ handler. True preemptive switching (interrupt-frame context save, `iretq`/`sysret` from the timer path) is deferred until after syscalls; it is not required to finish Phase 3 or start Phase 4.
+- **Preemption (deferred):** The LAPIC timer sets `preempt_requested`; threads honor it at `yieldIfRequested()` boundaries. That is timer-quantum *cooperative* scheduling, not involuntary preemption from the IRQ handler. True preemptive switching lands in [Phase 12 — Preemptive scheduling](12-preemptive-scheduling.md) (required before SMP).
 - Syscall machinery can be tested from ring 3 with a small user stub before real ELF userspace in Phase 4.
 - Document the chosen syscall ABI in `docs/syscall-abi.md`.

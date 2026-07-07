@@ -28,7 +28,7 @@
   - [x] Basic ANSI escape parsing
   - [x] Backed by serial or VGA text for now
 - [x] Add userspace build in [`build.zig`](../../build.zig)
-  - [x] Cross-compile static user programs (e.g. `hello`, `shell`)
+  - [x] Cross-compile static user programs (e.g. `shell`, `dig`)
   - [x] Install binaries into the FAT image (`/BIN/*` from `zig-out/userspace/bin/`)
 - [x] Add minimal libc or freestanding syscall wrappers for user programs
 - [x] Shell reads input and executes programs (built-in `exit`/`help` OK)
@@ -43,7 +43,7 @@
 
 ## Acceptance criteria
 
-1. **User ELF loads and runs** — `hello` prints a message from ring 3.
+1. **User ELF loads and runs** — a `/BIN/*` program (e.g. `lscpu`) runs from ring 3.
 2. **Syscalls work from userspace** — `write` to TTY/serial without kernel panics.
 3. **Process exit** reclaims address space and returns to shell or init.
 4. **Shell launches a child process** via `fork` + `execve` and reaps it with `wait4`.
@@ -57,5 +57,5 @@
 - Full Linux ABI compatibility is a long-term goal; document deviations.
 - FAT root (already used for boot) is sufficient for loading the first user binaries.
 - Filesystem abstraction can be thin — open by path from FAT is acceptable for this phase.
-- **`fork` uses eager page copy**, not copy-on-write. That is intentional for now: shell use is `fork` → `execve`, programs are small, and COW needs a page-fault handler plus shared-page refcounts. Revisit COW if fork latency or memory use becomes a problem (see also [`kernel/proc/process.zig`](../../kernel/proc/process.zig) on `forkChild`).
+- **`fork` uses eager page copy**, not copy-on-write — temporary; see [Phase 7 — Copy-on-write fork](07-copy-on-write-fork.md).
 - **Process launch** uses Linux `fork` / `execve` / `wait4`. The old `spawn` syscall (548) was removed once the shell migrated.

@@ -6,7 +6,7 @@ uv = "latest"
 [tasks.build]
 description = "Build kernel and userspace binaries"
 sources = ["build.zig", "build.zig.zon", "kernel/**/*", "userspace/**/*"]
-outputs = ["zig-out/bin/kernel", "zig-out/userspace/bin/hello", "zig-out/userspace/bin/shell", "zig-out/userspace/bin/dig", "zig-out/userspace/bin/ping", "zig-out/userspace/bin/curl", "zig-out/userspace/bin/ip"]
+outputs = ["zig-out/bin/kernel", "zig-out/userspace/bin/shell", "zig-out/userspace/bin/dig", "zig-out/userspace/bin/ping", "zig-out/userspace/bin/curl", "zig-out/userspace/bin/ip", "zig-out/userspace/bin/lscpu", "zig-out/userspace/bin/lspci", "zig-out/userspace/bin/lsblk", "zig-out/userspace/bin/lsmem"]
 run = "zig build"
 
 [tasks."uv-sync"]
