@@ -77,7 +77,7 @@ pub fn printHelp() void {
         }
     }
 
-    io.writeStr("Programs in /BIN: hello, dig, ping, curl, ip, lscpu, lspci, lsblk, lsmem, ...\n");
+    io.writeStr("Programs in /BIN: dig, ping, curl, ip, lscpu, lspci, lsblk, lsmem, ...\n");
     io.writeStr("  dig [@server] name  DNS A lookup (default server 10.0.2.3)\n");
     io.writeStr("  ping [host]  ICMP echo (default 10.0.2.2)\n");
     io.writeStr("  curl <url|host> [port]  HTTP GET (resolves hostnames via DNS)\n");

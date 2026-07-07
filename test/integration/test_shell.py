@@ -76,7 +76,7 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
             case="cat readme",
         )
         run_case(shell, "ls", "README.TXT", case="ls root")
-        run_case(shell, "ls /BIN", "HELLO", case="ls /BIN")
+        run_case(shell, "ls /BIN", "SHELL", case="ls /BIN")
         mkdir_out = shell.run("mkdir /TDIR")
         if "mkdir: ok" not in mkdir_out and "mkdir: failed" not in mkdir_out:
             raise AssertionError(f"mkdir: unexpected output:\n{mkdir_out}")
@@ -89,7 +89,7 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
         run_case(shell, "cat /TDIR/NOTE.TXT", "nested", case="cat in dir")
         run_case(shell, "rm /TDIR/NOTE.TXT", "rm: ok", case="rm note in dir")
         run_case(shell, "rmdir /TDIR", "rmdir: ok", case="rmdir tdir")
-        run_case(shell, "ls -l /BIN", "HELLO", case="ls -l /BIN")
+        run_case(shell, "ls -l /BIN", "SHELL", case="ls -l /BIN")
         run_case(shell, "ls /BIN", "DIG", case="ls /BIN dig")
         run_case(shell, "write /yo.txt yoman", "write: ok", case="write yo")
         run_case(shell, "cat /YO.TXT", "yoman", case="cat yo")
@@ -112,7 +112,7 @@ def test_shell_smoke_and_persistence(repo_root: Path) -> None:
             "persisted on disk!",
             case="cat persist",
         )
-        run_case(shell, "hello", "Hello from userspace!", case="fork/exec hello")
+        run_case(shell, "lscpu", "Architecture:", case="fork/exec lscpu")
         run_case(shell, "dig example.com", "ANSWER SECTION", case="dig example.com")
         run_case(shell, "dig example.com", "IN  A", case="dig A record")
         ping_out = run_case(shell, "ping -c 2", "ping: 10.0.2.2 reply seq=1", case="ping gateway")

@@ -49,7 +49,6 @@ pub fn build(b: *std.Build) void {
         .dest_dir = .{ .override = user_bin_dir },
     };
 
-    const install_hello = helpers.addUserProgram(b, user_deps, "hello", "userspace/hello/main.zig", user_install);
     const install_ping = helpers.addUserProgram(b, user_deps, "ping", "userspace/ping/main.zig", user_install);
     const install_ip = helpers.addUserProgram(b, user_deps, "ip", "userspace/ip/main.zig", user_install);
     const install_lscpu = helpers.addUserProgram(b, user_deps, "lscpu", "userspace/lscpu/main.zig", user_install);
@@ -89,7 +88,6 @@ pub fn build(b: *std.Build) void {
     curl.root_module.addImport("target.zig", curl_target_user);
     const install_curl = b.addInstallArtifact(curl, user_install);
 
-    b.getInstallStep().dependOn(&install_hello.step);
     b.getInstallStep().dependOn(&install_shell.step);
     b.getInstallStep().dependOn(&install_dig.step);
     b.getInstallStep().dependOn(&install_ping.step);

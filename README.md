@@ -14,7 +14,7 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 * Syscalls: `read`, `write`, `open` (`O_CREAT`, `O_TRUNC`, `O_APPEND`), `close`, `lseek`, `stat`, `brk`, `getpid`, `fork`, `execve`, `wait4`, `unlink`, `mkdir`, `rmdir`, `getdents64`, `clock_gettime`, `exit`/`exit_group`
 * PCI enumeration (legacy I/O ports on QEMU q35), VirtIO-blk read/write, FAT32 VFS (read/write/create/truncate/append)
 * VirtIO-net with ARP, IPv4, UDP, ICMP echo, minimal TCP client sockets, and DNS A-record resolution
-* Userspace programs on the VirtIO FAT disk (`/README.TXT`, `/BIN/hello`, `/BIN/shell`, …)
+* Userspace programs on the VirtIO FAT disk (`/README.TXT`, `/BIN/shell`, `/BIN/dig`, …)
 * Serial shell with modular builtins: `help`, `exit`, `pid`, `echo`, `cat`, `ls`, `write`, `rm`, `mkdir`, `rmdir`, `cd`, `pwd`, `date`
 * Disk image sync preserves user-created files across `mise run boot` (see [disk notes](#virtio-disk))
 * [mise](https://mise.jdx.dev) tasks for build, ISO, disk, QEMU boot, and integration tests
@@ -114,14 +114,14 @@ ls -l /
 write /NOTES.TXT hello
 write -a /NOTES.TXT world
 cat /NOTES.TXT
-hello
+lscpu
 ip addr
 ip route
 dig example.com
 curl example.com
 ```
 
-Use full paths for file builtins (`cat`, `ls`, `write`). Programs in `/BIN` can be launched by name (e.g. `hello`).
+Use full paths for file builtins (`cat`, `ls`, `write`). Programs in `/BIN` can be launched by name (e.g. `lscpu`).
 
 Host unit tests (no QEMU):
 
