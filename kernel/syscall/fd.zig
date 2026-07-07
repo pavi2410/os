@@ -13,7 +13,7 @@ pub fn currentProcess() Error!*process.Process {
 pub fn slot(proc: *process.Process, fd: u64) Error!*process.Fd {
     if (fd >= process.max_fds) return Error.BadFd;
     const entry = &proc.fds.fds[@intCast(fd)];
-    if (entry.kind == .none) return Error.BadFd;
+    if (entry.* == .none) return Error.BadFd;
     return entry;
 }
 
@@ -21,16 +21,20 @@ pub fn currentSlot(fd: u64) Error!*process.Fd {
     return slot(try currentProcess(), fd);
 }
 
-pub fn expectFile(fd: u64) Error!*process.Fd {
+pub fn expectFile(fd: u64) Error!u32 {
     const entry = try currentSlot(fd);
-    if (entry.kind != .file) return Error.BadFd;
-    return entry;
+    return switch (entry.*) {
+        .file => |handle| handle,
+        else => Error.BadFd,
+    };
 }
 
-pub fn expectSocket(fd: u64) Error!*process.Fd {
+pub fn expectSocket(fd: u64) Error!u32 {
     const entry = try currentSlot(fd);
-    if (entry.kind != .socket) return Error.BadFd;
-    return entry;
+    return switch (entry.*) {
+        .socket => |handle| handle,
+        else => Error.BadFd,
+    };
 }
 
 pub fn alloc(proc: *process.Process) Error!usize {

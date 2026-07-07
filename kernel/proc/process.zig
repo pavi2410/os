@@ -6,6 +6,7 @@ const gdt = @import("../arch/x86_64/gdt.zig");
 const thread = @import("thread.zig");
 const user_loader = @import("../mm/user_loader.zig");
 const user_entry = @import("user_entry.zig");
+const fd_table = @import("fd_table.zig");
 
 pub const ProcessError = error{
     OutOfMemory,
@@ -29,46 +30,9 @@ pub const user_stack_top = user_loader.user_stack_top;
 pub const user_stack_pages = user_loader.user_stack_pages;
 pub const user_brk_base: u64 = 0x0000000000400000;
 
-pub const FdKind = enum {
-    none,
-    console,
-    file,
-    socket,
-};
-
-pub const Fd = struct {
-    kind: FdKind = .none,
-    vfs_handle: u32 = 0,
-    socket_handle: u32 = 0,
-};
-
-pub const max_fds = 32;
-
-/// Per-process file descriptor table (stub for Phase 4).
-pub const FdTable = struct {
-    fds: [max_fds]Fd,
-
-    pub fn init() FdTable {
-        var table = FdTable{
-            .fds = undefined,
-        };
-        for (&table.fds) |*fd| {
-            fd.* = .{};
-        }
-        table.fds[0] = .{ .kind = .console };
-        table.fds[1] = .{ .kind = .console };
-        table.fds[2] = .{ .kind = .console };
-        return table;
-    }
-
-    pub fn allocFd(self: *FdTable) ?usize {
-        var i: usize = 3;
-        while (i < max_fds) : (i += 1) {
-            if (self.fds[i].kind == .none) return i;
-        }
-        return null;
-    }
-};
+pub const Fd = fd_table.Fd;
+pub const FdTable = fd_table.FdTable;
+pub const max_fds = fd_table.max_fds;
 
 pub const AddressSpace = struct {
     cr3: u64,
