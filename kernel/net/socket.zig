@@ -50,8 +50,8 @@ pub fn close(handle: u32) void {
 pub fn bind(handle: u32, addr: *const SockaddrIn) SocketError!void {
     const sock = table.get(handle) orelse return SocketError.NotFound;
     if (addr.family != AF_INET) return SocketError.Unsupported;
-    if (sock.kind != .udp) return SocketError.Unsupported;
-    sock.local_port = @byteSwap(addr.port_be);
+    const udp_sock = table.asUdp(sock) orelse return SocketError.Unsupported;
+    udp_sock.local_port = @byteSwap(addr.port_be);
 }
 
 pub fn connect(handle: u32, addr: *const SockaddrIn) SocketError!void {
@@ -75,7 +75,7 @@ pub fn sendto(
     if (dest.family != AF_INET) return SocketError.Unsupported;
     if (!link.isReady()) return SocketError.NotReady;
 
-    return switch (sock.kind) {
+    return switch (sock.active) {
         .udp => try sock_udp.send(handle, data, dest),
         .icmp => try sock_icmp.send(handle, dest),
         .tcp => SocketError.Unsupported,
@@ -91,7 +91,7 @@ pub fn recvfrom(
     const sock = table.get(handle) orelse return SocketError.NotFound;
     if (!link.isReady()) return SocketError.NotReady;
 
-    return switch (sock.kind) {
+    return switch (sock.active) {
         .udp => try sock_udp.recv(handle, buf, src_out, max_spins),
         .icmp => try sock_icmp.recv(handle, buf, src_out, max_spins),
         .tcp => SocketError.Unsupported,

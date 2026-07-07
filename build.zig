@@ -265,6 +265,12 @@ pub fn build(b: *std.Build) void {
     fd_table_test_mod.addImport("fd_table", fd_table_host_mod);
     const run_fd_table_tests = helpers.runHostTest(b, fd_table_test_mod);
 
+    const socket_table_host_mod = helpers.hostModule(b, "kernel/net/socket/table.zig");
+
+    const socket_table_test_mod = helpers.hostTestModule(b, "test/kernel/socket_table_test.zig");
+    socket_table_test_mod.addImport("socket_table", socket_table_host_mod);
+    const run_socket_table_tests = helpers.runHostTest(b, socket_table_test_mod);
+
     const time_math_host = helpers.hostModule(b, "userspace/ulib/time_math.zig");
 
     const ulib_helpers_test_mod = helpers.hostTestModule(b, "test/userspace/ulib_helpers_test.zig");
@@ -288,6 +294,7 @@ pub fn build(b: *std.Build) void {
         run_syscall_user_tests,
         run_crash_tests,
         run_fd_table_tests,
+        run_socket_table_tests,
         run_icmp_tests,
         run_tcp_tests,
         run_curl_target_tests,

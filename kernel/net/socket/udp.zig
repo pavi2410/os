@@ -8,6 +8,7 @@ const table = @import("table.zig");
 
 pub fn send(handle: u32, data: []const u8, dest: *const api.SockaddrIn) api.SocketError!usize {
     const sock = table.get(handle) orelse return api.SocketError.NotFound;
+    const udp_sock = table.asUdp(sock) orelse return api.SocketError.Unsupported;
     if (!link.isReady()) return api.SocketError.NotReady;
 
     table.ensureLocalPort(sock);
@@ -24,7 +25,7 @@ pub fn send(handle: u32, data: []const u8, dest: *const api.SockaddrIn) api.Sock
         mac,
         config.guest_ip,
         dst_ip,
-        sock.local_port,
+        udp_sock.local_port,
         dst_port,
         data,
     );
@@ -39,17 +40,18 @@ pub fn recv(
     max_spins: usize,
 ) api.SocketError!usize {
     const sock = table.get(handle) orelse return api.SocketError.NotFound;
-    if (sock.local_port == 0) return api.SocketError.NotBound;
+    const udp_sock = table.asUdp(sock) orelse return api.SocketError.Unsupported;
+    if (udp_sock.local_port == 0) return api.SocketError.NotBound;
     if (!link.isReady()) return api.SocketError.NotReady;
 
     var recv_buf: [link.max_frame_len]u8 = undefined;
     const len = pump.pollFrame(&recv_buf, max_spins, pump.UdpMatcher{
-        .local_port = sock.local_port,
+        .local_port = udp_sock.local_port,
     }) catch |err| return api.socketErrorFromPump(err);
 
-    var src_ip: @TypeOf(sock.last_peer) = undefined;
+    var src_ip: @TypeOf(udp_sock.last_peer) = undefined;
     var src_port: u16 = 0;
-    const payload = udp.match(recv_buf[0..len], sock.local_port, &src_ip, &src_port) orelse return api.SocketError.IoError;
+    const payload = udp.match(recv_buf[0..len], udp_sock.local_port, &src_ip, &src_port) orelse return api.SocketError.IoError;
     const copy_len = @min(payload.len, buf.len);
     @memcpy(buf[0..copy_len], payload[0..copy_len]);
     if (src_out) |out| {

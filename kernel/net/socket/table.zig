@@ -1,4 +1,4 @@
-const ipv4 = @import("../ipv4.zig");
+pub const Addr = [4]u8;
 
 pub const rx_buf_size = 8192;
 pub const max_sockets = 16;
@@ -20,21 +20,38 @@ pub const TcpState = enum {
     peer_closed,
 };
 
-pub const Socket = struct {
-    in_use: bool = false,
-    kind: Kind = .udp,
+pub const UdpSocket = struct {
     local_port: u16 = 0,
+    last_peer: Addr = .{ 0, 0, 0, 0 },
+};
+
+pub const IcmpSocket = struct {
     icmp_id: u16 = 0,
     icmp_seq: u16 = 0,
-    last_peer: ipv4.Addr = .{ 0, 0, 0, 0 },
+    last_peer: Addr = .{ 0, 0, 0, 0 },
+};
+
+pub const TcpSocket = struct {
+    local_port: u16 = 0,
     tcp_state: TcpState = .closed,
-    remote_ip: ipv4.Addr = .{ 0, 0, 0, 0 },
+    remote_ip: Addr = .{ 0, 0, 0, 0 },
     remote_port: u16 = 0,
     snd_isn: u32 = 0,
     snd_nxt: u32 = 0,
     rcv_nxt: u32 = 0,
     rx_buf: [rx_buf_size]u8 = undefined,
     rx_len: usize = 0,
+};
+
+pub const Socket = struct {
+    in_use: bool = false,
+    active: Active = .{ .udp = .{} },
+
+    pub const Active = union(Kind) {
+        udp: UdpSocket,
+        icmp: IcmpSocket,
+        tcp: TcpSocket,
+    };
 };
 
 var sockets: [max_sockets]Socket = [_]Socket{.{}} ** max_sockets;
@@ -54,13 +71,12 @@ pub fn create(kind: Kind) ?u32 {
     while (i < max_sockets) : (i += 1) {
         if (!sockets[i].in_use) {
             sockets[i] = switch (kind) {
-                .udp => .{ .in_use = true, .kind = .udp },
+                .udp => .{ .in_use = true, .active = .{ .udp = .{} } },
                 .icmp => .{
                     .in_use = true,
-                    .kind = .icmp,
-                    .icmp_id = allocIcmpId(),
+                    .active = .{ .icmp = .{ .icmp_id = allocIcmpId() } },
                 },
-                .tcp => .{ .in_use = true, .kind = .tcp },
+                .tcp => .{ .in_use = true, .active = .{ .tcp = .{} } },
             };
             return @intCast(i);
         }
@@ -93,7 +109,33 @@ pub fn allocIsn() u32 {
 }
 
 pub fn ensureLocalPort(sock: *Socket) void {
-    if (sock.local_port == 0) {
-        sock.local_port = allocEphemeralPort();
+    switch (sock.active) {
+        .udp => |*udp_sock| {
+            if (udp_sock.local_port == 0) {
+                udp_sock.local_port = allocEphemeralPort();
+            }
+        },
+        else => {},
     }
+}
+
+pub fn asUdp(sock: *Socket) ?*UdpSocket {
+    return switch (sock.active) {
+        .udp => |*udp_sock| udp_sock,
+        else => null,
+    };
+}
+
+pub fn asIcmp(sock: *Socket) ?*IcmpSocket {
+    return switch (sock.active) {
+        .icmp => |*icmp_sock| icmp_sock,
+        else => null,
+    };
+}
+
+pub fn asTcp(sock: *Socket) ?*TcpSocket {
+    return switch (sock.active) {
+        .tcp => |*tcp_sock| tcp_sock,
+        else => null,
+    };
 }
