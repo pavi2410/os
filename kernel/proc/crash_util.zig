@@ -42,12 +42,22 @@ pub fn signalName(signal: u32) []const u8 {
     };
 }
 
+const PfErr = packed struct(u64) {
+    present: u1,
+    write: u1,
+    user: u1,
+    reserved: u1,
+    fetch: u1,
+    _: u59 = 0,
+};
+
 pub fn pageFaultDescription(code: u64) []const u8 {
-    if (code & 0x10 != 0) return "instruction fetch to non-executable page";
-    if (code & 0x1 == 0) {
-        if (code & 0x2 != 0) return "write to unmapped page";
+    const err: PfErr = @bitCast(code);
+    if (err.fetch != 0) return "instruction fetch to non-executable page";
+    if (err.present == 0) {
+        if (err.write != 0) return "write to unmapped page";
         return "read from unmapped page";
     }
-    if (code & 0x2 != 0) return "write to read-only page";
+    if (err.write != 0) return "write to read-only page";
     return "access violation";
 }
