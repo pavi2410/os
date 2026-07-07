@@ -1,6 +1,7 @@
 const socket = @import("../net/socket.zig");
 const user_exec = @import("../proc/exec.zig");
 const vfs = @import("../fs/vfs.zig");
+const filesystem = @import("../fs/filesystem.zig");
 
 pub const EPERM: i64 = -1;
 pub const ENOENT: i64 = -2;
@@ -20,22 +21,7 @@ pub const ENOTCONN: i64 = -107;
 pub const ETIMEDOUT: i64 = -110;
 
 pub fn fromVfs(err: vfs.VfsError) i64 {
-    return switch (err) {
-        vfs.VfsError.NotFound => ENOENT,
-        vfs.VfsError.IsDirectory => EISDIR,
-        vfs.VfsError.BadHandle => EBADF,
-        vfs.VfsError.TooManyOpenFiles => EMFILE,
-        vfs.VfsError.InvalidWhence => EINVAL,
-        vfs.VfsError.NotReady, vfs.VfsError.IoError => EIO,
-        vfs.VfsError.InvalidBpb => EIO,
-        vfs.VfsError.NotFile => EINVAL,
-        vfs.VfsError.NameTooLong, vfs.VfsError.PathTooLong => EINVAL,
-        vfs.VfsError.BufferTooSmall => EINVAL,
-        vfs.VfsError.Exists => EEXIST,
-        vfs.VfsError.NoSpace => ENOSPC,
-        vfs.VfsError.NotEmpty => ENOTEMPTY,
-        vfs.VfsError.ReadOnly => EACCES,
-    };
+    return filesystem.errnoCode(err);
 }
 
 pub fn fromSocket(err: socket.SocketError) i64 {

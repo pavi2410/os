@@ -27,6 +27,24 @@ pub fn liftFat(err: FatError) Error {
     return err;
 }
 
+/// Maps a filesystem error to the negative errno values returned by syscalls.
+pub fn errnoCode(err: Error) i64 {
+    return switch (err) {
+        error.NotFound => -2,
+        error.IsDirectory => -21,
+        error.BadHandle => -9,
+        error.TooManyOpenFiles => -24,
+        error.InvalidWhence => -22,
+        error.NotReady, error.IoError, error.InvalidBpb => -5,
+        error.NotFile => -22,
+        error.NameTooLong, error.PathTooLong, error.BufferTooSmall => -22,
+        error.Exists => -17,
+        error.NoSpace => -28,
+        error.NotEmpty => -39,
+        error.ReadOnly => -13,
+    };
+}
+
 pub const Whence = enum(u32) {
     set = 0,
     cur = 1,

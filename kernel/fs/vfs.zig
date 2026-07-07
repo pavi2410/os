@@ -2,12 +2,7 @@ const fat32 = @import("fat32.zig");
 const filesystem = @import("filesystem.zig");
 const hal = @import("../hal.zig");
 
-pub const VfsError = filesystem.Error || error{
-    TooManyOpenFiles,
-    BadHandle,
-    InvalidWhence,
-    ReadOnly,
-};
+pub const VfsError = filesystem.Error;
 
 pub const Whence = filesystem.Whence;
 pub const OpenFlags = filesystem.OpenFlags;
