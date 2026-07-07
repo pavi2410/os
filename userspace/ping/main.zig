@@ -1,55 +1,59 @@
-const freestanding_std = @import("freestanding_std");
-const libc = @import("libc");
+const std_root = @import("std_root");
+pub const std_options_debug_io = std_root.std_options_debug_io;
+pub const std_options = std_root.std_options;
 
-pub const std_options_debug_io = freestanding_std.std_options_debug_io;
-pub const std_options = freestanding_std.std_options;
+const std = @import("std");
+const linux = std.os.linux;
+const ulib = @import("ulib");
 
 const default_host = [4]u8{ 10, 0, 2, 2 };
 const default_count: usize = 4;
 const max_count: usize = 16;
 
-export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
+/// Linux-target ping using `std.os.linux` sockets and `std.fmt` for output.
+pub fn main(init: std.process.Init.Minimal) void {
     var host = default_host;
     var count = default_count;
 
+    const argv = init.args.vector;
     var argi: usize = 1;
-    while (argi < argc) : (argi += 1) {
-        const arg = libc.io.cstr(argv[argi]);
-        if (libc.io.eql(arg, "-c")) {
+    while (argi < argv.len) : (argi += 1) {
+        const arg = std.mem.span(argv[argi]);
+        if (std.mem.eql(u8, arg, "-c")) {
             argi += 1;
-            if (argi >= argc) {
+            if (argi >= argv.len) {
                 writeStr("usage: ping [-c count] [ip]\n");
-                libc.process.exit(1);
+                ulib.process.exit(1);
             }
-            count = libc.parse.parseDecimal(libc.io.cstr(argv[argi]), max_count) orelse {
+            count = ulib.parse.parseDecimal(std.mem.span(argv[argi]), max_count) orelse {
                 writeStr("ping: bad count\n");
-                libc.process.exit(1);
+                ulib.process.exit(1);
             };
             continue;
         }
-        if (!libc.ip.parseIpv4(arg, &host)) {
+        if (!ulib.ip.parseIpv4(arg, &host)) {
             writeStr("ping: bad address\n");
-            libc.process.exit(1);
+            ulib.process.exit(1);
         }
     }
 
-    const fd = libc.net.socket(
-        libc.net.AF_INET,
-        libc.net.SOCK_DGRAM,
-        libc.net.IPPROTO_ICMP,
-    );
-    if (fd < 0) {
+    const fd_rc = linux.socket(linux.AF.INET, linux.SOCK.DGRAM, linux.IPPROTO.ICMP);
+    if (@as(isize, @bitCast(fd_rc)) < 0) {
         writeStr("ping: socket failed\n");
-        libc.process.exit(1);
+        ulib.process.exit(1);
     }
+    const fd: i32 = @intCast(fd_rc);
 
     var ip_buf: [16]u8 = undefined;
-    const ip_str = libc.ip.formatIpv4(host, &ip_buf) orelse "?";
+    const ip_str = ulib.ip.formatIpv4(host, &ip_buf) orelse "?";
     writeStr("PING ");
     writeStr(ip_str);
     writeStr(" 32 data bytes\n");
 
-    var dest = libc.net.sockaddrIn(host, 0);
+    var dest = linux.sockaddr.in{
+        .port = 0,
+        .addr = @bitCast(host),
+    };
 
     const empty: [0]u8 = .{};
     var reply: [64]u8 = undefined;
@@ -61,26 +65,14 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
 
     while (transmitted < count) : (transmitted += 1) {
         const start = monotonicUs();
-        if (libc.net.sendto(
-            @intCast(fd),
-            &empty,
-            0,
-            0,
-            &dest,
-        ) < 0) {
+        const send_rc = linux.sendto(fd, &empty, 0, 0, @ptrCast(&dest), @sizeOf(linux.sockaddr.in));
+        if (@as(isize, @bitCast(send_rc)) < 0) {
             writeStr("ping: send failed\n");
-            libc.process.exit(1);
+            ulib.process.exit(1);
         }
 
-        const n = libc.net.recvfrom(
-            @intCast(fd),
-            &reply,
-            reply.len,
-            0,
-            null,
-            null,
-        );
-        if (n < 0) {
+        const recv_rc = linux.recvfrom(fd, &reply, reply.len, 0, null, null);
+        if (@as(isize, @bitCast(recv_rc)) < 0) {
             writeStr("ping: ");
             writeStr(ip_str);
             writeStr(" timeout seq=");
@@ -88,6 +80,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
             writeStr("\n");
             continue;
         }
+        const n: usize = @intCast(recv_rc);
 
         const elapsed_us = elapsedSinceUs(start);
         if (received == 0 or elapsed_us < rtt_min_us) rtt_min_us = elapsed_us;
@@ -100,7 +93,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         writeStr(" reply seq=");
         writeDecimal(transmitted);
         writeStr(" bytes=");
-        writeDecimal(@intCast(n));
+        writeDecimal(n);
         writeStr(" time=");
         writeMillis(elapsed_us);
         writeStr(" ms\n");
@@ -124,28 +117,35 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         writeStr("/");
         writeMillis(rtt_max_us);
         writeStr(" ms\n");
-        libc.process.exit(0);
+        ulib.process.exit(0);
     }
 
-    libc.process.exit(1);
+    ulib.process.exit(1);
 }
 
 fn writeDecimal(n: usize) void {
-    libc.io.writeDecimal(n);
+    var buf: [24]u8 = undefined;
+    const text = std.fmt.bufPrint(&buf, "{d}", .{n}) catch return;
+    writeStr(text);
 }
 
 fn writeMillis(us: u64) void {
-    libc.io.writeMillis(us);
+    var buf: [24]u8 = undefined;
+    const ms = us / 1000;
+    const frac: u16 = @intCast(us % 1000);
+    const text = std.fmt.bufPrint(&buf, "{d}.{d:0>3}", .{ ms, frac }) catch return;
+    writeStr(text);
 }
 
 fn monotonicUs() u64 {
-    return libc.time.monotonicUs();
+    return ulib.time.monotonicUs();
 }
 
 fn elapsedSinceUs(start: u64) u64 {
-    return libc.time.elapsedUs(start, monotonicUs());
+    return ulib.time.elapsedUs(start, monotonicUs());
 }
 
 fn writeStr(s: []const u8) void {
-    libc.io.writeStr(s);
+    if (s.len == 0) return;
+    _ = linux.write(linux.STDOUT_FILENO, s.ptr, s.len);
 }

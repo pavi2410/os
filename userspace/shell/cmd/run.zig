@@ -1,6 +1,6 @@
 const argv_mod = @import("../argv.zig");
 const io = @import("../io.zig");
-const libc = @import("libc");
+const ulib = @import("ulib");
 
 const bin_dir = "/BIN/";
 
@@ -17,24 +17,24 @@ pub fn run(parsed: *const argv_mod.Parsed) void {
         return;
     }
 
-    const my_pid = libc.process.getpid();
-    const child = libc.process.fork();
+    const my_pid = ulib.process.getpid();
+    const child = ulib.process.fork();
     if (child < 0) {
         io.writeStr("run failed\n");
         return;
     }
 
-    if (libc.process.getpid() != my_pid) {
+    if (ulib.process.getpid() != my_pid) {
         const argc = buildArgv(parsed) orelse {
-            libc.process.exit(1);
+            ulib.process.exit(1);
         };
         exec_argv[argc] = null;
-        _ = libc.process.execve(@ptrCast(&exec_path), @ptrCast(&exec_argv), @ptrCast(&exec_envp));
-        libc.process.exit(1);
+        _ = ulib.process.execve(@ptrCast(&exec_path), @ptrCast(&exec_argv), @ptrCast(&exec_envp));
+        ulib.process.exit(1);
     }
 
     var status: u32 = 0;
-    if (libc.process.waitpid(child, &status, 0) < 0) {
+    if (ulib.process.waitpid(child, &status, 0) < 0) {
         io.writeStr("run failed\n");
     }
 }

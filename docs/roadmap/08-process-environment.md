@@ -72,7 +72,7 @@ Today the shell passes `exec_envp = { null }` and the kernel discards the third 
 - [ ] Still support explicit paths (`/BIN/curl`, `./tool` once cwd is kernel-side)
 - [ ] Uppercase FAT 8.3 names: document whether `PATH` entries are normalized or `/BIN` stays canonical
 
-#### Userspace libc (minimal)
+#### Userspace ulib (minimal)
 
 - [ ] `getenv(name)` — scan process environ on stack or via future syscall stub
 - [ ] Optional: `setenv` / `putenv` for shell and tests (can be shell-only at first)

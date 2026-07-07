@@ -1,4 +1,4 @@
-const libc = @import("libc");
+const ulib = @import("ulib");
 
 pub const default_port: u16 = 80;
 
@@ -24,7 +24,7 @@ const http_prefix = "http://";
 
 /// If `input` has no `://` scheme, writes `http://` + input into `norm_buf`.
 pub fn normalizeUrl(input: []const u8, norm_buf: []u8) ?[]const u8 {
-    if (libc.string.indexOf(input, "://")) |_| return input;
+    if (ulib.string.indexOf(input, "://")) |_| return input;
     if (http_prefix.len + input.len > norm_buf.len) return null;
     @memcpy(norm_buf[0..http_prefix.len], http_prefix);
     @memcpy(norm_buf[http_prefix.len..][0..input.len], input);
@@ -33,10 +33,10 @@ pub fn normalizeUrl(input: []const u8, norm_buf: []u8) ?[]const u8 {
 
 pub fn parse(input: []const u8, norm_buf: []u8, host_buf: []u8, path_buf: []u8) ParseError!Target {
     const url_text = normalizeUrl(input, norm_buf) orelse return error.BadUrl;
-    if (!libc.string.startsWith(url_text, http_prefix)) return error.BadUrl;
+    if (!ulib.string.startsWith(url_text, http_prefix)) return error.BadUrl;
 
     const after_scheme = url_text[http_prefix.len..];
-    const slash = libc.string.indexOfScalar(after_scheme, '/');
+    const slash = ulib.string.indexOfScalar(after_scheme, '/');
     const authority = if (slash) |idx| after_scheme[0..idx] else after_scheme;
     const path_src = if (slash) |idx| after_scheme[idx..] else "/";
 
@@ -44,10 +44,10 @@ pub fn parse(input: []const u8, norm_buf: []u8, host_buf: []u8, path_buf: []u8) 
 
     var host_len = authority.len;
     var port = default_port;
-    if (libc.string.lastIndexOfScalar(authority, ':')) |colon| {
+    if (ulib.string.lastIndexOfScalar(authority, ':')) |colon| {
         const port_text = authority[colon + 1 ..];
         if (port_text.len == 0) return error.BadUrl;
-        port = libc.parse.parsePort(port_text) orelse return error.BadUrl;
+        port = ulib.parse.parsePort(port_text) orelse return error.BadUrl;
         host_len = colon;
     }
     if (host_len == 0 or host_len >= host_buf.len) return error.HostTooLong;
@@ -55,7 +55,7 @@ pub fn parse(input: []const u8, norm_buf: []u8, host_buf: []u8, path_buf: []u8) 
     const host = host_buf[0..host_len];
 
     const path = path_slice: {
-        if (path_src.len == 0 or libc.string.eql(path_src, "/")) {
+        if (path_src.len == 0 or ulib.string.eql(path_src, "/")) {
             path_buf[0] = '/';
             break :path_slice path_buf[0..1];
         }
@@ -69,7 +69,7 @@ pub fn parse(input: []const u8, norm_buf: []u8, host_buf: []u8, path_buf: []u8) 
 
 pub fn hostKind(host: []const u8) HostKind {
     var addr: [4]u8 = undefined;
-    if (libc.ip.parseIpv4(host, &addr)) return .ipv4;
+    if (ulib.ip.parseIpv4(host, &addr)) return .ipv4;
     return .hostname;
 }
 

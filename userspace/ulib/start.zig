@@ -1,4 +1,4 @@
-/// Freestanding entry point linked into every user program via `libc`.
+/// Freestanding entry point linked into every user program via `ulib`.
 export fn _start() callconv(.naked) noreturn {
     asm volatile (
         \\ mov (%%rsp), %%rdi

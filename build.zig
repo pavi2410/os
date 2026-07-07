@@ -27,21 +27,37 @@ pub fn build(b: *std.Build) void {
     const common_view_user = helpers.exeModule(b, "common/view.zig", user_target, user_optimize);
     abi_user.attachFsView(common_view_user);
 
-    const user_libc = helpers.exeModule(b, "userspace/libc/mod.zig", user_target, user_optimize);
-    abi_user.attachTo(user_libc);
+    const user_ulib = helpers.exeModule(b, "userspace/ulib/mod.zig", user_target, user_optimize);
+    abi_user.attachTo(user_ulib);
 
     const dns_codec_user = helpers.exeModule(b, "userspace/net/dns_codec.zig", user_target, user_optimize);
     dns_codec_user.addImport("common_bytes", common_bytes_user);
-    user_libc.addImport("dns_codec", dns_codec_user);
+    user_ulib.addImport("dns_codec", dns_codec_user);
 
-    const freestanding_std = helpers.exeModule(b, "userspace/freestanding_std.zig", user_target, user_optimize);
+    const std_root = helpers.exeModule(b, "userspace/std_root.zig", user_target, user_optimize);
     const time_unix_user = helpers.exeModule(b, "common/time_unix.zig", user_target, user_optimize);
 
     const user_deps = helpers.UserDeps{
         .target = user_target,
         .optimize = user_optimize,
-        .libc = user_libc,
-        .freestanding_std = freestanding_std,
+        .ulib = user_ulib,
+        .std_root = std_root,
+    };
+
+    const linux_target = b.resolveTargetQuery(.{
+        .cpu_arch = .x86_64,
+        .os_tag = .linux,
+        .abi = .gnu,
+    });
+    const abi_linux = helpers.AbiBundle.create(b, linux_target, user_optimize);
+    const linux_ulib = helpers.exeModule(b, "userspace/ulib/mod.zig", linux_target, user_optimize);
+    abi_linux.attachTo(linux_ulib);
+    const linux_std_root = helpers.exeModule(b, "userspace/std_root.zig", linux_target, user_optimize);
+    const linux_deps = helpers.UserDeps{
+        .target = linux_target,
+        .optimize = user_optimize,
+        .ulib = linux_ulib,
+        .std_root = linux_std_root,
     };
 
     const user_bin_dir: std.Build.InstallDir = .{ .custom = "userspace/bin" };
@@ -49,7 +65,7 @@ pub fn build(b: *std.Build) void {
         .dest_dir = .{ .override = user_bin_dir },
     };
 
-    const install_ping = helpers.addUserProgram(b, user_deps, "ping", "userspace/ping/main.zig", user_install);
+    const install_ping = helpers.addLinuxUserProgram(b, linux_deps, "ping", "userspace/ping/main.zig", user_install);
     const install_ip = helpers.addUserProgram(b, user_deps, "ip", "userspace/ip/main.zig", user_install);
     const install_lscpu = helpers.addUserProgram(b, user_deps, "lscpu", "userspace/lscpu/main.zig", user_install);
     const install_lspci = helpers.addUserProgram(b, user_deps, "lspci", "userspace/lspci/main.zig", user_install);
@@ -61,8 +77,9 @@ pub fn build(b: *std.Build) void {
         .root_module = helpers.exeModule(b, "userspace/shell/main.zig", user_target, user_optimize),
     });
     shell.setLinkerScript(b.path("userspace/linker.ld"));
-    shell.root_module.addImport("libc", user_libc);
-    shell.root_module.addImport("freestanding_std", freestanding_std);
+    shell.root_module.link_libc = false;
+    shell.root_module.addImport("ulib", user_ulib);
+    shell.root_module.addImport("std_root", std_root);
     shell.root_module.addImport("time_unix", time_unix_user);
     const install_shell = b.addInstallArtifact(shell, user_install);
 
@@ -71,8 +88,9 @@ pub fn build(b: *std.Build) void {
         .root_module = helpers.exeModule(b, "userspace/dig/main.zig", user_target, user_optimize),
     });
     dig.setLinkerScript(b.path("userspace/linker.ld"));
-    dig.root_module.addImport("libc", user_libc);
-    dig.root_module.addImport("freestanding_std", freestanding_std);
+    dig.root_module.link_libc = false;
+    dig.root_module.addImport("ulib", user_ulib);
+    dig.root_module.addImport("std_root", std_root);
     dig.root_module.addImport("dns_codec", dns_codec_user);
     const install_dig = b.addInstallArtifact(dig, user_install);
 
@@ -81,10 +99,11 @@ pub fn build(b: *std.Build) void {
         .root_module = helpers.exeModule(b, "userspace/curl/main.zig", user_target, user_optimize),
     });
     curl.setLinkerScript(b.path("userspace/linker.ld"));
-    curl.root_module.addImport("libc", user_libc);
-    curl.root_module.addImport("freestanding_std", freestanding_std);
+    curl.root_module.link_libc = false;
+    curl.root_module.addImport("ulib", user_ulib);
+    curl.root_module.addImport("std_root", std_root);
     const curl_target_user = helpers.exeModule(b, "userspace/curl/target.zig", user_target, user_optimize);
-    curl_target_user.addImport("libc", user_libc);
+    curl_target_user.addImport("ulib", user_ulib);
     curl.root_module.addImport("target.zig", curl_target_user);
     const install_curl = b.addInstallArtifact(curl, user_install);
 
@@ -176,9 +195,9 @@ pub fn build(b: *std.Build) void {
     tcp_test_mod.addImport("common_view", host_common.view);
     const run_tcp_tests = helpers.runHostTest(b, tcp_test_mod);
 
-    const libc_ip_host = helpers.hostModule(b, "userspace/libc/ip.zig");
-    const libc_format_host = helpers.hostModule(b, "userspace/libc/format.zig");
-    const libc_parse_host = helpers.hostModule(b, "userspace/libc/parse.zig");
+    const ulib_ip_host = helpers.hostModule(b, "userspace/ulib/ip.zig");
+    const ulib_format_host = helpers.hostModule(b, "userspace/ulib/format.zig");
+    const ulib_parse_host = helpers.hostModule(b, "userspace/ulib/parse.zig");
 
     const dns_codec_mod = helpers.hostModule(b, "userspace/net/dns_codec.zig");
     dns_codec_mod.addImport("common_bytes", host_common.bytes);
@@ -186,10 +205,10 @@ pub fn build(b: *std.Build) void {
     const abi_host = helpers.AbiBundle.create(b, b.graph.host, .Debug);
     abi_host.attachFsView(host_common.view);
 
-    const libc_target_support_host = helpers.hostModule(b, "userspace/libc/target_support.zig");
+    const ulib_target_support_host = helpers.hostModule(b, "userspace/ulib/target_support.zig");
 
     const curl_target_mod = helpers.hostModule(b, "userspace/curl/target.zig");
-    curl_target_mod.addImport("libc", libc_target_support_host);
+    curl_target_mod.addImport("ulib", ulib_target_support_host);
 
     const curl_target_test_mod = helpers.hostTestModule(b, "test/userspace/curl_target_test.zig");
     curl_target_test_mod.addImport("curl_target", curl_target_mod);
@@ -224,13 +243,13 @@ pub fn build(b: *std.Build) void {
     syscall_user_test_mod.addImport("syscall_user", syscall_user_host_mod);
     const run_syscall_user_tests = helpers.runHostTest(b, syscall_user_test_mod);
 
-    const time_math_host = helpers.hostModule(b, "userspace/libc/time_math.zig");
+    const time_math_host = helpers.hostModule(b, "userspace/ulib/time_math.zig");
 
-    const libc_helpers_test_mod = helpers.hostTestModule(b, "test/userspace/libc_helpers_test.zig");
-    libc_helpers_test_mod.addImport("libc_ip", libc_ip_host);
-    libc_helpers_test_mod.addImport("libc_format", libc_format_host);
-    libc_helpers_test_mod.addImport("libc_parse", libc_parse_host);
-    const run_libc_helpers_tests = helpers.runHostTest(b, libc_helpers_test_mod);
+    const ulib_helpers_test_mod = helpers.hostTestModule(b, "test/userspace/ulib_helpers_test.zig");
+    ulib_helpers_test_mod.addImport("ulib_ip", ulib_ip_host);
+    ulib_helpers_test_mod.addImport("ulib_format", ulib_format_host);
+    ulib_helpers_test_mod.addImport("ulib_parse", ulib_parse_host);
+    const run_ulib_helpers_tests = helpers.runHostTest(b, ulib_helpers_test_mod);
 
     const time_math_test_mod = helpers.hostTestModule(b, "test/userspace/time_math_test.zig");
     time_math_test_mod.addImport("time_math", time_math_host);
@@ -252,7 +271,7 @@ pub fn build(b: *std.Build) void {
         run_abi_tests,
         run_bytes_tests,
         run_view_tests,
-        run_libc_helpers_tests,
+        run_ulib_helpers_tests,
         run_time_math_tests,
     });
 }

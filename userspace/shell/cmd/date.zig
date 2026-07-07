@@ -1,11 +1,11 @@
 const io = @import("../io.zig");
-const libc = @import("libc");
+const ulib = @import("ulib");
 const time_unix = @import("time_unix");
 
-var timespec_storage: libc.time.Timespec = .{ .tv_sec = 0, .tv_nsec = 0 };
+var timespec_storage: ulib.time.Timespec = .{ .tv_sec = 0, .tv_nsec = 0 };
 
 pub fn run() void {
-    if (!libc.time.realtime(&timespec_storage)) {
+    if (!ulib.time.realtime(&timespec_storage)) {
         io.writeStr("date: failed\n");
         return;
     }

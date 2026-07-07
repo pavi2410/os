@@ -1,4 +1,5 @@
-//! Freestanding-safe std configuration for userspace program roots.
+//! Freestanding-safe `std` configuration — re-export from each program root:
+//! `pub const std_options_debug_io = std_root.std_options_debug_io;` etc.
 const std = @import("std");
 
 pub const std_options_debug_io: std.Io = std.Io.failing;

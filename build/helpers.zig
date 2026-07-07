@@ -54,9 +54,20 @@ pub const AbiBundle = struct {
 pub const UserDeps = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    libc: *std.Build.Module,
-    freestanding_std: *std.Build.Module,
+    ulib: *std.Build.Module,
+    std_root: *std.Build.Module,
 };
+
+fn wireUserExe(
+    b: *std.Build,
+    exe: *std.Build.Step.Compile,
+    deps: UserDeps,
+) void {
+    exe.setLinkerScript(b.path("userspace/linker.ld"));
+    exe.root_module.link_libc = false;
+    exe.root_module.addImport("ulib", deps.ulib);
+    exe.root_module.addImport("std_root", deps.std_root);
+}
 
 pub fn addUserProgram(
     b: *std.Build,
@@ -69,9 +80,22 @@ pub fn addUserProgram(
         .name = name,
         .root_module = exeModule(b, main_path, deps.target, deps.optimize),
     });
-    exe.setLinkerScript(b.path("userspace/linker.ld"));
-    exe.root_module.addImport("libc", deps.libc);
-    exe.root_module.addImport("freestanding_std", deps.freestanding_std);
+    wireUserExe(b, exe, deps);
+    return b.addInstallArtifact(exe, install_opts);
+}
+
+pub fn addLinuxUserProgram(
+    b: *std.Build,
+    linux_deps: UserDeps,
+    name: []const u8,
+    main_path: []const u8,
+    install_opts: std.Build.Step.InstallArtifact.Options,
+) *std.Build.Step.InstallArtifact {
+    const exe = b.addExecutable(.{
+        .name = name,
+        .root_module = exeModule(b, main_path, linux_deps.target, linux_deps.optimize),
+    });
+    wireUserExe(b, exe, linux_deps);
     return b.addInstallArtifact(exe, install_opts);
 }
 

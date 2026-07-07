@@ -1,6 +1,6 @@
 const io = @import("../io.zig");
 const path = @import("../path.zig");
-const libc = @import("libc");
+const ulib = @import("ulib");
 const argv = @import("../argv.zig");
 
 pub fn run(parsed: *const argv.Parsed) void {
@@ -18,7 +18,7 @@ fn catFile(file_path: []const u8) void {
         return;
     };
 
-    const fd = libc.fs.open(@ptrCast(resolved.ptr), libc.fs.O_RDONLY, 0);
+    const fd = ulib.fs.open(@ptrCast(resolved.ptr), ulib.fs.O_RDONLY, 0);
     if (fd < 0) {
         io.writeStr("cat: open failed\n");
         return;
@@ -27,11 +27,11 @@ fn catFile(file_path: []const u8) void {
     var buf: [512]u8 = undefined;
     var got_data = false;
     while (true) {
-        const n = libc.fs.read(@intCast(fd), &buf, buf.len);
+        const n = ulib.fs.read(@intCast(fd), &buf, buf.len);
         if (n <= 0) break;
         got_data = true;
-        _ = libc.fs.write(1, &buf, @intCast(n));
+        _ = ulib.fs.write(1, &buf, @intCast(n));
     }
     if (!got_data) io.writeStr("(empty)\n");
-    _ = libc.fs.close(@intCast(fd));
+    _ = ulib.fs.close(@intCast(fd));
 }

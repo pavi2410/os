@@ -1,21 +1,21 @@
-const freestanding_std = @import("freestanding_std");
-const libc = @import("libc");
+const std_root = @import("std_root");
+pub const std_options_debug_io = std_root.std_options_debug_io;
+pub const std_options = std_root.std_options;
 
-pub const std_options_debug_io = freestanding_std.std_options_debug_io;
-pub const std_options = freestanding_std.std_options;
+const ulib = @import("ulib");
 
 const max_devices = 8;
 
-var devices: [max_devices]libc.hw.BlockDeviceInfo = undefined;
+var devices: [max_devices]ulib.hw.BlockDeviceInfo = undefined;
 
 export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
     _ = _argc;
     _ = _argv;
 
-    const n = libc.hw.getblockdevices(&devices, max_devices);
+    const n = ulib.hw.getblockdevices(&devices, max_devices);
     if (n < 0) {
         writeStr("lsblk: getblockdevices failed\n");
-        libc.process.exit(1);
+        ulib.process.exit(1);
     }
 
     const count = @min(@as(usize, @intCast(n)), max_devices);
@@ -25,7 +25,7 @@ export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) 
     while (i < count) : (i += 1) {
         // Avoid copying BlockDeviceInfo to the stack: ReleaseSmall may emit movaps,
         // which faults if the stack frame is only 8-byte aligned.
-        const name = libc.hw.zstr(devices[i].name[0..]);
+        const name = ulib.hw.zstr(devices[i].name[0..]);
         writeStr(name);
         var pad: usize = 17;
         if (name.len < 17) pad = 17 - name.len;
@@ -37,11 +37,11 @@ export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) 
         }
         const bytes = blockBytes(devices[i].capacity_sectors, devices[i].sector_size);
         var size_buf: [32]u8 = undefined;
-        writeStr(libc.hw.formatSize(bytes, &size_buf));
+        writeStr(ulib.hw.formatSize(bytes, &size_buf));
         writeStr("\n");
     }
 
-    libc.process.exit(0);
+    ulib.process.exit(0);
 }
 
 fn blockBytes(capacity_sectors: u64, sector_size: u32) u64 {
@@ -51,5 +51,5 @@ fn blockBytes(capacity_sectors: u64, sector_size: u32) u64 {
 }
 
 fn writeStr(s: []const u8) void {
-    libc.io.writeStr(s);
+    ulib.io.writeStr(s);
 }

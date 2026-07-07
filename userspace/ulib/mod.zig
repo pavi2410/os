@@ -1,3 +1,5 @@
+//! Userland library: Linux ABI syscalls, CRT (`_start`), and helpers for `/BIN/*` programs.
+//! Not glibc and not Zig's `std`.
 pub const syscall = @import("syscall.zig");
 pub const dns = @import("dns.zig");
 pub const format = @import("format.zig");
@@ -12,5 +14,7 @@ pub const time = @import("time.zig");
 pub const hw = @import("hw.zig");
 
 comptime {
-    _ = @import("start.zig");
+    if (@import("builtin").os.tag != .linux) {
+        _ = @import("start.zig");
+    }
 }

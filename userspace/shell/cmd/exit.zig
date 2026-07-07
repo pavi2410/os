@@ -1,5 +1,5 @@
-const libc = @import("libc");
+const ulib = @import("ulib");
 
 pub fn run() void {
-    libc.process.exit(0);
+    ulib.process.exit(0);
 }

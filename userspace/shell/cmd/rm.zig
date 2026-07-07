@@ -1,7 +1,7 @@
 const argv = @import("../argv.zig");
 const io = @import("../io.zig");
 const path = @import("../path.zig");
-const libc = @import("libc");
+const ulib = @import("ulib");
 
 pub fn run(parsed: *const argv.Parsed) void {
     const file_path = parsed.positionalAt(0) orelse {
@@ -15,7 +15,7 @@ pub fn run(parsed: *const argv.Parsed) void {
         return;
     };
 
-    if (libc.fs.unlink(@ptrCast(resolved.ptr)) < 0) {
+    if (ulib.fs.unlink(@ptrCast(resolved.ptr)) < 0) {
         io.writeStr("rm: failed\n");
         return;
     }

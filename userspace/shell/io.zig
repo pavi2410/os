@@ -1,11 +1,12 @@
-const libc = @import("libc");
+const std = @import("std");
+const ulib = @import("ulib");
 
 pub fn writeStr(s: []const u8) void {
-    libc.io.writeStr(s);
+    ulib.io.writeStr(s);
 }
 
 pub fn eql(a: []const u8, b: []const u8) bool {
-    return libc.io.eql(a, b);
+    return std.mem.eql(u8, a, b);
 }
 
 pub fn writeChar(ch: u8) void {

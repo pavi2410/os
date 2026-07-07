@@ -1,7 +1,7 @@
 const std = @import("std");
-const ip = @import("libc_ip");
-const format = @import("libc_format");
-const parse = @import("libc_parse");
+const ip = @import("ulib_ip");
+const format = @import("ulib_format");
+const parse = @import("ulib_parse");
 
 test "IPv4 parser accepts valid dotted decimal" {
     var addr: [4]u8 = undefined;

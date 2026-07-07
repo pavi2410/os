@@ -1,7 +1,7 @@
 const io = @import("../io.zig");
-const libc = @import("libc");
+const ulib = @import("ulib");
 
 pub fn run() void {
-    libc.io.writeSignedDecimal(libc.process.getpid());
+    ulib.io.writeSignedDecimal(ulib.process.getpid());
     io.writeNewline();
 }

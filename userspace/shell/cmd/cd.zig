@@ -2,7 +2,7 @@ const argv = @import("../argv.zig");
 const cwd = @import("../cwd.zig");
 const io = @import("../io.zig");
 const path = @import("../path.zig");
-const libc = @import("libc");
+const ulib = @import("ulib");
 
 pub fn run(parsed: *const argv.Parsed) void {
     const target = parsed.positionalAt(0) orelse "/";
@@ -13,12 +13,12 @@ pub fn run(parsed: *const argv.Parsed) void {
         return;
     };
 
-    var st: libc.fs.Stat = .{};
-    if (libc.fs.stat(@ptrCast(resolved.ptr), &st) < 0) {
+    var st: ulib.fs.Stat = .{};
+    if (ulib.fs.stat(@ptrCast(resolved.ptr), &st) < 0) {
         io.writeStr("cd: not found\n");
         return;
     }
-    if (!libc.fs.isDir(st.st_mode)) {
+    if (!ulib.fs.isDir(st.st_mode)) {
         io.writeStr("cd: not a directory\n");
         return;
     }

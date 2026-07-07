@@ -1,4 +1,4 @@
-//! Hardware snapshot layouts shared by kernel syscall handlers and userspace libc.
+//! Hardware snapshot layouts shared by kernel syscall handlers and userspace ulib.
 //!
 //! Use `extern struct` so field order and padding match the C ABI on x86_64.
 //! Fixed-size `[N]u8` name buffers are placed before integers so later scalar

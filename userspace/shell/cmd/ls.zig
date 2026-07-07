@@ -3,7 +3,7 @@ const argv = @import("../argv.zig");
 const cwd = @import("../cwd.zig");
 const io = @import("../io.zig");
 const path = @import("../path.zig");
-const libc = @import("libc");
+const ulib = @import("ulib");
 
 pub fn run(parsed: *const argv.Parsed) void {
     const dir_arg = parsed.positionalAt(0);
@@ -18,16 +18,16 @@ fn lsDir(dir_arg: ?[]const u8, long: bool) void {
         return;
     };
 
-    const fd = libc.fs.open(@ptrCast(dir.ptr), libc.fs.O_RDONLY, 0);
+    const fd = ulib.fs.open(@ptrCast(dir.ptr), ulib.fs.O_RDONLY, 0);
     if (fd < 0) {
         io.writeStr("ls: failed\n");
         return;
     }
-    defer _ = libc.fs.close(@intCast(fd));
+    defer _ = ulib.fs.close(@intCast(fd));
 
     var buf: [1024]u8 = undefined;
     while (true) {
-        const n = libc.fs.getdents64(@intCast(fd), &buf, buf.len);
+        const n = ulib.fs.getdents64(@intCast(fd), &buf, buf.len);
         if (n <= 0) break;
         if (long) {
             emitLongNames(dir, buf[0..@intCast(n)]);
@@ -38,7 +38,7 @@ fn lsDir(dir_arg: ?[]const u8, long: bool) void {
 }
 
 fn emitShortNames(data: []const u8) void {
-    var it = libc.fs.Dirent64Iterator{ .data = data };
+    var it = ulib.fs.Dirent64Iterator{ .data = data };
     while (it.next()) |entry| {
         if (entry.name.len == 0) continue;
         io.writeStr(entry.name);
@@ -47,7 +47,7 @@ fn emitShortNames(data: []const u8) void {
 }
 
 fn emitLongNames(dir: []const u8, data: []const u8) void {
-    var it = libc.fs.Dirent64Iterator{ .data = data };
+    var it = ulib.fs.Dirent64Iterator{ .data = data };
     while (it.next()) |entry| {
         if (entry.name.len == 0) continue;
         printLongEntry(dir, entry.name);
@@ -58,8 +58,8 @@ fn printLongEntry(dir: []const u8, name: []const u8) void {
     var pathbuf: [128]u8 = undefined;
     if (!path.join(dir, name, &pathbuf)) return;
 
-    var st: libc.fs.Stat = .{};
-    if (libc.fs.stat(@ptrCast(&pathbuf), &st) < 0) return;
+    var st: ulib.fs.Stat = .{};
+    if (ulib.fs.stat(@ptrCast(&pathbuf), &st) < 0) return;
 
     writeEntryType(st.st_mode);
     printSizePadded(@intCast(@max(st.st_size, 0)));
@@ -69,7 +69,7 @@ fn printLongEntry(dir: []const u8, name: []const u8) void {
 }
 
 fn writeEntryType(mode: u32) void {
-    if (mode & libc.fs.S_IFDIR != 0) {
+    if (mode & ulib.fs.S_IFDIR != 0) {
         io.writeStr("dir  ");
     } else {
         io.writeStr("file ");
