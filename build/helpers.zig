@@ -94,11 +94,13 @@ pub fn hostTestModule(b: *std.Build, test_path: []const u8) *std.Build.Module {
 
 pub const HostCommon = struct {
     bytes: *std.Build.Module,
+    acpi_sig: *std.Build.Module,
     view: *std.Build.Module,
 
     pub fn create(b: *std.Build) HostCommon {
         return .{
             .bytes = hostModule(b, "common/bytes.zig"),
+            .acpi_sig = hostModule(b, "common/acpi_sig.zig"),
             .view = hostModule(b, "common/view.zig"),
         };
     }

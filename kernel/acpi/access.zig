@@ -1,5 +1,6 @@
 const address = @import("../mm/address.zig");
 const bytes = @import("common_bytes");
+const acpi_sig = @import("common_acpi_sig");
 
 pub fn physBytes(phys: u64) [*]const u8 {
     return @ptrFromInt(address.physToVirt(phys));
@@ -9,20 +10,9 @@ pub fn virtBytes(virt: u64) [*]const u8 {
     return @ptrFromInt(virt);
 }
 
-pub fn sigEq4At(table: []const u8, off: usize, expected: [4]u8) bool {
-    return table[off] == expected[0] and
-        table[off + 1] == expected[1] and
-        table[off + 2] == expected[2] and
-        table[off + 3] == expected[3];
-}
-
-pub fn sigEq8At(table: []const u8, off: usize, expected: []const u8) bool {
-    var i: usize = 0;
-    while (i < 8) : (i += 1) {
-        if (table[off + i] != expected[i]) return false;
-    }
-    return true;
-}
+pub const sigEq4At = acpi_sig.sigEq4At;
+pub const sigEq4Bytes = acpi_sig.sigEq4Bytes;
+pub const sigEq8At = acpi_sig.sigEq8At;
 
 pub const sdt_header_size = 36;
 
@@ -50,7 +40,7 @@ pub fn findTablePhys(root_phys: u64, signature: [4]u8) ?u64 {
     if (length < sdt_header_size) return null;
     const root_bytes = root[0..length];
 
-    if (sigEq4At(root_bytes, 0, .{ 'X', 'S', 'D', 'T' })) {
+    if (sigEq4At(root_bytes, 0, "XSDT")) {
         const entry_bytes = length - sdt_header_size;
         const entry_count = entry_bytes / 8;
         var i: usize = 0;
@@ -58,12 +48,12 @@ pub fn findTablePhys(root_phys: u64, signature: [4]u8) ?u64 {
             const table_phys = bytes.readU64Le(root_bytes, sdt_header_size + i * 8);
             if (table_phys == 0) continue;
             const table = physBytes(table_phys);
-            if (sigEq4At(table[0..8], 0, signature)) return table_phys;
+            if (sigEq4Bytes(table[0..8], 0, signature)) return table_phys;
         }
         return null;
     }
 
-    if (sigEq4At(root_bytes, 0, .{ 'R', 'S', 'D', 'T' })) {
+    if (sigEq4At(root_bytes, 0, "RSDT")) {
         const entry_bytes = length - sdt_header_size;
         const entry_count = entry_bytes / 4;
         var i: usize = 0;
@@ -71,7 +61,7 @@ pub fn findTablePhys(root_phys: u64, signature: [4]u8) ?u64 {
             const table_phys = @as(u64, bytes.readU32Le(root_bytes, sdt_header_size + i * 4));
             if (table_phys == 0) continue;
             const table = physBytes(table_phys);
-            if (sigEq4At(table[0..8], 0, signature)) return table_phys;
+            if (sigEq4Bytes(table[0..8], 0, signature)) return table_phys;
         }
         return null;
     }

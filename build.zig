@@ -138,10 +138,12 @@ pub fn build(b: *std.Build) void {
 
     const abi_kernel = helpers.AbiBundle.create(b, kernel_target, optimize);
     const common_bytes_kernel = helpers.exeModule(b, "common/bytes.zig", kernel_target, optimize);
+    const common_acpi_sig_kernel = helpers.exeModule(b, "common/acpi_sig.zig", kernel_target, optimize);
     const common_view_kernel = helpers.exeModule(b, "common/view.zig", kernel_target, optimize);
     abi_kernel.attachFsView(common_view_kernel);
     abi_kernel.attachTo(kernel_mod);
     kernel_mod.addImport("common_bytes", common_bytes_kernel);
+    kernel_mod.addImport("common_acpi_sig", common_acpi_sig_kernel);
     kernel_mod.addImport("common_view", common_view_kernel);
     kernel_mod.addImport("common_tap", helpers.exeModule(b, "common/tap.zig", kernel_target, optimize));
     kernel_mod.addImport("time_unix", helpers.exeModule(b, "common/time_unix.zig", kernel_target, optimize));
@@ -271,6 +273,10 @@ pub fn build(b: *std.Build) void {
     socket_table_test_mod.addImport("socket_table", socket_table_host_mod);
     const run_socket_table_tests = helpers.runHostTest(b, socket_table_test_mod);
 
+    const acpi_access_test_mod = helpers.hostTestModule(b, "test/kernel/acpi_access_test.zig");
+    acpi_access_test_mod.addImport("common_acpi_sig", host_common.acpi_sig);
+    const run_acpi_access_tests = helpers.runHostTest(b, acpi_access_test_mod);
+
     const time_math_host = helpers.hostModule(b, "userspace/ulib/time_math.zig");
 
     const ulib_helpers_test_mod = helpers.hostTestModule(b, "test/userspace/ulib_helpers_test.zig");
@@ -295,6 +301,7 @@ pub fn build(b: *std.Build) void {
         run_crash_tests,
         run_fd_table_tests,
         run_socket_table_tests,
+        run_acpi_access_tests,
         run_icmp_tests,
         run_tcp_tests,
         run_curl_target_tests,
