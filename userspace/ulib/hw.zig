@@ -1,5 +1,6 @@
 const abi_hw = @import("abi_hw");
 const syscall = @import("syscall.zig");
+const pci_class = @import("pci_class.zig");
 
 pub const CpuInfo = abi_hw.CpuInfo;
 pub const PciDeviceInfo = abi_hw.PciDeviceInfo;
@@ -50,21 +51,11 @@ pub fn memKindName(kind: u32) []const u8 {
     };
 }
 
+pub const PciClass = pci_class.PciClass;
+pub const StorageSubclass = pci_class.StorageSubclass;
+
 pub fn pciClassName(class_code: u8, subclass: u8) []const u8 {
-    return switch (class_code) {
-        0x00 => "Unclassified",
-        0x01 => switch (subclass) {
-            0x00 => "SCSI storage",
-            0x01 => "IDE storage",
-            0x08 => "NVMe storage",
-            else => "Mass storage",
-        },
-        0x02 => "Network",
-        0x03 => "Display",
-        0x06 => "Bridge",
-        0x0C => "Serial bus",
-        else => "Device",
-    };
+    return pci_class.className(class_code, subclass);
 }
 
 pub fn formatHex16(value: u16, out: []u8) []const u8 {

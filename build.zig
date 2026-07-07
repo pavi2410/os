@@ -285,6 +285,12 @@ pub fn build(b: *std.Build) void {
     ulib_helpers_test_mod.addImport("ulib_parse", ulib_parse_host);
     const run_ulib_helpers_tests = helpers.runHostTest(b, ulib_helpers_test_mod);
 
+    const pci_class_host = helpers.hostModule(b, "userspace/ulib/pci_class.zig");
+
+    const pci_class_test_mod = helpers.hostTestModule(b, "test/userspace/pci_class_test.zig");
+    pci_class_test_mod.addImport("pci_class", pci_class_host);
+    const run_pci_class_tests = helpers.runHostTest(b, pci_class_test_mod);
+
     const time_math_test_mod = helpers.hostTestModule(b, "test/userspace/time_math_test.zig");
     time_math_test_mod.addImport("time_math", time_math_host);
     const run_time_math_tests = helpers.runHostTest(b, time_math_test_mod);
@@ -310,6 +316,7 @@ pub fn build(b: *std.Build) void {
         run_bytes_tests,
         run_view_tests,
         run_ulib_helpers_tests,
+        run_pci_class_tests,
         run_time_math_tests,
     });
 }
