@@ -1,20 +1,8 @@
 const bytes = @import("common_bytes");
 const block = @import("../../drivers/block.zig");
+const filesystem = @import("../filesystem.zig");
 
-pub const FatError = error{
-    NotReady,
-    InvalidBpb,
-    NotFound,
-    NotFile,
-    IsDirectory,
-    IoError,
-    NameTooLong,
-    PathTooLong,
-    BufferTooSmall,
-    Exists,
-    NoSpace,
-    NotEmpty,
-};
+pub const FatError = filesystem.FatError;
 
 pub const Entry = struct {
     start_cluster: u32,

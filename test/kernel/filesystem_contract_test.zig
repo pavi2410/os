@@ -17,3 +17,8 @@ test "open file exposes directory bit without FAT32 type leak" {
     try std.testing.expect(dir.isDirectory());
     try std.testing.expect(!file.isDirectory());
 }
+
+test "liftFat coerces shared fat32 errors into filesystem errors" {
+    try std.testing.expectEqual(filesystem.Error.NotFound, filesystem.liftFat(filesystem.FatError.NotFound));
+    try std.testing.expectEqual(filesystem.Error.NoSpace, filesystem.liftFat(filesystem.FatError.NoSpace));
+}

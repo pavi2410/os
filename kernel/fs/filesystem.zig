@@ -1,6 +1,6 @@
 const abi_fs = @import("abi_fs");
 
-pub const Error = error{
+pub const FatError = error{
     NotReady,
     InvalidBpb,
     NotFound,
@@ -13,11 +13,19 @@ pub const Error = error{
     Exists,
     NoSpace,
     NotEmpty,
+};
+
+pub const Error = FatError || error{
     TooManyOpenFiles,
     BadHandle,
     InvalidWhence,
     ReadOnly,
 };
+
+/// Maps a FAT32-layer error into the shared filesystem error set.
+pub fn liftFat(err: FatError) Error {
+    return err;
+}
 
 pub const Whence = enum(u32) {
     set = 0,

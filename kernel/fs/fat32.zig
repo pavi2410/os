@@ -83,7 +83,7 @@ pub fn isMounted() bool {
 }
 
 fn fsMount() filesystem.Error!void {
-    mount() catch |err| return fsError(err);
+    mount() catch |err| return filesystem.liftFat(err);
 }
 
 fn fsOpen(path_str: []const u8, flags: filesystem.OpenFlags) filesystem.Error!filesystem.OpenFile {
@@ -92,50 +92,50 @@ fn fsOpen(path_str: []const u8, flags: filesystem.OpenFlags) filesystem.Error!fi
             if (entry.attr & 0x10 != 0) {
                 if (flags.write or flags.create or flags.truncate) return filesystem.Error.IsDirectory;
                 if (!flags.read) return filesystem.Error.IsDirectory;
-                break :blk dir.openDirectory(path_str) catch |err| return fsError(err);
+                break :blk dir.openDirectory(path_str) catch |err| return filesystem.liftFat(err);
             }
-            break :blk file.openFile(path_str, flags.truncate) catch |err| return fsError(err);
+            break :blk file.openFile(path_str, flags.truncate) catch |err| return filesystem.liftFat(err);
         } else |_| {
             if (!flags.create) return filesystem.Error.NotFound;
-            break :blk file.createFile(path_str) catch |err| return fsError(err);
+            break :blk file.createFile(path_str) catch |err| return filesystem.liftFat(err);
         }
     };
     return toFsFile(opened);
 }
 
 fn fsRead(opened_file: filesystem.OpenFile, offset: u64, buf: []u8) filesystem.Error!usize {
-    return read(fromFsFile(opened_file).entry, offset, buf) catch |err| return fsError(err);
+    return read(fromFsFile(opened_file).entry, offset, buf) catch |err| return filesystem.liftFat(err);
 }
 
 fn fsWriteAt(opened_file: *filesystem.OpenFile, offset: u64, buf: []const u8) filesystem.Error!usize {
     var opened = fromFsFile(opened_file.*);
-    const n = writeAt(&opened, offset, buf) catch |err| return fsError(err);
+    const n = writeAt(&opened, offset, buf) catch |err| return filesystem.liftFat(err);
     opened_file.* = toFsFile(opened);
     return n;
 }
 
 fn fsStat(path_str: []const u8, out: *filesystem.Stat) filesystem.Error!void {
-    const entry = lookup(path_str) catch |err| return fsError(err);
+    const entry = lookup(path_str) catch |err| return filesystem.liftFat(err);
     out.* = .{};
     out.st_mode = if (entry.attr & 0x10 != 0) filesystem.S_IFDIR | 0o755 else filesystem.S_IFREG | 0o644;
     out.st_size = @intCast(entry.size);
 }
 
 fn fsGetDents64(opened_file: filesystem.OpenFile, dir_skip: *usize, buf: []u8) filesystem.Error!usize {
-    return getDents64(opened_file.start_cluster, dir_skip, buf) catch |err| return fsError(err);
+    return getDents64(opened_file.start_cluster, dir_skip, buf) catch |err| return filesystem.liftFat(err);
 }
 
 fn fsUnlink(path_str: []const u8) filesystem.Error!?filesystem.FileId {
-    const loc = unlinkFile(path_str) catch |err| return fsError(err);
+    const loc = unlinkFile(path_str) catch |err| return filesystem.liftFat(err);
     return fileId(loc);
 }
 
 fn fsMkdir(path_str: []const u8) filesystem.Error!void {
-    createDirectory(path_str) catch |err| return fsError(err);
+    createDirectory(path_str) catch |err| return filesystem.liftFat(err);
 }
 
 fn fsRmdir(path_str: []const u8) filesystem.Error!?filesystem.FileId {
-    const loc = removeDirectory(path_str) catch |err| return fsError(err);
+    const loc = removeDirectory(path_str) catch |err| return filesystem.liftFat(err);
     return fileId(loc);
 }
 
@@ -166,21 +166,4 @@ fn fromFsFile(opened_file: filesystem.OpenFile) OpenResult {
 
 fn fileId(loc: DirLoc) filesystem.FileId {
     return .{ .a = loc.cluster, .b = loc.offset };
-}
-
-fn fsError(err: FatError) filesystem.Error {
-    return switch (err) {
-        FatError.NotReady => filesystem.Error.NotReady,
-        FatError.InvalidBpb => filesystem.Error.InvalidBpb,
-        FatError.NotFound => filesystem.Error.NotFound,
-        FatError.NotFile => filesystem.Error.NotFile,
-        FatError.IsDirectory => filesystem.Error.IsDirectory,
-        FatError.IoError => filesystem.Error.IoError,
-        FatError.NameTooLong => filesystem.Error.NameTooLong,
-        FatError.PathTooLong => filesystem.Error.PathTooLong,
-        FatError.BufferTooSmall => filesystem.Error.BufferTooSmall,
-        FatError.Exists => filesystem.Error.Exists,
-        FatError.NoSpace => filesystem.Error.NoSpace,
-        FatError.NotEmpty => filesystem.Error.NotEmpty,
-    };
 }
