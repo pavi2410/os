@@ -1,24 +1,25 @@
 const std = @import("std");
 const helpers = @import("build/helpers.zig");
 
+const baseline_x86_features_add = std.Target.x86.featureSet(&.{ .popcnt, .soft_float });
+const baseline_x86_features_sub = std.Target.x86.featureSet(&.{ .avx, .avx2, .sse, .sse2, .mmx });
+
+const freestanding_x64_query: std.Target.Query = .{
+    .cpu_arch = .x86_64,
+    .os_tag = .freestanding,
+    .abi = .none,
+    .cpu_features_add = baseline_x86_features_add,
+    .cpu_features_sub = baseline_x86_features_sub,
+};
+
 pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{
         .preferred_optimize_mode = .ReleaseSmall,
     });
 
-    const kernel_target = b.resolveTargetQuery(.{
-        .cpu_arch = .x86_64,
-        .os_tag = .freestanding,
-        .abi = .none,
-        .cpu_features_add = std.Target.x86.featureSet(&.{ .popcnt, .soft_float }),
-        .cpu_features_sub = std.Target.x86.featureSet(&.{ .avx, .avx2, .sse, .sse2, .mmx }),
-    });
+    const kernel_target = b.resolveTargetQuery(freestanding_x64_query);
 
-    const user_target = b.resolveTargetQuery(.{
-        .cpu_arch = .x86_64,
-        .os_tag = .freestanding,
-        .abi = .none,
-    });
+    const user_target = b.resolveTargetQuery(freestanding_x64_query);
 
     const user_optimize: std.builtin.OptimizeMode = .ReleaseSmall;
 
