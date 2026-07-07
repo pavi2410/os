@@ -8,14 +8,14 @@ const max_devices = 64;
 
 var devices: [max_devices]ulib.hw.PciDeviceInfo = undefined;
 
-export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
+export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8 {
     _ = _argc;
     _ = _argv;
 
     const n = ulib.hw.getpcidevices(&devices, max_devices);
     if (n < 0) {
         ulib.io.writeStr("lspci: getpcidevices failed\n");
-        ulib.process.exit(1);
+        return 1;
     }
 
     var hex: [4]u8 = undefined;
@@ -42,5 +42,5 @@ export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) 
         ulib.io.writeStr("\n");
     }
 
-    ulib.process.exit(0);
+    return 0;
 }

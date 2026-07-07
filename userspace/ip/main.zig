@@ -6,39 +6,39 @@ const ulib = @import("ulib");
 
 const iface_name = "eth0";
 
-export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
+export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8 {
     if (argc < 2) {
         printUsage();
-        ulib.process.exit(1);
+        return 1;
     }
 
     const sub = ulib.io.cstr(argv[1]);
     if (ulib.string.eql(sub, "addr") or ulib.string.eql(sub, "a")) {
-        cmdAddr();
-    } else if (ulib.string.eql(sub, "route") or ulib.string.eql(sub, "r")) {
-        cmdRoute();
-    } else if (ulib.string.eql(sub, "neigh") or ulib.string.eql(sub, "n")) {
-        cmdNeigh();
-    } else {
-        ulib.io.writeStr("ip: unknown subcommand '");
-        ulib.io.writeStr(sub);
-        ulib.io.writeStr("'\n");
-        printUsage();
-        ulib.process.exit(1);
+        return cmdAddr();
+    }
+    if (ulib.string.eql(sub, "route") or ulib.string.eql(sub, "r")) {
+        return cmdRoute();
+    }
+    if (ulib.string.eql(sub, "neigh") or ulib.string.eql(sub, "n")) {
+        return cmdNeigh();
     }
 
-    ulib.process.exit(0);
+    ulib.io.writeStr("ip: unknown subcommand '");
+    ulib.io.writeStr(sub);
+    ulib.io.writeStr("'\n");
+    printUsage();
+    return 1;
 }
 
 fn printUsage() void {
     ulib.io.writeStr("usage: ip <addr|route|neigh>\n");
 }
 
-fn cmdAddr() void {
+fn cmdAddr() u8 {
     var cfg: ulib.net.NetConfig = undefined;
     if (ulib.net.getnetconfig(&cfg) < 0) {
         ulib.io.writeStr("ip: getnetconfig failed\n");
-        ulib.process.exit(1);
+        return 1;
     }
 
     ulib.io.writeStr(iface_name);
@@ -52,13 +52,14 @@ fn cmdAddr() void {
     ulib.io.writeStr("\n    link/ether ");
     writeMac(cfg.mac);
     ulib.io.writeStr(" brd ff:ff:ff:ff:ff:ff\n");
+    return 0;
 }
 
-fn cmdRoute() void {
+fn cmdRoute() u8 {
     var cfg: ulib.net.NetConfig = undefined;
     if (ulib.net.getnetconfig(&cfg) < 0) {
         ulib.io.writeStr("ip: getnetconfig failed\n");
-        ulib.process.exit(1);
+        return 1;
     }
 
     ulib.io.writeStr("default via ");
@@ -74,14 +75,15 @@ fn cmdRoute() void {
     ulib.io.writeStr(" dev ");
     ulib.io.writeStr(iface_name);
     ulib.io.writeStr(" scope link\n");
+    return 0;
 }
 
-fn cmdNeigh() void {
+fn cmdNeigh() u8 {
     var entries: [8]ulib.net.NeighEntry = undefined;
     const n = ulib.net.getneighbors(&entries, entries.len);
     if (n < 0) {
         ulib.io.writeStr("ip: getneighbors failed\n");
-        ulib.process.exit(1);
+        return 1;
     }
 
     var i: usize = 0;
@@ -93,6 +95,7 @@ fn cmdNeigh() void {
         writeMac(entries[i].mac);
         ulib.io.writeStr(" REACHABLE\n");
     }
+    return 0;
 }
 
 fn writeIpv4(addr: [4]u8) void {

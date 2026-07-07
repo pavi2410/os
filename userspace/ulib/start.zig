@@ -4,8 +4,8 @@ export fn _start() callconv(.naked) noreturn {
         \\ mov (%%rsp), %%rdi
         \\ lea 8(%%rsp), %%rsi
         \\ call main
+        \\ mov %%rax, %%rdi
         \\ mov $60, %%rax
-        \\ xor %%rdi, %%rdi
         \\ syscall
         ::: .{ .memory = true });
     unreachable;

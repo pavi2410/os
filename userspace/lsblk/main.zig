@@ -8,14 +8,14 @@ const max_devices = 8;
 
 var devices: [max_devices]ulib.hw.BlockDeviceInfo = undefined;
 
-export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
+export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8 {
     _ = _argc;
     _ = _argv;
 
     const n = ulib.hw.getblockdevices(&devices, max_devices);
     if (n < 0) {
         ulib.io.writeStr("lsblk: getblockdevices failed\n");
-        ulib.process.exit(1);
+        return 1;
     }
 
     const count = @min(@as(usize, @intCast(n)), max_devices);
@@ -41,7 +41,7 @@ export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) 
         ulib.io.writeStr("\n");
     }
 
-    ulib.process.exit(0);
+    return 0;
 }
 
 fn blockBytes(capacity_sectors: u64, sector_size: u32) u64 {

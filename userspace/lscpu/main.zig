@@ -8,14 +8,14 @@ comptime {
     if (@offsetOf(ulib.hw.CpuInfo, "vendor") != 0) @compileError("CpuInfo.vendor must be at offset 0");
 }
 
-export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
+export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8 {
     _ = _argc;
     _ = _argv;
 
     var info: ulib.hw.CpuInfo = undefined;
     if (ulib.hw.getcpuinfo(&info) < 0) {
         ulib.io.writeStr("lscpu: getcpuinfo failed\n");
-        ulib.process.exit(1);
+        return 1;
     }
 
     ulib.io.writeStr("Architecture:        x86_64\n");
@@ -38,5 +38,5 @@ export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) 
     ulib.io.writeU32(info.ioapic_count);
     ulib.io.writeStr("\n");
 
-    ulib.process.exit(0);
+    return 0;
 }

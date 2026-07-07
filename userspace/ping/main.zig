@@ -8,7 +8,7 @@ const default_host = [4]u8{ 10, 0, 2, 2 };
 const default_count: usize = 4;
 const max_count: usize = 16;
 
-export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
+export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8 {
     var host = default_host;
     var count = default_count;
 
@@ -19,17 +19,17 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
             argi += 1;
             if (argi >= argc) {
                 ulib.io.writeStr("usage: ping [-c count] [ip]\n");
-                ulib.process.exit(1);
+                return 1;
             }
             count = ulib.parse.parseDecimal(ulib.io.cstr(argv[argi]), max_count) orelse {
                 ulib.io.writeStr("ping: bad count\n");
-                ulib.process.exit(1);
+                return 1;
             };
             continue;
         }
         if (!ulib.ip.parseIpv4(arg, &host)) {
             ulib.io.writeStr("ping: bad address\n");
-            ulib.process.exit(1);
+            return 1;
         }
     }
 
@@ -40,7 +40,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
     );
     if (fd < 0) {
         ulib.io.writeStr("ping: socket failed\n");
-        ulib.process.exit(1);
+        return 1;
     }
 
     var ip_buf: [16]u8 = undefined;
@@ -69,7 +69,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
             &dest,
         ) < 0) {
             ulib.io.writeStr("ping: send failed\n");
-            ulib.process.exit(1);
+            return 1;
         }
 
         const n = ulib.net.recvfrom(
@@ -124,8 +124,8 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         ulib.io.writeStr("/");
         ulib.io.writeMillis(rtt_max_us);
         ulib.io.writeStr(" ms\n");
-        ulib.process.exit(0);
+        return 0;
     }
 
-    ulib.process.exit(1);
+    return 1;
 }

@@ -14,7 +14,7 @@ fn writePrompt() void {
     io.writeStr("> ");
 }
 
-export fn main(argc: usize, raw_argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
+export fn main(argc: usize, raw_argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8 {
     _ = argc;
     _ = raw_argv;
     io.writeStr("Simple shell ready. Type 'help'.\n");

@@ -8,7 +8,7 @@ const dns_codec = @import("dns_codec");
 const default_dns = [4]u8{ 10, 0, 2, 3 };
 const dns_port: u16 = 53;
 
-export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) void {
+export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8 {
     var dns_addr = default_dns;
     var name: ?[]const u8 = null;
 
@@ -19,7 +19,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         if (arg[0] == '@') {
             if (!ulib.ip.parseIpv4(arg[1..], &dns_addr)) {
                 ulib.io.writeStr("dig: bad server address\n");
-                ulib.process.exit(1);
+                return 1;
             }
             continue;
         }
@@ -29,19 +29,19 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
 
     const qname = name orelse {
         ulib.io.writeStr("usage: dig [@server] name\n");
-        ulib.process.exit(1);
+        return 1;
     };
 
     var query: [256]u8 = undefined;
     const query_len = dns_codec.buildQuery(qname, &query) catch {
         ulib.io.writeStr("dig: bad name\n");
-        ulib.process.exit(1);
+        return 1;
     };
 
     const fd = ulib.net.socket(ulib.net.AF_INET, ulib.net.SOCK_DGRAM, 0);
     if (fd < 0) {
         ulib.io.writeStr("dig: socket failed\n");
-        ulib.process.exit(1);
+        return 1;
     }
 
     var dest = ulib.net.sockaddrIn(dns_addr, dns_port);
@@ -54,7 +54,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
         &dest,
     ) < 0) {
         ulib.io.writeStr("dig: send failed\n");
-        ulib.process.exit(1);
+        return 1;
     }
 
     var reply: [512]u8 = undefined;
@@ -68,11 +68,11 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) vo
     );
     if (n < 12) {
         ulib.io.writeStr("dig: timeout\n");
-        ulib.process.exit(1);
+        return 1;
     }
 
     printResult(qname, reply[0..@intCast(n)]);
-    ulib.process.exit(0);
+    return 0;
 }
 
 fn printResult(qname: []const u8, pkt: []const u8) void {
