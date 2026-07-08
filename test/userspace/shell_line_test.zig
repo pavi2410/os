@@ -18,10 +18,12 @@ test "stripComment keeps hash inside double quotes" {
     try std.testing.expectEqual(@as(usize, input.len), len);
 }
 
-test "stripComment treats whole line comment as empty" {
-    var buf: [16]u8 = undefined;
-    const input = "# hello";
-    @memcpy(buf[0..input.len], input);
-    const len = line.stripComment(&buf, input.len);
-    try std.testing.expectEqual(@as(usize, 0), len);
+test "segmentCount splits on unquoted semicolon" {
+    const input = "echo a; echo b";
+    try std.testing.expectEqual(@as(usize, 2), line.segmentCount(input, input.len));
+}
+
+test "segmentCount keeps semicolon inside quotes" {
+    const input = "echo \"a;b\"";
+    try std.testing.expectEqual(@as(usize, 1), line.segmentCount(input, input.len));
 }

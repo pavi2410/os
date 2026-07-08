@@ -180,6 +180,12 @@ class TestShellEnvironment:
         run_case(shell_session, "FOO=bar echo $FOO", "bar", case="prefix env echo")
 
 
+class TestShellSemicolon:
+    def test_semicolon_runs_last_status(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "false; echo ok", "ok", case="semicolon second command")
+        run_case(shell_session, "echo $?", "0", case="semicolon last status")
+
+
 class TestShellQuotes:
     def test_double_quoted_argument(self, shell_session: QemuShell) -> None:
         run_case(shell_session, 'echo "hello world"', "hello world", case="quoted echo")

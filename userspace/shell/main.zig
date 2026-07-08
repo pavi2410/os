@@ -8,9 +8,7 @@ const environ = @import("environ.zig");
 const expand = @import("expand.zig");
 const io = @import("io.zig");
 const line_mod = @import("line.zig");
-const prefix_env = @import("prefix_env.zig");
 const ulib = @import("ulib");
-const registry = @import("cmd/registry.zig");
 
 fn writePrompt() void {
     io.writeNewline();
@@ -33,25 +31,8 @@ export fn main(argc: usize, raw_argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }
         if (n <= 0) continue;
 
         const effective_len = line_mod.stripComment(&line, @intCast(n));
+        if (effective_len == 0) continue;
 
-        var parsed = arg.parse(&line, effective_len) catch {
-            io.writeStr("too many arguments\n");
-            continue;
-        };
-        if (parsed.argc == 0) continue;
-
-        prefix_env.clear();
-        if (!prefix_env.peel(&parsed)) {
-            io.writeStr("invalid command\n");
-            continue;
-        }
-
-        if (!expand.expandArgvWith(&parsed, &expand_bufs, prefix_env.lookup)) {
-            io.writeStr("expansion failed\n");
-            continue;
-        }
-
-        const cmd = parsed.cmd().?;
-        _ = registry.dispatch(cmd, &parsed);
+        line_mod.executeLine(line[0..effective_len], &expand_bufs);
     }
 }
