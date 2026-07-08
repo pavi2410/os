@@ -14,7 +14,9 @@ const cmd_pwd = @import("pwd.zig");
 const cmd_rm = @import("rm.zig");
 const cmd_rmdir = @import("rmdir.zig");
 const cmd_export = @import("export.zig");
+const cmd_false = @import("false.zig");
 const cmd_run = @import("run.zig");
+const cmd_true = @import("true.zig");
 const cmd_write = @import("write.zig");
 
 pub const Handler = union(enum) {
@@ -44,6 +46,8 @@ pub const entries = [_]Entry{
     .{ .name = "pwd", .handler = .{ .none = cmd_pwd.run }, .summary = "  pwd  print working directory" },
     .{ .name = "date", .handler = .{ .none = cmd_date.run }, .summary = "  date  print RTC date and time (UTC)" },
     .{ .name = "export", .handler = .{ .parsed = cmd_export.run }, .summary = "  export [KEY=value]  set or list environment" },
+    .{ .name = "true", .handler = .{ .none = cmd_true.run }, .summary = "  true  succeed with exit status 0" },
+    .{ .name = "false", .handler = .{ .none = cmd_false.run }, .summary = "  false  fail with exit status 1" },
 };
 
 pub fn dispatch(cmd: []const u8, parsed: *const argv.Parsed) u8 {

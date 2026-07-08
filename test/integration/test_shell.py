@@ -178,6 +178,12 @@ class TestShellExitStatus:
         run_case(shell_session, "echo ok", "ok", case="echo success")
         run_case(shell_session, "echo $?", "0", case="echo zero status")
 
+    def test_true_false_status(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "false", case="false builtin")
+        run_case(shell_session, "echo $?", "1", case="false status")
+        run_case(shell_session, "true", case="true builtin")
+        run_case(shell_session, "echo $?", "0", case="true status")
+
 
 class TestShellDevfs:
     def test_devtest(self, shell_session: QemuShell) -> None:
