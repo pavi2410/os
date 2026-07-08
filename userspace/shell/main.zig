@@ -41,6 +41,6 @@ export fn main(argc: usize, raw_argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }
         }
 
         const cmd = parsed.cmd().?;
-        registry.dispatch(cmd, &parsed);
+        _ = registry.dispatch(cmd, &parsed);
     }
 }

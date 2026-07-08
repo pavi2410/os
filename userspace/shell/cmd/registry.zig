@@ -1,5 +1,6 @@
 const argv = @import("../argv.zig");
 const io = @import("../io.zig");
+const status = @import("../status.zig");
 
 const cmd_cat = @import("cat.zig");
 const cmd_cd = @import("cd.zig");
@@ -17,8 +18,9 @@ const cmd_run = @import("run.zig");
 const cmd_write = @import("write.zig");
 
 pub const Handler = union(enum) {
-    none: *const fn () void,
-    parsed: *const fn (*const argv.Parsed) void,
+    exit,
+    none: *const fn () u8,
+    parsed: *const fn (*const argv.Parsed) u8,
 };
 
 pub const Entry = struct {
@@ -29,7 +31,7 @@ pub const Entry = struct {
 
 pub const entries = [_]Entry{
     .{ .name = "help", .handler = .{ .none = printHelp } },
-    .{ .name = "exit", .handler = .{ .none = cmd_exit.run } },
+    .{ .name = "exit", .handler = .exit },
     .{ .name = "pid", .handler = .{ .none = cmd_pid.run } },
     .{ .name = "echo", .handler = .{ .parsed = cmd_echo.run }, .summary = "  echo [text...]  print a line" },
     .{ .name = "cat", .handler = .{ .parsed = cmd_cat.run } },
@@ -44,21 +46,24 @@ pub const entries = [_]Entry{
     .{ .name = "export", .handler = .{ .parsed = cmd_export.run }, .summary = "  export [KEY=value]  set or list environment" },
 };
 
-pub fn dispatch(cmd: []const u8, parsed: *const argv.Parsed) void {
+pub fn dispatch(cmd: []const u8, parsed: *const argv.Parsed) u8 {
     for (entries) |entry| {
-        if (io.eql(cmd, entry.name)) {
-            switch (entry.handler) {
-                .none => |run| run(),
-                .parsed => |run| run(parsed),
-            }
-            return;
-        }
+        if (!io.eql(cmd, entry.name)) continue;
+        const code = switch (entry.handler) {
+            .exit => cmd_exit.run(),
+            .none => |run| run(),
+            .parsed => |run| run(parsed),
+        };
+        status.set(code);
+        return code;
     }
 
-    cmd_run.run(parsed);
+    const code = cmd_run.run(parsed);
+    status.set(code);
+    return code;
 }
 
-pub fn printHelp() void {
+pub fn printHelp() u8 {
     io.writeStr("Built-ins:");
     var i: usize = 0;
     while (i < entries.len) : (i += 1) {
@@ -84,4 +89,5 @@ pub fn printHelp() void {
     io.writeStr("  lsblk  list block devices\n");
     io.writeStr("  lsmem  list physical memory regions\n");
     io.writeStr("Paths may be absolute (/foo) or relative to the current directory.\n");
+    return 0;
 }

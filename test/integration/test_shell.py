@@ -169,6 +169,16 @@ class TestShellEnvironment:
         run_case(shell_session, "ls $HOME/BIN", "SHELL", case="ls HOME/BIN")
 
 
+class TestShellExitStatus:
+    def test_exit_status_after_failure(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "cat /NOPE", "cat: open failed", case="cat missing file")
+        run_case(shell_session, "echo $?", "1", case="echo exit status")
+
+    def test_exit_status_after_success(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "echo ok", "ok", case="echo success")
+        run_case(shell_session, "echo $?", "0", case="echo zero status")
+
+
 class TestShellDevfs:
     def test_devtest(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "devtest", "devtest: ok", case="devnull and devzero")

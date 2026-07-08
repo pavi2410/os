@@ -1,5 +1,6 @@
 const std = @import("std");
 const expand = @import("expand");
+const status = @import("status");
 
 fn mockLookup(name: []const u8) ?[]const u8 {
     if (std.mem.eql(u8, name, "PATH")) return "/BIN";
@@ -48,4 +49,18 @@ test "expandArgv expands each parsed token" {
     try std.testing.expect(expand.expandArgvWith(&parsed, &storage, mockLookup));
     try std.testing.expectEqualStrings("ls", parsed.args[0]);
     try std.testing.expectEqualStrings("/BIN", parsed.args[1]);
+}
+
+test "expand replaces $? with last exit status" {
+    status.set(42);
+    var out: [64]u8 = undefined;
+    const result = expand.expandWith("code=$?", &out, mockLookup).?;
+    try std.testing.expectEqualStrings("code=42", result);
+}
+
+test "expand replaces bare $?" {
+    status.set(1);
+    var out: [64]u8 = undefined;
+    const result = expand.expandWith("$?", &out, mockLookup).?;
+    try std.testing.expectEqualStrings("1", result);
 }

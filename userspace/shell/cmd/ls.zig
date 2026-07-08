@@ -5,33 +5,33 @@ const io = @import("../io.zig");
 const path = @import("../path.zig");
 const ulib = @import("ulib");
 
-pub fn run(parsed: *const argv.Parsed) void {
+pub fn run(parsed: *const argv.Parsed) u8 {
     const dir_arg = parsed.positionalAt(0);
-    lsDir(dir_arg, parsed.hasFlag('l'));
+    return lsDir(dir_arg, parsed.hasFlag('l'));
 }
 
-fn lsDir(dir_arg: ?[]const u8, long: bool) void {
+fn lsDir(dir_arg: ?[]const u8, long: bool) u8 {
     var pathbuf: [128]u8 = undefined;
     const input = dir_arg orelse cwd.get();
     const dir = path.resolve(input, &pathbuf) orelse {
         io.writeStr("ls: path too long\n");
-        return;
+        return 1;
     };
 
     var st: ulib.fs.Stat = .{};
     if (ulib.fs.stat(@ptrCast(dir.ptr), &st) < 0) {
         io.writeStr("ls: failed\n");
-        return;
+        return 1;
     }
     if (!ulib.fs.isDir(st.st_mode)) {
         io.writeStr("ls: not a directory\n");
-        return;
+        return 1;
     }
 
     const fd = ulib.fs.open(@ptrCast(dir.ptr), ulib.fs.O_RDONLY, 0);
     if (fd < 0) {
         io.writeStr("ls: failed\n");
-        return;
+        return 1;
     }
     defer _ = ulib.fs.close(@intCast(fd));
 
@@ -45,6 +45,7 @@ fn lsDir(dir_arg: ?[]const u8, long: bool) void {
             emitShortNames(buf[0..@intCast(n)]);
         }
     }
+    return 0;
 }
 
 fn emitShortNames(data: []const u8) void {

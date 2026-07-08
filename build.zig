@@ -109,6 +109,7 @@ pub fn build(b: *std.Build) void {
     const install_envtest = helpers.addUserProgram(b, user_deps, "envtest", "userspace/envtest/main.zig", user_install);
     const install_devtest = helpers.addUserProgram(b, user_deps, "devtest", "userspace/devtest/main.zig", user_install);
 
+    const shell_status_user = helpers.exeModule(b, "userspace/shell/status.zig", user_target, user_optimize);
     const shell = b.addExecutable(.{
         .name = "shell",
         .root_module = helpers.exeModule(b, "userspace/shell/main.zig", user_target, user_optimize),
@@ -118,6 +119,7 @@ pub fn build(b: *std.Build) void {
     shell.root_module.addImport("ulib", user_ulib);
     shell.root_module.addImport("std_root", std_root);
     shell.root_module.addImport("time_unix", time_unix_user);
+    shell.root_module.addImport("status", shell_status_user);
     const install_shell = b.addInstallArtifact(shell, user_install);
 
     const dig = b.addExecutable(.{
@@ -384,13 +386,16 @@ pub fn build(b: *std.Build) void {
 
     const shell_argv_host = helpers.hostModule(b, "userspace/shell/argv.zig");
     const shell_environ_stub = helpers.hostModule(b, "test/stub/shell_environ_stub.zig");
+    const shell_status_host = helpers.hostModule(b, "userspace/shell/status.zig");
     const shell_expand_host = helpers.hostModule(b, "userspace/shell/expand.zig");
     shell_expand_host.addImport("argv.zig", shell_argv_host);
     shell_expand_host.addImport("environ", shell_environ_stub);
+    shell_expand_host.addImport("status", shell_status_host);
 
     const shell_expand_test_mod = helpers.hostTestModule(b, "test/userspace/shell_expand_test.zig");
     shell_expand_test_mod.addImport("expand", shell_expand_host);
     shell_expand_test_mod.addImport("argv", shell_argv_host);
+    shell_expand_test_mod.addImport("status", shell_status_host);
     const run_shell_expand_tests = helpers.runHostTest(b, shell_expand_test_mod);
 
     const ulib_helpers_test_mod = helpers.hostTestModule(b, "test/userspace/ulib_helpers_test.zig");

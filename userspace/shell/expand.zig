@@ -1,5 +1,6 @@
 const argv = @import("argv.zig");
 const environ = @import("environ.zig");
+const status = @import("status");
 
 pub const max_arg_len = 256;
 pub const LookupFn = *const fn (name: []const u8) ?[]const u8;
@@ -30,6 +31,13 @@ pub fn expandWith(input: []const u8, out: []u8, lookup: LookupFn) ?[]const u8 {
     var out_len: usize = 0;
     var i: usize = 0;
     while (i < input.len) {
+        if (input[i] == '$' and i + 1 < input.len and input[i + 1] == '?') {
+            const digits = status.formatTo(out[out_len..]) orelse return null;
+            out_len += digits.len;
+            i += 2;
+            continue;
+        }
+
         if (input[i] == '$' and i + 1 < input.len and isNameStart(input[i + 1])) {
             const name_start = i + 1;
             var name_end = name_start;

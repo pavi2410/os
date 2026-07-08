@@ -2,6 +2,7 @@ const argv_mod = @import("../argv.zig");
 const environ = @import("../environ.zig");
 const io = @import("../io.zig");
 const path = @import("../path.zig");
+const status = @import("../status.zig");
 const ulib = @import("ulib");
 
 var exec_path: [128]u8 = undefined;
@@ -9,18 +10,18 @@ var exec_arg_bufs: [argv_mod.max_args][128]u8 = undefined;
 var exec_argv: [argv_mod.max_args + 1]?[*:0]const u8 = .{null} ** (argv_mod.max_args + 1);
 var exec_envp: [environ.max_entries + 1]?[*:0]const u8 = .{null} ** (environ.max_entries + 1);
 
-pub fn run(parsed: *const argv_mod.Parsed) void {
-    const cmd = parsed.cmd() orelse return;
+pub fn run(parsed: *const argv_mod.Parsed) u8 {
+    const cmd = parsed.cmd() orelse return 0;
     if (!resolveExecutable(cmd, &exec_path)) {
         io.writeStr("run failed\n");
-        return;
+        return 127;
     }
 
     const my_pid = ulib.process.getpid();
     const child = ulib.process.fork();
     if (child < 0) {
         io.writeStr("run failed\n");
-        return;
+        return 1;
     }
 
     if (ulib.process.getpid() != my_pid) {
@@ -33,10 +34,12 @@ pub fn run(parsed: *const argv_mod.Parsed) void {
         ulib.process.exit(1);
     }
 
-    var status: u32 = 0;
-    if (ulib.process.waitpid(child, &status, 0) < 0) {
+    var wstatus: u32 = 0;
+    if (ulib.process.waitpid(child, &wstatus, 0) < 0) {
         io.writeStr("run failed\n");
+        return 1;
     }
+    return status.codeFromWait(wstatus);
 }
 
 fn buildArgv(parsed: *const argv_mod.Parsed) ?usize {

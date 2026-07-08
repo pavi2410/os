@@ -3,25 +3,25 @@ const path = @import("../path.zig");
 const ulib = @import("ulib");
 const argv = @import("../argv.zig");
 
-pub fn run(parsed: *const argv.Parsed) void {
+pub fn run(parsed: *const argv.Parsed) u8 {
     const file_path = parsed.positionalAt(0) orelse {
         io.writeStr("cat: usage: cat /path\n");
-        return;
+        return 1;
     };
-    catFile(file_path);
+    return catFile(file_path);
 }
 
-fn catFile(file_path: []const u8) void {
+fn catFile(file_path: []const u8) u8 {
     var pathbuf: [128]u8 = undefined;
     const resolved = path.resolve(file_path, &pathbuf) orelse {
         io.writeStr("path too long\n");
-        return;
+        return 1;
     };
 
     const fd = ulib.fs.open(@ptrCast(resolved.ptr), ulib.fs.O_RDONLY, 0);
     if (fd < 0) {
         io.writeStr("cat: open failed\n");
-        return;
+        return 1;
     }
 
     var buf: [512]u8 = undefined;
@@ -34,4 +34,5 @@ fn catFile(file_path: []const u8) void {
     }
     if (!got_data) io.writeStr("(empty)\n");
     _ = ulib.fs.close(@intCast(fd));
+    return 0;
 }
