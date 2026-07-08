@@ -18,11 +18,22 @@ pub const Header = extern struct {
     urgent_be: u16,
 };
 
-pub const flag_fin: u8 = 0x01;
-pub const flag_syn: u8 = 0x02;
-pub const flag_rst: u8 = 0x04;
-pub const flag_ack: u8 = 0x10;
-pub const flag_psh: u8 = 0x08;
+pub const Flags = packed struct(u8) {
+    fin: u1 = 0,
+    syn: u1 = 0,
+    rst: u1 = 0,
+    psh: u1 = 0,
+    ack: u1 = 0,
+    _: u3 = 0,
+};
+
+comptime {
+    if (@as(u8, @bitCast(Flags{ .fin = 1 })) != 0x01) @compileError("Flags.fin must be 0x01");
+    if (@as(u8, @bitCast(Flags{ .syn = 1 })) != 0x02) @compileError("Flags.syn must be 0x02");
+    if (@as(u8, @bitCast(Flags{ .rst = 1 })) != 0x04) @compileError("Flags.rst must be 0x04");
+    if (@as(u8, @bitCast(Flags{ .psh = 1 })) != 0x08) @compileError("Flags.psh must be 0x08");
+    if (@as(u8, @bitCast(Flags{ .ack = 1 })) != 0x10) @compileError("Flags.ack must be 0x10");
+}
 
 pub const default_window: u16 = 8192;
 
@@ -33,7 +44,7 @@ pub const Segment = struct {
     dst_port: u16,
     seq: u32,
     ack: u32,
-    flags: u8,
+    flags: Flags,
     payload: []const u8,
 };
 
@@ -93,7 +104,7 @@ pub fn build(
     dst_port: u16,
     seq: u32,
     ack: u32,
-    flags: u8,
+    flags: Flags,
     payload: []const u8,
 ) usize {
     const tcp_len: u16 = header_len + @as(u16, @intCast(payload.len));
@@ -111,7 +122,7 @@ pub fn build(
     bytes.writeU32Be(out, tcp_off + 4, seq);
     bytes.writeU32Be(out, tcp_off + 8, ack);
     out[tcp_off + 12] = 0x50; // 5 * 4 = 20 bytes
-    out[tcp_off + 13] = flags;
+    out[tcp_off + 13] = @bitCast(flags);
     bytes.writeU16Be(out, tcp_off + 14, default_window);
     bytes.writeU16Be(out, tcp_off + 16, 0);
     bytes.writeU16Be(out, tcp_off + 18, 0);
@@ -162,7 +173,7 @@ pub fn parseSegment(frame: []const u8) ?Segment {
         .dst_port = bytes.readU16Be(frame, tcp_off + 2),
         .seq = bytes.readU32Be(frame, tcp_off + 4),
         .ack = bytes.readU32Be(frame, tcp_off + 8),
-        .flags = frame[tcp_off + 13],
+        .flags = @bitCast(frame[tcp_off + 13]),
         .payload = frame[payload_off .. payload_off + payload_len],
     };
 }

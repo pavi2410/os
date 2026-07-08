@@ -21,7 +21,7 @@ test "matchEchoReply rejects inflated IP total length" {
 
     const icmp_off = ethernet.header_len + ipv4.header_len;
     const hdr = view.mut(icmp.Header, &frame, icmp_off).?;
-    hdr.type = icmp.echo_reply;
+    hdr.type = @intFromEnum(icmp.Type.echo_reply);
     hdr.code = 0;
     hdr.identifier_be = @byteSwap(@as(u16, 0x4000));
     hdr.sequence_be = @byteSwap(@as(u16, 0));

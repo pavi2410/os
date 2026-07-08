@@ -5,8 +5,24 @@ const ipv4_addr = @import("common/ipv4_addr");
 const mac = @import("common/mac");
 
 pub const header_len = 8;
-pub const echo_request: u8 = 8;
-pub const echo_reply: u8 = 0;
+
+pub const Type = enum(u8) {
+    echo_reply = 0,
+    echo_request = 8,
+
+    pub inline fn fromByte(byte: u8) ?Type {
+        return switch (byte) {
+            @intFromEnum(Type.echo_reply) => .echo_reply,
+            @intFromEnum(Type.echo_request) => .echo_request,
+            else => null,
+        };
+    }
+};
+
+comptime {
+    if (@intFromEnum(Type.echo_reply) != 0) @compileError("Type.echo_reply must be 0");
+    if (@intFromEnum(Type.echo_request) != 8) @compileError("Type.echo_request must be 8");
+}
 
 pub const echo_payload_len = 32;
 
@@ -46,7 +62,7 @@ pub fn buildEchoRequest(
 
     const icmp_off = ethernet.header_len + ipv4.header_len;
     const icmp = view.mut(Header, out, icmp_off).?;
-    icmp.type = echo_request;
+    icmp.type = @intFromEnum(Type.echo_request);
     icmp.code = 0;
     icmp.checksum_be = 0;
     icmp.identifier_be = @byteSwap(id);
@@ -83,7 +99,7 @@ pub fn matchEchoReply(
 
     const icmp_off = ethernet.header_len + ipv4.header_len;
     const icmp = view.get(Header, frame, icmp_off) orelse return null;
-    if (icmp.type != echo_reply) return null;
+    if (Type.fromByte(icmp.type) != .echo_reply) return null;
     if (icmp.code != 0) return null;
     if (identifierHost(icmp) != id) return null;
     if (sequence) |seq| {

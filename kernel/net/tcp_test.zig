@@ -32,7 +32,7 @@ test "parseSegment reads SYN-ACK with MSS option" {
     frame[tcp_off + 10] = 0x56;
     frame[tcp_off + 11] = 0x78;
     frame[tcp_off + 12] = 0x60;
-    frame[tcp_off + 13] = tcp.flag_syn | tcp.flag_ack;
+    frame[tcp_off + 13] = @bitCast(tcp.Flags{ .syn = 1, .ack = 1 });
     frame[tcp_off + 20] = 0x02;
     frame[tcp_off + 21] = 0x04;
     frame[tcp_off + 22] = 0x05;
@@ -40,7 +40,7 @@ test "parseSegment reads SYN-ACK with MSS option" {
 
     const seg = tcp.parseSegment(&frame) orelse return error.TestExpectedEqual;
     try std.testing.expectEqual(@as(u16, 80), seg.dst_port);
-    try std.testing.expect(seg.flags & tcp.flag_syn != 0);
-    try std.testing.expect(seg.flags & tcp.flag_ack != 0);
+    try std.testing.expect(seg.flags.syn != 0);
+    try std.testing.expect(seg.flags.ack != 0);
     try std.testing.expectEqual(@as(usize, 0), seg.payload.len);
 }

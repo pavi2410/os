@@ -4,9 +4,28 @@ const ipv4 = @import("ipv4.zig");
 const ipv4_addr = @import("common/ipv4_addr");
 const mac = @import("common/mac");
 
-pub const hardware_ethernet: u16 = 1;
-pub const op_request: u16 = 1;
-pub const op_reply: u16 = 2;
+pub const HardwareType = enum(u16) {
+    ethernet = 1,
+};
+
+pub const Opcode = enum(u16) {
+    request = 1,
+    reply = 2,
+
+    pub inline fn fromHost(host: u16) ?Opcode {
+        return switch (host) {
+            @intFromEnum(Opcode.request) => .request,
+            @intFromEnum(Opcode.reply) => .reply,
+            else => null,
+        };
+    }
+};
+
+comptime {
+    if (@intFromEnum(HardwareType.ethernet) != 1) @compileError("HardwareType.ethernet must be 1");
+    if (@intFromEnum(Opcode.request) != 1) @compileError("Opcode.request must be 1");
+    if (@intFromEnum(Opcode.reply) != 2) @compileError("Opcode.reply must be 2");
+}
 
 pub const header_len = 28;
 
@@ -26,6 +45,10 @@ pub fn opcodeHost(hdr: *const Header) u16 {
     return @byteSwap(hdr.opcode_be);
 }
 
+pub fn headerOpcode(hdr: *const Header) ?Opcode {
+    return Opcode.fromHost(opcodeHost(hdr));
+}
+
 pub fn buildRequest(
     out: []u8,
     src_mac: mac.Mac,
@@ -38,11 +61,11 @@ pub fn buildRequest(
     ethernet.putHeader(out, mac.Mac.broadcast, src_mac, ethernet.Ethertype.arp);
 
     const arp = view.mut(Header, out, ethernet.header_len).?;
-    arp.hw_type_be = @byteSwap(hardware_ethernet);
+    arp.hw_type_be = @byteSwap(@intFromEnum(HardwareType.ethernet));
     arp.proto_type_be = ethernet.Ethertype.ipv4.toBe();
     arp.hw_len = mac.len;
     arp.proto_len = ipv4_addr.len;
-    arp.opcode_be = @byteSwap(op_request);
+    arp.opcode_be = @byteSwap(@intFromEnum(Opcode.request));
     arp.sender_mac = src_mac;
     arp.sender_ip = sender_ip;
     arp.target_ip = target_ip;
@@ -55,7 +78,7 @@ pub fn isReply(frame: []const u8) bool {
     const eth = view.get(ethernet.Header, frame, 0) orelse return false;
     if (ethernet.headerEthertype(eth) != .arp) return false;
     const arp_hdr = view.get(Header, frame, ethernet.header_len) orelse return false;
-    return opcodeHost(arp_hdr) == op_reply;
+    return headerOpcode(arp_hdr) == .reply;
 }
 
 /// ARP reply for @p ip: returns the sender hardware address (resolved MAC).

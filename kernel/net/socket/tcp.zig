@@ -14,14 +14,14 @@ var tx_frame: [link.max_frame_len]u8 = undefined;
 pub fn close(sock: *table.Socket) void {
     const tcp_sock = table.asTcp(sock) orelse return;
     if (tcp_sock.tcp_state == .established) {
-        sendSegment(tcp_sock, tcp_sock.snd_nxt, tcp_sock.rcv_nxt, tcp.flag_fin | tcp.flag_ack, "") catch {};
+        sendSegment(tcp_sock, tcp_sock.snd_nxt, tcp_sock.rcv_nxt, .{ .fin = 1, .ack = 1 }, "") catch {};
     }
 }
 
 pub fn connect(handle: u32, addr: *const api.SockaddrIn) api.SocketError!void {
     const sock = table.get(handle) orelse return api.SocketError.NotFound;
     const tcp_sock = table.asTcp(sock) orelse return api.SocketError.Unsupported;
-    if (addr.family != api.AF_INET) return api.SocketError.Unsupported;
+    if (api.sockaddrFamily(addr) != .inet) return api.SocketError.Unsupported;
     if (!link.isReady()) return api.SocketError.NotReady;
     if (tcp_sock.tcp_state != .closed) return api.SocketError.IoError;
 
@@ -31,17 +31,17 @@ pub fn connect(handle: u32, addr: *const api.SockaddrIn) api.SocketError!void {
 
     tcp_sock.snd_isn = table.allocIsn();
 
-    try sendSegment(tcp_sock, tcp_sock.snd_isn, 0, tcp.flag_syn, "");
+    try sendSegment(tcp_sock, tcp_sock.snd_isn, 0, .{ .syn = 1 }, "");
     tcp_sock.tcp_state = .syn_sent;
 
     const seg = (try pollSegment(tcp_sock, table.connect_spins)) orelse return api.SocketError.Timeout;
 
-    if (seg.flags & (tcp.flag_syn | tcp.flag_ack) != (tcp.flag_syn | tcp.flag_ack)) return api.SocketError.IoError;
+    if (seg.flags.syn != 1 or seg.flags.ack != 1) return api.SocketError.IoError;
     if (seg.ack != tcp_sock.snd_isn + 1) return api.SocketError.IoError;
 
     tcp_sock.rcv_nxt = seg.seq + 1;
     tcp_sock.snd_nxt = tcp_sock.snd_isn + 1;
-    try sendSegment(tcp_sock, tcp_sock.snd_nxt, tcp_sock.rcv_nxt, tcp.flag_ack, "");
+    try sendSegment(tcp_sock, tcp_sock.snd_nxt, tcp_sock.rcv_nxt, .{ .ack = 1 }, "");
     tcp_sock.tcp_state = .established;
 }
 
@@ -52,7 +52,7 @@ pub fn send(handle: u32, data: []const u8) api.SocketError!usize {
     if (!link.isReady()) return api.SocketError.NotReady;
 
     const chunk = @min(data.len, table.max_tcp_segment);
-    try sendSegment(tcp_sock, tcp_sock.snd_nxt, tcp_sock.rcv_nxt, tcp.flag_ack | tcp.flag_psh, data[0..chunk]);
+    try sendSegment(tcp_sock, tcp_sock.snd_nxt, tcp_sock.rcv_nxt, .{ .ack = 1, .psh = 1 }, data[0..chunk]);
     const expect_ack = tcp_sock.snd_nxt + @as(u32, @intCast(chunk));
     tcp_sock.snd_nxt = expect_ack;
 
@@ -61,7 +61,7 @@ pub fn send(handle: u32, data: []const u8) api.SocketError!usize {
         const seg = pollSegment(tcp_sock, 1) catch return api.SocketError.IoError;
         if (seg) |s| {
             try ingestSegment(tcp_sock, s);
-            if (s.flags & tcp.flag_ack != 0 and s.ack >= expect_ack) return chunk;
+            if (s.flags.ack != 0 and s.ack >= expect_ack) return chunk;
         }
     }
     return api.SocketError.Timeout;
@@ -90,7 +90,7 @@ pub fn recv(handle: u32, buf: []u8, max_spins: usize) api.SocketError!usize {
     return api.SocketError.Timeout;
 }
 
-fn sendSegment(tcp_sock: *table.TcpSocket, seq: u32, ack: u32, flags: u8, payload: []const u8) api.SocketError!void {
+fn sendSegment(tcp_sock: *table.TcpSocket, seq: u32, ack: u32, flags: tcp.Flags, payload: []const u8) api.SocketError!void {
     const mac = link.localMac();
     const dst_mac = resolve.resolve(tcp_sock.remote_ip, mac) orelse return api.SocketError.IoError;
     const frame_len = tcp.build(
@@ -122,7 +122,7 @@ fn pollSegment(tcp_sock: *const table.TcpSocket, max_spins: usize) api.SocketErr
 }
 
 fn ingestSegment(tcp_sock: *table.TcpSocket, seg: tcp.Segment) api.SocketError!void {
-    if (seg.flags & tcp.flag_rst != 0) return api.SocketError.IoError;
+    if (seg.flags.rst != 0) return api.SocketError.IoError;
 
     if (seg.payload.len > 0 and seg.seq == tcp_sock.rcv_nxt) {
         const space = table.rx_buf_size - tcp_sock.rx_len;
@@ -132,12 +132,12 @@ fn ingestSegment(tcp_sock: *table.TcpSocket, seg: tcp.Segment) api.SocketError!v
             tcp_sock.rx_len += copy;
         }
         tcp_sock.rcv_nxt +%= @intCast(seg.payload.len);
-        try sendSegment(tcp_sock, tcp_sock.snd_nxt, tcp_sock.rcv_nxt, tcp.flag_ack, "");
+        try sendSegment(tcp_sock, tcp_sock.snd_nxt, tcp_sock.rcv_nxt, .{ .ack = 1 }, "");
     }
 
-    if (seg.flags & tcp.flag_fin != 0) {
+    if (seg.flags.fin != 0) {
         tcp_sock.rcv_nxt += 1;
-        try sendSegment(tcp_sock, tcp_sock.snd_nxt, tcp_sock.rcv_nxt, tcp.flag_ack, "");
+        try sendSegment(tcp_sock, tcp_sock.snd_nxt, tcp_sock.rcv_nxt, .{ .ack = 1 }, "");
         tcp_sock.tcp_state = .peer_closed;
     }
 }

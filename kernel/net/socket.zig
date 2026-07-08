@@ -5,13 +5,9 @@ const sock_icmp = @import("socket/icmp.zig");
 const sock_tcp = @import("socket/tcp.zig");
 const sock_udp = @import("socket/udp.zig");
 
-pub const AF_INET = api.AF_INET;
-pub const SOCK_DGRAM = api.SOCK_DGRAM;
-pub const SOCK_STREAM = api.SOCK_STREAM;
-
-pub const IPPROTO_ICMP = api.IPPROTO_ICMP;
-pub const IPPROTO_TCP = api.IPPROTO_TCP;
-pub const IPPROTO_UDP = api.IPPROTO_UDP;
+pub const AddressFamily = api.AddressFamily;
+pub const SocketType = api.SocketType;
+pub const IpProtocol = api.IpProtocol;
 
 pub const SocketError = api.SocketError;
 pub const SockaddrIn = api.SockaddrIn;
@@ -20,20 +16,20 @@ pub const socketErrorFromPump = api.socketErrorFromPump;
 pub const putSockaddrIn = api.putSockaddrIn;
 
 pub fn create(domain: u32, sock_type: u32, protocol: i32) SocketError!u32 {
-    if (domain != AF_INET) return SocketError.Unsupported;
+    const family = api.AddressFamily.fromInt(domain) orelse return SocketError.Unsupported;
+    if (family != .inet) return SocketError.Unsupported;
     if (!link.isReady()) return SocketError.NotReady;
 
-    const kind: table.Kind = switch (sock_type) {
-        SOCK_DGRAM => switch (protocol) {
-            IPPROTO_ICMP => .icmp,
-            0, IPPROTO_UDP => .udp,
+    const kind: table.Kind = switch (api.SocketType.fromInt(sock_type) orelse return SocketError.Unsupported) {
+        .dgram => switch (api.IpProtocol.fromInt(protocol) orelse .udp) {
+            .icmp => .icmp,
+            .udp => .udp,
             else => return SocketError.Unsupported,
         },
-        SOCK_STREAM => switch (protocol) {
-            0, IPPROTO_TCP => .tcp,
+        .stream => switch (api.IpProtocol.fromInt(protocol) orelse .tcp) {
+            .tcp => .tcp,
             else => return SocketError.Unsupported,
         },
-        else => return SocketError.Unsupported,
     };
 
     const handle = table.create(kind) orelse return SocketError.TooManySockets;
@@ -49,7 +45,7 @@ pub fn close(handle: u32) void {
 
 pub fn bind(handle: u32, addr: *const SockaddrIn) SocketError!void {
     const sock = table.get(handle) orelse return SocketError.NotFound;
-    if (addr.family != AF_INET) return SocketError.Unsupported;
+    if (api.sockaddrFamily(addr) != .inet) return SocketError.Unsupported;
     const udp_sock = table.asUdp(sock) orelse return SocketError.Unsupported;
     udp_sock.local_port = @byteSwap(addr.port_be);
 }
@@ -72,7 +68,7 @@ pub fn sendto(
     dest: *const SockaddrIn,
 ) SocketError!usize {
     const sock = table.get(handle) orelse return SocketError.NotFound;
-    if (dest.family != AF_INET) return SocketError.Unsupported;
+    if (api.sockaddrFamily(dest) != .inet) return SocketError.Unsupported;
     if (!link.isReady()) return SocketError.NotReady;
 
     return switch (sock.active) {
