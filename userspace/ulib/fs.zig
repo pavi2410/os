@@ -15,12 +15,14 @@ pub const SEEK_END = abi_fs.SEEK_END;
 
 pub const S_IFREG = abi_fs.S_IFREG;
 pub const S_IFDIR = abi_fs.S_IFDIR;
+pub const S_IFCHR = abi_fs.S_IFCHR;
 
 pub const Stat = abi_fs.Stat;
 pub const Dirent64 = abi_fs.Dirent64;
 pub const dirent64_name_offset = abi_fs.dirent64_name_offset;
 pub const DT_DIR = abi_fs.DT_DIR;
 pub const DT_REG = abi_fs.DT_REG;
+pub const DT_CHR = abi_fs.DT_CHR;
 pub const dirent64Reclen = abi_fs.dirent64Reclen;
 pub const Dirent64Entry = abi_fs.Dirent64Entry;
 pub const Dirent64Iterator = abi_fs.Dirent64Iterator;

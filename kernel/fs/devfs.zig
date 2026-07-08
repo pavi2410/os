@@ -67,23 +67,13 @@ pub fn writeDevice(dev: Device, buf: []const u8) usize {
 }
 
 pub fn getdents64(dir_skip: *usize, buf: []u8) filesystem.Error!usize {
-    const total = 2 + dev_names.len;
+    const total = dev_names.len;
     if (dir_skip.* >= total) return 0;
 
     var written: usize = 0;
     var index = dir_skip.*;
     while (index < total) : (index += 1) {
-        const name: []const u8 = switch (index) {
-            0 => ".",
-            1 => "..",
-            else => dev_names[index - 2],
-        };
-        const d_type: u8 = if (index < 2) abi_fs.DT_DIR else abi_fs.DT_CHR;
-        const ino: u64 = switch (index) {
-            0, 1 => dev_root_ino,
-            else => @intFromEnum(dev_nodes[index - 2].device),
-        };
-
+        const name = dev_names[index];
         const reclen = abi_fs.dirent64Reclen(name.len);
         if (written + reclen > buf.len) {
             if (written == 0) return filesystem.Error.BufferTooSmall;
@@ -93,9 +83,9 @@ pub fn getdents64(dir_skip: *usize, buf: []u8) filesystem.Error!usize {
 
         abi_fs.writeDirent64(
             buf[written .. written + reclen],
-            ino,
+            @intFromEnum(dev_nodes[index].device),
             @intCast(index + 1),
-            d_type,
+            abi_fs.DT_CHR,
             name,
         );
         written += reclen;
@@ -103,6 +93,15 @@ pub fn getdents64(dir_skip: *usize, buf: []u8) filesystem.Error!usize {
 
     dir_skip.* = total;
     return written;
+}
+
+/// Append the virtual `/dev` mount entry when listing the filesystem root.
+pub fn appendRootMountDirent(buf: []u8) ?usize {
+    const name = "dev";
+    const reclen = abi_fs.dirent64Reclen(name.len);
+    if (buf.len < reclen) return null;
+    abi_fs.writeDirent64(buf[0..reclen], dev_root_ino, 1, abi_fs.DT_DIR, name);
+    return reclen;
 }
 
 fn stdEql(a: []const u8, b: []const u8) bool {

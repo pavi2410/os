@@ -24,7 +24,9 @@ const Handle = struct {
     offset: u64 = 0,
     writable: bool = false,
     is_directory: bool = false,
+    is_fs_root: bool = false,
     dir_skip: usize = 0,
+    root_mount_emitted: bool = false,
 };
 
 var handles: [max_handles]Handle = undefined;
@@ -59,6 +61,7 @@ pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
         .offset = if (flags.append and !is_directory) opened.size else 0,
         .writable = flags.write and !is_directory,
         .is_directory = is_directory,
+        .is_fs_root = is_directory and path.len == 1 and path[0] == '/',
         .dir_skip = 0,
     };
     return slot;
@@ -129,7 +132,14 @@ pub fn getdents64(handle: u32, buf: []u8) VfsError!usize {
     const h = try getHandle(handle);
     if (!h.is_directory) return VfsError.NotFile;
     if (h.kind == .dev_root) return devfs.getdents64(&h.dir_skip, buf);
-    return active_fs.getdents64(h.open, &h.dir_skip, buf);
+
+    const n = try active_fs.getdents64(h.open, &h.dir_skip, buf);
+    if (n > 0) return n;
+
+    if (!h.is_fs_root or h.root_mount_emitted) return 0;
+    const extra = devfs.appendRootMountDirent(buf) orelse return 0;
+    h.root_mount_emitted = true;
+    return extra;
 }
 
 pub fn unlink(path: []const u8) VfsError!void {

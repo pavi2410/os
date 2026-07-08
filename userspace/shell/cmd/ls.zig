@@ -18,6 +18,16 @@ fn lsDir(dir_arg: ?[]const u8, long: bool) void {
         return;
     };
 
+    var st: ulib.fs.Stat = .{};
+    if (ulib.fs.stat(@ptrCast(dir.ptr), &st) < 0) {
+        io.writeStr("ls: failed\n");
+        return;
+    }
+    if (!ulib.fs.isDir(st.st_mode)) {
+        io.writeStr("ls: not a directory\n");
+        return;
+    }
+
     const fd = ulib.fs.open(@ptrCast(dir.ptr), ulib.fs.O_RDONLY, 0);
     if (fd < 0) {
         io.writeStr("ls: failed\n");
@@ -40,7 +50,7 @@ fn lsDir(dir_arg: ?[]const u8, long: bool) void {
 fn emitShortNames(data: []const u8) void {
     var it = ulib.fs.Dirent64Iterator{ .data = data };
     while (it.next()) |entry| {
-        if (entry.name.len == 0) continue;
+        if (!shouldShow(entry.name)) continue;
         io.writeStr(entry.name);
         io.writeNewline();
     }
@@ -49,9 +59,13 @@ fn emitShortNames(data: []const u8) void {
 fn emitLongNames(dir: []const u8, data: []const u8) void {
     var it = ulib.fs.Dirent64Iterator{ .data = data };
     while (it.next()) |entry| {
-        if (entry.name.len == 0) continue;
+        if (!shouldShow(entry.name)) continue;
         printLongEntry(dir, entry.name);
     }
+}
+
+fn shouldShow(name: []const u8) bool {
+    return name.len > 0 and !io.eql(name, ".") and !io.eql(name, "..");
 }
 
 fn printLongEntry(dir: []const u8, name: []const u8) void {
@@ -69,7 +83,9 @@ fn printLongEntry(dir: []const u8, name: []const u8) void {
 }
 
 fn writeEntryType(mode: u32) void {
-    if (mode & ulib.fs.S_IFDIR != 0) {
+    if (mode & ulib.fs.S_IFCHR != 0) {
+        io.writeStr("cdev ");
+    } else if (mode & ulib.fs.S_IFDIR != 0) {
         io.writeStr("dir  ");
     } else {
         io.writeStr("file ");

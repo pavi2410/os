@@ -46,4 +46,12 @@ test "getdents64 lists device directory entries" {
     try std.testing.expect(std.mem.indexOf(u8, buf[0..n], "null") != null);
     try std.testing.expect(std.mem.indexOf(u8, buf[0..n], "zero") != null);
     try std.testing.expect(std.mem.indexOf(u8, buf[0..n], "ttyS0") != null);
+    try std.testing.expect(std.mem.indexOf(u8, buf[0..n], ".\x00") == null);
+}
+
+test "appendRootMountDirent adds dev entry for root listing" {
+    var buf: [64]u8 = undefined;
+    const n = devfs.appendRootMountDirent(&buf).?;
+    try std.testing.expect(n > 0);
+    try std.testing.expect(std.mem.indexOf(u8, buf[0..n], "dev") != null);
 }
