@@ -1,6 +1,6 @@
 const icmp = @import("icmp.zig");
 const hal = @import("../hal.zig");
-const ipv4 = @import("ipv4.zig");
+const ipv4_addr = @import("common_ipv4_addr");
 const link = @import("link.zig");
 const tcp = @import("tcp.zig");
 const udp = @import("udp.zig");
@@ -14,7 +14,7 @@ pub const UdpMatcher = struct {
     local_port: u16,
 
     pub fn matches(self: @This(), frame: []const u8) bool {
-        var src_ip: ipv4.Addr = undefined;
+        var src_ip: ipv4_addr.Addr = undefined;
         var src_port: u16 = 0;
         return udp.match(frame, self.local_port, &src_ip, &src_port) != null;
     }
@@ -23,7 +23,7 @@ pub const UdpMatcher = struct {
 pub const IcmpEchoMatcher = struct {
     id: u16,
     sequence: u16,
-    expected_src: ipv4.Addr,
+    expected_src: ipv4_addr.Addr,
 
     pub fn matches(self: @This(), frame: []const u8) bool {
         return icmp.isEchoReply(frame, self.expected_src, self.id, self.sequence);
@@ -32,7 +32,7 @@ pub const IcmpEchoMatcher = struct {
 
 pub const TcpEndpointMatcher = struct {
     local_port: u16,
-    remote_ip: ipv4.Addr,
+    remote_ip: ipv4_addr.Addr,
     remote_port: u16,
 
     pub fn matches(self: @This(), frame: []const u8) bool {

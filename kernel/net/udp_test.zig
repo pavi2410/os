@@ -1,5 +1,5 @@
 const config = @import("config.zig");
-const ipv4 = @import("ipv4.zig");
+const ipv4_addr = @import("common_ipv4_addr");
 const link = @import("link.zig");
 const resolve = @import("resolve.zig");
 const udp = @import("udp.zig");
@@ -34,10 +34,10 @@ pub fn dnsReplyOk() bool {
     var attempt: usize = 0;
     while (attempt < 10) : (attempt += 1) {
         if (link.pollReceive(&recv_buf, 100_000)) |len| {
-            var src_ip: ipv4.Addr = undefined;
+            var src_ip: ipv4_addr.Addr = undefined;
             var src_port: u16 = 0;
             if (udp.match(recv_buf[0..len], test_src_port, &src_ip, &src_port)) |payload| {
-                if (ipv4.equal(src_ip, config.dns_ip) and src_port == dns_port and payload.len >= 12) {
+                if (src_ip.eql(config.dns_ip) and src_port == dns_port and payload.len >= 12) {
                     return true;
                 }
             }

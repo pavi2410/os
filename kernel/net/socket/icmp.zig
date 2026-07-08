@@ -1,5 +1,6 @@
 const config = @import("../config.zig");
 const icmp = @import("../icmp.zig");
+const ipv4_addr = @import("common_ipv4_addr");
 const link = @import("../link.zig");
 const pump = @import("../pump.zig");
 const resolve = @import("../resolve.zig");
@@ -11,7 +12,7 @@ pub fn send(handle: u32, dest: *const api.SockaddrIn) api.SocketError!usize {
     const icmp_sock = table.asIcmp(sock) orelse return api.SocketError.Unsupported;
     if (!link.isReady()) return api.SocketError.NotReady;
 
-    const dst_ip = dest.addr;
+    const dst_ip = ipv4_addr.Addr.fromOctets(dest.addr);
     const mac = link.localMac();
     const dst_mac = resolve.resolve(dst_ip, mac) orelse return api.SocketError.IoError;
 

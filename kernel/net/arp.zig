@@ -1,6 +1,7 @@
 const view = @import("common_view");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
+const ipv4_addr = @import("common_ipv4_addr");
 const mac = @import("common_mac");
 
 pub const hardware_ethernet: u16 = 1;
@@ -16,9 +17,9 @@ pub const Header = extern struct {
     proto_len: u8,
     opcode_be: u16,
     sender_mac: mac.Mac,
-    sender_ip: ipv4.Addr,
+    sender_ip: ipv4_addr.Addr,
     target_mac: mac.Mac,
-    target_ip: ipv4.Addr,
+    target_ip: ipv4_addr.Addr,
 };
 
 pub fn opcodeHost(hdr: *const Header) u16 {
@@ -28,8 +29,8 @@ pub fn opcodeHost(hdr: *const Header) u16 {
 pub fn buildRequest(
     out: []u8,
     src_mac: mac.Mac,
-    sender_ip: ipv4.Addr,
-    target_ip: ipv4.Addr,
+    sender_ip: ipv4_addr.Addr,
+    target_ip: ipv4_addr.Addr,
 ) usize {
     const frame_len = ethernet.min_frame_len;
     @memset(out[0..frame_len], 0);
@@ -40,11 +41,11 @@ pub fn buildRequest(
     arp.hw_type_be = @byteSwap(hardware_ethernet);
     arp.proto_type_be = ethernet.Ethertype.ipv4.toBe();
     arp.hw_len = mac.len;
-    arp.proto_len = ipv4.addr_len;
+    arp.proto_len = ipv4_addr.len;
     arp.opcode_be = @byteSwap(op_request);
     arp.sender_mac = src_mac;
-    @memcpy(&arp.sender_ip, &sender_ip);
-    @memcpy(&arp.target_ip, &target_ip);
+    arp.sender_ip = sender_ip;
+    arp.target_ip = target_ip;
 
     return frame_len;
 }
@@ -58,9 +59,9 @@ pub fn isReply(frame: []const u8) bool {
 }
 
 /// ARP reply for @p ip: returns the sender hardware address (resolved MAC).
-pub fn senderMacFor(frame: []const u8, ip: ipv4.Addr) ?mac.Mac {
+pub fn senderMacFor(frame: []const u8, addr: ipv4_addr.Addr) ?mac.Mac {
     if (!isReply(frame)) return null;
     const arp_hdr = view.get(Header, frame, ethernet.header_len) orelse return null;
-    if (!ipv4.equal(arp_hdr.sender_ip, ip)) return null;
+    if (!arp_hdr.sender_ip.eql(addr)) return null;
     return arp_hdr.sender_mac;
 }

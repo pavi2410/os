@@ -1,6 +1,7 @@
 const view = @import("common_view");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
+const ipv4_addr = @import("common_ipv4_addr");
 const mac = @import("common_mac");
 
 pub const header_len = 8;
@@ -28,8 +29,8 @@ pub fn build(
     out: []u8,
     dst_mac: mac.Mac,
     src_mac: mac.Mac,
-    src_ip: ipv4.Addr,
-    dst_ip: ipv4.Addr,
+    src_ip: ipv4_addr.Addr,
+    dst_ip: ipv4_addr.Addr,
     src_port: u16,
     dst_port: u16,
     payload: []const u8,
@@ -78,7 +79,7 @@ pub fn payloadSlice(frame: []const u8) ?[]const u8 {
 pub fn match(
     frame: []const u8,
     local_port: u16,
-    src_ip_out: *ipv4.Addr,
+    src_ip_out: *ipv4_addr.Addr,
     src_port_out: *u16,
 ) ?[]const u8 {
     const payload = payloadSlice(frame) orelse return null;

@@ -1,4 +1,6 @@
-pub const Addr = [4]u8;
+const ipv4_addr = @import("common_ipv4_addr");
+
+pub const Addr = ipv4_addr.Addr;
 
 pub const rx_buf_size = 8192;
 pub const max_sockets = 16;
@@ -22,19 +24,19 @@ pub const TcpState = enum {
 
 pub const UdpSocket = struct {
     local_port: u16 = 0,
-    last_peer: Addr = .{ 0, 0, 0, 0 },
+    last_peer: Addr = Addr.zero,
 };
 
 pub const IcmpSocket = struct {
     icmp_id: u16 = 0,
     icmp_seq: u16 = 0,
-    last_peer: Addr = .{ 0, 0, 0, 0 },
+    last_peer: Addr = Addr.zero,
 };
 
 pub const TcpSocket = struct {
     local_port: u16 = 0,
     tcp_state: TcpState = .closed,
-    remote_ip: Addr = .{ 0, 0, 0, 0 },
+    remote_ip: Addr = Addr.zero,
     remote_port: u16 = 0,
     snd_isn: u32 = 0,
     snd_nxt: u32 = 0,

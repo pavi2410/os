@@ -1,6 +1,7 @@
 const view = @import("common_view");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
+const ipv4_addr = @import("common_ipv4_addr");
 const mac = @import("common_mac");
 
 pub const header_len = 8;
@@ -29,8 +30,8 @@ pub fn buildEchoRequest(
     out: []u8,
     dst_mac: mac.Mac,
     src_mac: mac.Mac,
-    src_ip: ipv4.Addr,
-    dst_ip: ipv4.Addr,
+    src_ip: ipv4_addr.Addr,
+    dst_ip: ipv4_addr.Addr,
     id: u16,
     sequence: u16,
 ) usize {
@@ -67,7 +68,7 @@ pub fn matchEchoReply(
     frame: []const u8,
     id: u16,
     sequence: ?u16,
-    src_ip_out: *ipv4.Addr,
+    src_ip_out: *ipv4_addr.Addr,
 ) ?[]const u8 {
     if (frame.len < ethernet.header_len + ipv4.header_len + header_len) return null;
 
@@ -101,13 +102,13 @@ pub fn matchEchoReply(
 
 pub fn isEchoReply(
     frame: []const u8,
-    expected_src: ipv4.Addr,
+    expected_src: ipv4_addr.Addr,
     id: u16,
     sequence: u16,
 ) bool {
-    var src: ipv4.Addr = undefined;
+    var src: ipv4_addr.Addr = undefined;
     if (matchEchoReply(frame, id, sequence, &src)) |_| {
-        return ipv4.equal(src, expected_src);
+        return src.eql(expected_src);
     }
     return false;
 }

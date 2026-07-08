@@ -1,5 +1,6 @@
 const config = @import("../config.zig");
 const hal = @import("../../hal.zig");
+const ipv4_addr = @import("common_ipv4_addr");
 const link = @import("../link.zig");
 const pump = @import("../pump.zig");
 const resolve = @import("../resolve.zig");
@@ -24,7 +25,7 @@ pub fn connect(handle: u32, addr: *const api.SockaddrIn) api.SocketError!void {
     if (!link.isReady()) return api.SocketError.NotReady;
     if (tcp_sock.tcp_state != .closed) return api.SocketError.IoError;
 
-    tcp_sock.remote_ip = addr.addr;
+    tcp_sock.remote_ip = ipv4_addr.Addr.fromOctets(addr.addr);
     tcp_sock.remote_port = @byteSwap(addr.port_be);
     tcp_sock.local_port = table.allocEphemeralPort();
 

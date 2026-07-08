@@ -1,5 +1,5 @@
 const pump = @import("../pump.zig");
-const ipv4 = @import("../ipv4.zig");
+const ipv4_addr = @import("common_ipv4_addr");
 const abi_net = @import("abi_net");
 
 pub const AF_INET = abi_net.AF_INET;
@@ -30,6 +30,6 @@ pub fn socketErrorFromPump(err: pump.Error) SocketError {
     };
 }
 
-pub fn putSockaddrIn(out: *SockaddrIn, ip: ipv4.Addr, port_host: u16) void {
-    out.* = abi_net.sockaddrIn(ip, port_host);
+pub fn putSockaddrIn(out: *SockaddrIn, ip: ipv4_addr.Addr, port_host: u16) void {
+    out.* = abi_net.sockaddrIn(ip.octets, port_host);
 }

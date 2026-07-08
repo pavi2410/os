@@ -1,6 +1,7 @@
 const bytes = @import("common_bytes");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
+const ipv4_addr = @import("common_ipv4_addr");
 const mac = @import("common_mac");
 
 pub const header_len = 20;
@@ -26,8 +27,8 @@ pub const flag_psh: u8 = 0x08;
 pub const default_window: u16 = 8192;
 
 pub const Segment = struct {
-    src_ip: ipv4.Addr,
-    dst_ip: ipv4.Addr,
+    src_ip: ipv4_addr.Addr,
+    dst_ip: ipv4_addr.Addr,
     src_port: u16,
     dst_port: u16,
     seq: u32,
@@ -56,10 +57,10 @@ pub fn dataOffset(hdr: *const Header) u8 {
     return (hdr.data_offset_reserved >> 4) * 4;
 }
 
-pub fn checksum(src_ip: ipv4.Addr, dst_ip: ipv4.Addr, tcp: []const u8) u16 {
+pub fn checksum(src_ip: ipv4_addr.Addr, dst_ip: ipv4_addr.Addr, tcp: []const u8) u16 {
     var pseudo: [12]u8 = undefined;
-    @memcpy(pseudo[0..4], &src_ip);
-    @memcpy(pseudo[4..8], &dst_ip);
+    @memcpy(pseudo[0..4], &src_ip.octets);
+    @memcpy(pseudo[4..8], &dst_ip.octets);
     pseudo[8] = 0;
     pseudo[9] = @intFromEnum(ipv4.Protocol.tcp);
     const tcp_len: u16 = @intCast(tcp.len);
@@ -86,8 +87,8 @@ pub fn build(
     out: []u8,
     dst_mac: mac.Mac,
     src_mac: mac.Mac,
-    src_ip: ipv4.Addr,
-    dst_ip: ipv4.Addr,
+    src_ip: ipv4_addr.Addr,
+    dst_ip: ipv4_addr.Addr,
     src_port: u16,
     dst_port: u16,
     seq: u32,
@@ -149,10 +150,10 @@ pub fn parseSegment(frame: []const u8) ?Segment {
     const payload_len = frame_ip_end - payload_off;
     if (payload_off + payload_len > frame.len) return null;
 
-    var src_ip: ipv4.Addr = undefined;
-    var dst_ip: ipv4.Addr = undefined;
-    @memcpy(&src_ip, frame[ip_off + 12 ..][0..ipv4.addr_len]);
-    @memcpy(&dst_ip, frame[ip_off + 16 ..][0..ipv4.addr_len]);
+    var src_ip: ipv4_addr.Addr = undefined;
+    var dst_ip: ipv4_addr.Addr = undefined;
+    @memcpy(&src_ip.octets, frame[ip_off + 12 ..][0..ipv4_addr.len]);
+    @memcpy(&dst_ip.octets, frame[ip_off + 16 ..][0..ipv4_addr.len]);
 
     return .{
         .src_ip = src_ip,
@@ -169,12 +170,12 @@ pub fn parseSegment(frame: []const u8) ?Segment {
 pub fn matchEndpoint(
     frame: []const u8,
     local_port: u16,
-    remote_ip: ipv4.Addr,
+    remote_ip: ipv4_addr.Addr,
     remote_port: u16,
 ) ?Segment {
     const seg = parseSegment(frame) orelse return null;
     if (seg.dst_port != local_port) return null;
-    if (!ipv4.equal(seg.src_ip, remote_ip)) return null;
+    if (!seg.src_ip.eql(remote_ip)) return null;
     if (seg.src_port != remote_port) return null;
     return seg;
 }
