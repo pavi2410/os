@@ -1,6 +1,9 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
+const copy_out = @import("../syscall/copy_out.zig");
+const errno = @import("../syscall/errno.zig");
 const process = @import("process.zig");
 const scheduler = @import("scheduler.zig");
+const std = @import("std");
 
 const WNOHANG: u32 = 1;
 const ECHILD: i64 = -10;
@@ -11,8 +14,7 @@ pub fn wait4(parent: *process.Process, pid: i64, status_ptr: u64, options: u32) 
             if (status_ptr != 0) {
                 parent.address_space.activate();
                 const wstatus: u32 = zombie.status << 8;
-                const out: *u32 = @ptrFromInt(status_ptr);
-                out.* = wstatus;
+                copy_out.copyOut(status_ptr, std.mem.asBytes(&wstatus)) catch return errno.EFAULT;
             }
             return @intCast(zombie.pid);
         }

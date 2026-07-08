@@ -4,6 +4,7 @@ const io = @import("../io.zig");
 const path = @import("../path.zig");
 const prefix_env = @import("../prefix_env.zig");
 const status = @import("status");
+const redirect = @import("../redirect.zig");
 const ulib = @import("ulib");
 
 var exec_path: [128]u8 = undefined;
@@ -26,6 +27,7 @@ pub fn run(parsed: *const argv_mod.Parsed) u8 {
     }
 
     if (ulib.process.getpid() != my_pid) {
+        redirect.applyStored();
         const argc = buildArgv(parsed) orelse {
             ulib.process.exit(1);
         };

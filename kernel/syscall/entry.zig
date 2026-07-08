@@ -48,6 +48,7 @@ comptime {
         \\  mov %rsp, %rdi
         \\  call syscall_dispatch
         \\
+        \\syscall_resume_userspace:
         \\  // rax holds the return value. Restore argument registers from the
         \\  // frame (the dispatcher clobbered them) and callee-saved registers
         \\  // from the values saved at syscall entry.

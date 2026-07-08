@@ -2,11 +2,14 @@ const process = @import("process.zig");
 const scheduler = @import("scheduler.zig");
 const thread = @import("thread.zig");
 const user_fork = @import("user_fork.zig");
+const gdt = @import("../arch/x86_64/gdt.zig");
+const hal = @import("../hal.zig");
 
 var pending_child: ?*process.Process = null;
 var pending_ctx: user_fork.ForkUserContext = undefined;
 
 pub fn forkFromSyscall(ctx: user_fork.ForkUserContext) i64 {
+    hal.console.println("forkFromSyscall enter", .{});
     const parent = process.currentProcess() orelse return -1;
 
     const child = process.forkChild(parent) catch |err| switch (err) {
@@ -23,6 +26,8 @@ pub fn forkFromSyscall(ctx: user_fork.ForkUserContext) i64 {
         return -12;
     };
 
+    scheduler.yield();
+    hal.console.println("fork parent={d} child={d}", .{ parent.id, child.id });
     return @intCast(child.id);
 }
 
@@ -35,5 +40,10 @@ fn forkChildEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
     child.address_space.activate();
     child.state = .running;
 
+    const self = thread.currentThread() orelse thread.exit();
+    const kstack = (@intFromPtr(self.stack) + self.stack_size) & ~@as(u64, 15);
+    gdt.setKernelStack(kstack);
+
+    hal.console.println("fork-child pid={d} rip=0x{x} rsp=0x{x}", .{ child.id, ctx.user_rip, ctx.user_rsp });
     user_fork.returnToUser(ctx, 0);
 }

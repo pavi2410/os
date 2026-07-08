@@ -16,6 +16,7 @@ const hal = @import("hal.zig");
 const scheduler = @import("proc/scheduler.zig");
 const process = @import("proc/process.zig");
 const tty = @import("drivers/tty.zig");
+const pipe = @import("ipc/pipe.zig");
 const pci = @import("drivers/pci.zig");
 const driver_manager = @import("drivers/manager.zig");
 const tap_suite = @import("boot/tap_suite.zig");
@@ -84,6 +85,7 @@ pub fn init(ctx: BootContext) void {
     syscall.init();
     process.init();
     tty.init();
+    pipe.init();
     initApic(ctx.rsdp_virt);
     initPci(ctx.rsdp_virt);
     initBlock();

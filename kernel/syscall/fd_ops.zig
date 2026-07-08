@@ -3,6 +3,7 @@ const devfs = @import("../fs/devfs.zig");
 const socket = @import("../net/socket.zig");
 const tty = @import("../drivers/tty.zig");
 const vfs = @import("../fs/vfs.zig");
+const pipe = @import("../ipc/pipe.zig");
 const errno = @import("errno.zig");
 
 pub fn read(fd: u64, slot: *process.Fd, buf: []u8) i64 {
@@ -28,6 +29,16 @@ pub fn read(fd: u64, slot: *process.Fd, buf: []u8) i64 {
             const n = vfs.read(handle, buf) catch |err| return errno.fromVfs(err);
             return @intCast(n);
         },
+        .pipe_fd => |pfd| {
+            const n = pipe.read(pfd.handle, buf) catch |err| {
+                return switch (err) {
+                    pipe.PipeError.BrokenPipe => 0,
+                    pipe.PipeError.WouldBlock => errno.EAGAIN,
+                    pipe.PipeError.TooManyPipes => errno.EIO,
+                };
+            };
+            return @intCast(n);
+        },
         .socket, .none => errno.EBADF,
     };
 }
@@ -49,6 +60,19 @@ pub fn write(fd: u64, slot: *process.Fd, buf: []const u8) i64 {
             const n = vfs.write(handle, buf) catch |err| return errno.fromVfs(err);
             return @intCast(n);
         },
+        .pipe_fd => |pfd| {
+            if (!pfd.is_read) {
+                const n = pipe.write(pfd.handle, buf) catch |err| {
+                    return switch (err) {
+                        pipe.PipeError.BrokenPipe => errno.EPIPE,
+                        pipe.PipeError.WouldBlock => errno.EAGAIN,
+                        pipe.PipeError.TooManyPipes => errno.EIO,
+                    };
+                };
+                return @intCast(n);
+            }
+            return errno.EBADF;
+        },
         .socket, .none => errno.EBADF,
     };
 }
@@ -62,6 +86,15 @@ pub fn close(slot: *process.Fd) i64 {
         },
         .socket => |handle| {
             socket.close(handle);
+            slot.* = .none;
+            return 0;
+        },
+        .pipe_fd => |pfd| {
+            if (pfd.is_read) {
+                pipe.closeRead(pfd.handle);
+            } else {
+                pipe.closeWrite(pfd.handle);
+            }
             slot.* = .none;
             return 0;
         },

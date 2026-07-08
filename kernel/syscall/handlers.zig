@@ -11,6 +11,7 @@ const socket = @import("../net/socket.zig");
 const net_info = @import("../net/info.zig");
 const hw_info = @import("../hw/info.zig");
 const hal = @import("../hal.zig");
+const pipe = @import("../ipc/pipe.zig");
 const abi_fs = @import("abi_fs");
 const abi_syscall = @import("abi_syscall");
 const errno = @import("errno.zig");
@@ -49,6 +50,9 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.stat => sysStat(frame.arg0, frame.arg1),
         numbers.lseek => sysLseek(frame.arg0, @bitCast(@as(i64, @intCast(frame.arg1))), @truncate(frame.arg2)),
         numbers.brk => sysBrk(frame.arg0),
+        numbers.pipe => sysPipe(frame.arg0),
+        numbers.dup => sysDup(frame.arg0),
+        numbers.dup2 => sysDup2(frame.arg0, frame.arg1),
         numbers.getpid => sysGetpid(),
         numbers.fork => sysFork(frame),
         numbers.execve => sysExecve(frame.arg0, frame.arg1, frame.arg2),
@@ -176,6 +180,7 @@ fn sysGetpid() i64 {
 }
 
 fn sysFork(frame: *Frame) i64 {
+    hal.console.println("sysFork rip=0x{x}", .{frame.user_rip});
     const ctx = user_fork_ctx.ForkUserContext.captureFromFrame(frame.*);
     return user_fork.forkFromSyscall(ctx);
 }
@@ -424,6 +429,75 @@ fn sysGetmemregions(buf_ptr: u64, max: u64) i64 {
     const count = hw_info.fillMemRegions(buf[0..cap]);
     copy_out.copyOut(buf_ptr, std.mem.sliceAsBytes(buf[0..count])) catch return errno.EFAULT;
     return @intCast(count);
+}
+
+fn sysPipe(fd_ptr: u64) i64 {
+    if (fd_ptr == 0) return errno.EFAULT;
+    const out = user.outPtr([2]i32, fd_ptr) orelse return errno.EFAULT;
+
+    const handle = pipe.create() catch |err| switch (err) {
+        pipe.PipeError.TooManyPipes => return errno.EMFILE,
+        else => return errno.EIO,
+    };
+
+    const proc = fdtab.currentProcess() catch return errno.EPERM;
+
+    const read_fd = fdtab.alloc(proc) catch {
+        pipe.closeRead(handle);
+        pipe.closeWrite(handle);
+        return errno.EMFILE;
+    };
+    proc.fds.fds[read_fd] = .{ .pipe_fd = .{ .handle = handle, .is_read = true } };
+
+    const write_fd = fdtab.alloc(proc) catch {
+        proc.fds.fds[read_fd] = .none;
+        pipe.closeRead(handle);
+        pipe.closeWrite(handle);
+        return errno.EMFILE;
+    };
+    proc.fds.fds[write_fd] = .{ .pipe_fd = .{ .handle = handle, .is_read = false } };
+
+    out.* = .{ @intCast(read_fd), @intCast(write_fd) };
+    return 0;
+}
+
+fn sysDup(old_fd: u64) i64 {
+    if (old_fd >= process.max_fds) return errno.EBADF;
+    const proc = fdtab.currentProcess() catch return errno.EPERM;
+    _ = fdtab.slot(proc, old_fd) catch return errno.EBADF;
+
+    const new_fd = fdtab.alloc(proc) catch return errno.EMFILE;
+    const old_entry = proc.fds.fds[@intCast(old_fd)];
+    proc.fds.fds[new_fd] = old_entry;
+
+    switch (old_entry) {
+        .pipe_fd => |pfd| pipe.dupRef(pfd.handle),
+        else => {},
+    }
+
+    return @intCast(new_fd);
+}
+
+fn sysDup2(old_fd: u64, new_fd: u64) i64 {
+    if (old_fd >= process.max_fds or new_fd >= process.max_fds) return errno.EBADF;
+    if (old_fd == new_fd) return @intCast(new_fd);
+
+    const proc = fdtab.currentProcess() catch return errno.EPERM;
+    const old_entry = fdtab.slot(proc, old_fd) catch return errno.EBADF;
+
+    // If new_fd is open, close it first
+    if (proc.fds.fds[@intCast(new_fd)] != .none) {
+        _ = fd_ops.close(&proc.fds.fds[@intCast(new_fd)]);
+    }
+
+    proc.fds.fds[@intCast(new_fd)] = old_entry.*;
+
+    switch (old_entry.*) {
+        .pipe_fd => |pfd| pipe.dupRef(pfd.handle),
+        else => {},
+    }
+
+    return @intCast(new_fd);
 }
 
 fn sysExit(status: u64) i64 {

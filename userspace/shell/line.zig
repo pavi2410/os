@@ -2,6 +2,7 @@ const argv = @import("argv.zig");
 const expand = @import("expand.zig");
 const io = @import("io.zig");
 const prefix_env = @import("prefix_env.zig");
+const redirect = @import("redirect.zig");
 const registry = @import("cmd/registry.zig");
 
 /// Return effective line length after stripping an unquoted `#` comment.
@@ -63,7 +64,7 @@ pub fn segmentCount(buf: []const u8, len: usize) usize {
     return count;
 }
 
-const Op = enum { and_op, or_op };
+const Op = enum { and_op, or_op, pipe_op };
 
 const max_chain_parts = 8;
 
@@ -97,6 +98,7 @@ fn runSegment(segment: []u8, expand_bufs: *[argv.max_args][expand.max_arg_len]u8
             switch (ops[i - 1]) {
                 .and_op => if (exit_code != 0) continue,
                 .or_op => if (exit_code == 0) continue,
+                .pipe_op => {},
             }
         }
 
@@ -137,13 +139,17 @@ fn splitByOperators(
 fn matchOperator(segment: []const u8, i: usize) ?Op {
     if (isQuotedAt(segment, i)) return null;
     if (i + 1 < segment.len and segment[i] == '&' and segment[i + 1] == '&') return .and_op;
-    if (i + 1 < segment.len and segment[i] == '|' and segment[i + 1] == '|') return .or_op;
+    if (i + 1 < segment.len and segment[i] == '|') {
+        if (segment[i + 1] == '|') return .or_op;
+        return .pipe_op;
+    }
     return null;
 }
 
 fn operatorLen(op: Op) usize {
     return switch (op) {
         .and_op, .or_op => 2,
+        .pipe_op => 1,
     };
 }
 
@@ -204,4 +210,10 @@ fn trimTrailing(buf: []u8, end: usize) usize {
     var len = end;
     while (len > 0 and buf[len - 1] == ' ') len -= 1;
     return len;
+}
+
+fn runPipeline(segment: []u8, parts: []PartRange, ops: []Op, part_count: usize, expand_bufs: *[argv.max_args][expand.max_arg_len]u8) u8 {
+    _ = ops;
+    const pipeline = @import("pipeline.zig");
+    return pipeline.run(segment, parts, part_count, expand_bufs);
 }

@@ -1,6 +1,7 @@
 pub const max_fds = 32;
 
 const devfs = @import("../fs/devfs.zig");
+const pipe = @import("../ipc/pipe.zig");
 
 pub const DeviceFd = struct {
     kind: devfs.Device,
@@ -14,6 +15,7 @@ pub const Fd = union(enum) {
     file: u32,
     device: DeviceFd,
     socket: u32,
+    pipe_fd: pipe.PipeFd,
 };
 
 /// Per-process file descriptor table.

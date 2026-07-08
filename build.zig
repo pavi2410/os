@@ -355,8 +355,12 @@ pub fn build(b: *std.Build) void {
     crash_test_mod.addImport("crash_util", crash_util_host_mod);
     const run_crash_tests = helpers.runHostTest(b, crash_test_mod);
 
+
+    const pipe_host_mod = helpers.hostModule(b, "kernel/ipc/pipe.zig");
+
     const fd_table_host_mod = helpers.hostModule(b, "kernel/proc/fd_table.zig");
     fd_table_host_mod.addImport("../fs/devfs.zig", devfs_host_mod);
+    fd_table_host_mod.addImport("../ipc/pipe.zig", pipe_host_mod);
 
     const fd_table_test_mod = helpers.hostTestModule(b, "test/kernel/fd_table_test.zig");
     fd_table_test_mod.addImport("fd_table", fd_table_host_mod);

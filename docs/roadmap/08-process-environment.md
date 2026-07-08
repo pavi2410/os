@@ -15,7 +15,7 @@ Interaction today is entirely over **serial**: shell, `curl` output, kernel pani
 - ~~`cd`/`pwd` are **shell-local**~~ — kernel `chdir`/`getcwd` and shell wrappers (done)
 - ~~No **environment variables**~~ — `execve` delivers `envp`; shell `export` and `PATH` lookup (done)
 - ~~No **`PATH`**~~ — shell searches colon-separated `PATH` (done)
-- No **pipes** or FD duplication — no `cmd | cmd`, redirects, or `2>&1`
+- ~~No **pipes** or FD duplication~~ — `pipe` syscall, shell `|` pipelines, `>` / `2>&1` redirects (done)
 - **Init is the shell** ([`kernel/proc/init_shell.zig`](../../kernel/proc/init_shell.zig)) — no PID 1 reap loop or service spawning
 - ~~No **`/dev`** nodes~~ — kernel devfs exposes `/dev/null`, `/dev/zero`, `/dev/ttyS0` (done)
 
@@ -83,11 +83,11 @@ Polish this layer before `mmap`, ext2, and SMP.
 
 ### IPC and file descriptors
 
-- [ ] `pipe` / `pipe2` — ring buffer between two FDs
-- [ ] `dup`, `dup2`, `fcntl(F_DUPFD, …)` — FD table manipulation
-- [ ] Shell pipelines: `ls | wc` (even if `wc` is a stub)
-- [ ] Shell redirects: `>`, `>>`, `2>&1` (stretch: heredocs)
-- [ ] `fork` inherits pipe FDs correctly; `execve` preserves them
+- [x] `pipe` / `pipe2` — ring buffer between two FDs
+- [x] `dup`, `dup2` — FD table manipulation (no `fcntl(F_DUPFD)` yet)
+- [x] Shell pipelines: `ls | wc` (even if `wc` is a stub)
+- [x] Shell redirects: `>`, `>>`, `2>`, `2>>`, `2>&1`, `<` (no heredocs)
+- [x] `fork` inherits pipe FDs correctly; `execve` preserves them
 
 ### Signals (minimal Linux subset)
 
@@ -132,7 +132,7 @@ Polish this layer before `mmap`, ext2, and SMP.
 3. **Kernel cwd** — `cd` in shell affects child `open("relative")` after `execve`.
 4. **Environment** — `execve` delivers non-empty `envp`; child can read `getenv("PATH")` (and at least one custom variable).
 5. **`PATH` lookup** — bare command name resolves via `PATH` (default includes `/BIN`); explicit absolute paths still work.
-6. **Pipes and redirects** work for at least one pipeline and one output redirect.
+6. **Pipes and redirects** work for at least one pipeline and one output redirect. ✅
 7. **`/dev/null`** — writes discarded; reads return EOF.
 8. **PID 1** reaps orphans; shell runs as a child of init.
 9. **Serial remains the recommended interface** in README; GUI is not required for daily development.

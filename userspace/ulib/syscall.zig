@@ -25,6 +25,18 @@ pub fn close(fd: u32) isize {
     return syscall6(abi_syscall.close, fd, 0, 0, 0, 0, 0);
 }
 
+pub fn pipe(fds: *[2]i32) isize {
+    return syscall6(abi_syscall.pipe, @intFromPtr(fds), 0, 0, 0, 0, 0);
+}
+
+pub fn dup(old_fd: u32) isize {
+    return syscall6(abi_syscall.dup, old_fd, 0, 0, 0, 0, 0);
+}
+
+pub fn dup2(old_fd: u32, new_fd: u32) isize {
+    return syscall6(abi_syscall.dup2, old_fd, new_fd, 0, 0, 0, 0);
+}
+
 pub fn lseek(fd: u32, offset: i64, whence: u32) isize {
     return syscall6(abi_syscall.lseek, fd, @bitCast(@as(u64, @intCast(offset))), whence, 0, 0, 0);
 }
@@ -197,3 +209,4 @@ fn syscall6(
           [arg5] "{r9}" (arg5),
         : .{ .rcx = true, .r11 = true, .memory = true });
 }
+
