@@ -5,6 +5,7 @@ pub const std_options = std_root.std_options;
 const arg = @import("argv.zig");
 const cwd = @import("cwd.zig");
 const environ = @import("environ.zig");
+const expand = @import("expand.zig");
 const io = @import("io.zig");
 const ulib = @import("ulib");
 const registry = @import("cmd/registry.zig");
@@ -22,17 +23,22 @@ export fn main(argc: usize, raw_argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }
     io.writeStr("Simple shell ready. Type 'help'.\n");
 
     var line: [256]u8 = undefined;
+    var expand_bufs: [arg.max_args][expand.max_arg_len]u8 = undefined;
     while (true) {
         writePrompt();
 
         const n = ulib.io.readStdin(&line);
         if (n <= 0) continue;
 
-        const parsed = arg.parse(&line, @intCast(n)) catch {
+        var parsed = arg.parse(&line, @intCast(n)) catch {
             io.writeStr("too many arguments\n");
             continue;
         };
         if (parsed.argc == 0) continue;
+        if (!expand.expandArgv(&parsed, &expand_bufs)) {
+            io.writeStr("expansion failed\n");
+            continue;
+        }
 
         const cmd = parsed.cmd().?;
         registry.dispatch(cmd, &parsed);

@@ -36,3 +36,16 @@ test "expand handles multiple variables" {
     const result = expand.expandWith("$FOO:$PATH", &out, mockLookup).?;
     try std.testing.expectEqualStrings("bar:/BIN", result);
 }
+
+test "expandArgv expands each parsed token" {
+    const argv = @import("argv");
+
+    var parsed: argv.Parsed = .{};
+    parsed.argc = 2;
+    parsed.args[0] = "ls";
+    parsed.args[1] = "$PATH";
+    var storage: [argv.max_args][expand.max_arg_len]u8 = undefined;
+    try std.testing.expect(expand.expandArgvWith(&parsed, &storage, mockLookup));
+    try std.testing.expectEqualStrings("ls", parsed.args[0]);
+    try std.testing.expectEqualStrings("/BIN", parsed.args[1]);
+}

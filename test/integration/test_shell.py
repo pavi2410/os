@@ -164,6 +164,10 @@ class TestShellEnvironment:
     def test_path_lookup(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "lscpu", "Architecture:", case="PATH resolves lscpu")
 
+    def test_ls_home_expansion(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "ls $HOME", "README.TXT", case="ls HOME")
+        run_case(shell_session, "ls $HOME/BIN", "SHELL", case="ls HOME/BIN")
+
 
 class TestShellDevfs:
     def test_devtest(self, shell_session: QemuShell) -> None:

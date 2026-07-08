@@ -1,6 +1,26 @@
+const argv = @import("argv.zig");
 const environ = @import("environ.zig");
 
+pub const max_arg_len = 256;
 pub const LookupFn = *const fn (name: []const u8) ?[]const u8;
+
+pub fn expandArgv(parsed: *argv.Parsed, storage: *[argv.max_args][max_arg_len]u8) bool {
+    return expandArgvWith(parsed, storage, environ.getValue);
+}
+
+pub fn expandArgvWith(
+    parsed: *argv.Parsed,
+    storage: *[argv.max_args][max_arg_len]u8,
+    lookup: LookupFn,
+) bool {
+    var i: usize = 0;
+    while (i < parsed.argc) : (i += 1) {
+        const expanded = expandWith(parsed.args[i], &storage[i], lookup) orelse return false;
+        storage[i][expanded.len] = 0;
+        parsed.args[i] = expanded;
+    }
+    return true;
+}
 
 pub fn expand(input: []const u8, out: []u8) ?[]const u8 {
     return expandWith(input, out, environ.getValue);

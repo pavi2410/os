@@ -382,12 +382,15 @@ pub fn build(b: *std.Build) void {
     environ_test_mod.addImport("environ", ulib_environ_host);
     const run_environ_tests = helpers.runHostTest(b, environ_test_mod);
 
+    const shell_argv_host = helpers.hostModule(b, "userspace/shell/argv.zig");
     const shell_environ_stub = helpers.hostModule(b, "test/stub/shell_environ_stub.zig");
     const shell_expand_host = helpers.hostModule(b, "userspace/shell/expand.zig");
+    shell_expand_host.addImport("argv.zig", shell_argv_host);
     shell_expand_host.addImport("environ", shell_environ_stub);
 
     const shell_expand_test_mod = helpers.hostTestModule(b, "test/userspace/shell_expand_test.zig");
     shell_expand_test_mod.addImport("expand", shell_expand_host);
+    shell_expand_test_mod.addImport("argv", shell_argv_host);
     const run_shell_expand_tests = helpers.runHostTest(b, shell_expand_test_mod);
 
     const ulib_helpers_test_mod = helpers.hostTestModule(b, "test/userspace/ulib_helpers_test.zig");

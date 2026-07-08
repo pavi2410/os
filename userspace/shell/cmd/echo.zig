@@ -1,5 +1,4 @@
 const argv = @import("../argv.zig");
-const expand = @import("../expand.zig");
 const io = @import("../io.zig");
 
 pub fn run(parsed: *const argv.Parsed) void {
@@ -8,14 +7,8 @@ pub fn run(parsed: *const argv.Parsed) void {
         return;
     }
 
-    var raw: [192]u8 = undefined;
-    const joined = parsed.joinPositionalsFrom(&raw, 0) catch {
-        io.writeStr("echo: text too long\n");
-        return;
-    };
-
-    var expanded: [256]u8 = undefined;
-    const text = expand.expand(joined, &expanded) orelse {
+    var buf: [192]u8 = undefined;
+    const text = parsed.joinPositionalsFrom(&buf, 0) catch {
         io.writeStr("echo: text too long\n");
         return;
     };
