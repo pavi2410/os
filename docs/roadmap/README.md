@@ -1,6 +1,6 @@
 # Kernel roadmap
 
-Phased plan for kernel development after the Limine bootloader. Phases 0–5 are complete; phases 6–14 are the active forward plan in execution order.
+Phased plan for kernel development after the Limine bootloader. Phases 0–5 and 7 are complete; phases 6 and 8–14 are the active forward plan in execution order.
 
 | Phase | Document | Status | Summary |
 |-------|----------|--------|---------|
@@ -11,7 +11,7 @@ Phased plan for kernel development after the Limine bootloader. Phases 0–5 are
 | 4 | [04-userspace.md](04-userspace.md) | Done | ELF loader, TTY, shell, fork/exec |
 | 5 | [05-io-stack.md](05-io-stack.md) | Done | VirtIO block/net, FAT32, sockets, user tools |
 | 6 | [06-testing-and-quality.md](06-testing-and-quality.md) | **Next** | Automated tests, ABI guards, CI gate |
-| 7 | [07-copy-on-write-fork.md](07-copy-on-write-fork.md) | Planned | COW fork, shared pages, fault promotion |
+| 7 | [07-copy-on-write-fork.md](07-copy-on-write-fork.md) | Done | COW fork, shared pages, fault promotion |
 | 8 | [08-process-environment.md](08-process-environment.md) | Planned | Signals, IPC, cwd, env, PATH, init, devfs, TTY |
 | 9 | [09-virtual-memory-and-page-cache.md](09-virtual-memory-and-page-cache.md) | Planned | `mmap`, demand paging, page cache, W^X |
 | 10 | [10-filesystems-ext2-tmpfs.md](10-filesystems-ext2-tmpfs.md) | Planned | ext2, `mount`, tmpfs, permissions, VFS ops |
@@ -22,7 +22,7 @@ Phased plan for kernel development after the Limine bootloader. Phases 0–5 are
 
 **Current focus:** [Phase 6 — Testing and quality](06-testing-and-quality.md)
 
-**Hard gates:** do not start phase 13 (SMP) until phase 7 (COW) and phase 12 (preemption) are done on one CPU. GUI ([phase 14](14-gui.md)) follows SMP.
+**Hard gates:** do not start phase 13 (SMP) until phase 7 (COW — done) and phase 12 (preemption) are done on one CPU. GUI ([phase 14](14-gui.md)) follows SMP.
 
 See also the high-level checklist in the [project README](../../README.md#-roadmap).
 

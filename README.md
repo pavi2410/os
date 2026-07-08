@@ -11,7 +11,7 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 * Higher-half kernel with page tables, physical/virtual/heap allocators
 * APIC (LAPIC + IOAPIC), LAPIC timer, round-robin scheduler, `syscall`/`sysret`
 * ELF64 user program loader, ring-3 execution, serial TTY (canonical mode + basic ANSI)
-* Syscalls: `read`, `write`, `open` (`O_CREAT`, `O_TRUNC`, `O_APPEND`), `close`, `lseek`, `stat`, `brk`, `getpid`, `fork`, `execve`, `wait4`, `unlink`, `mkdir`, `rmdir`, `getdents64`, `clock_gettime`, `exit`/`exit_group`
+* Syscalls: `read`, `write`, `open` (`O_CREAT`, `O_TRUNC`, `O_APPEND`), `close`, `lseek`, `stat`, `brk`, `getpid`, `fork` (copy-on-write), `execve`, `wait4`, `unlink`, `mkdir`, `rmdir`, `getdents64`, `clock_gettime`, `exit`/`exit_group`
 * PCI enumeration (legacy I/O ports on QEMU q35), VirtIO-blk read/write, FAT32 VFS (read/write/create/truncate/append)
 * VirtIO-net with ARP, IPv4, UDP, ICMP echo, minimal TCP client sockets, and DNS A-record resolution
 * Userspace programs on the VirtIO FAT disk (`/README.TXT`, `/BIN/shell`, `/BIN/dig`, …)
@@ -21,7 +21,7 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 
 **Next up** (see [docs/roadmap/](docs/roadmap/))
 
-Phase 6 — testing, COW fork, process environment (IPC/cwd/init/devfs), virtual memory, ext2/tmpfs, procfs, preemption, SMP, and GUI.
+Phase 6 — testing and quality; then process environment (IPC/cwd/init/devfs), virtual memory, ext2/tmpfs, procfs, preemption, SMP, and GUI.
 
 ## 🚀 Goals
 
@@ -162,7 +162,7 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 | 4 — Userspace | Done | ELF loader, TTY, shell, fork/exec |
 | 5 — I/O stack | Done | VirtIO, FAT32, TCP/UDP, sockets, `ip`/`curl`/`dig`, hw tools |
 | 6 — Testing | **Next** | ABI tests, shell integration tests, CI gate |
-| 7 — COW fork | Planned | Shared mappings, write fault promotion |
+| 7 — COW fork | Done | Shared mappings, write fault promotion |
 | 8 — Process env | Planned | Signals, pipes, cwd, env, PATH, init, devfs, TTY |
 | 9 — Virtual memory | Planned | `mmap`, page cache, demand paging, W^X |
 | 10 — Filesystems | Planned | ext2, `mount`, tmpfs, permissions, rename/symlink |

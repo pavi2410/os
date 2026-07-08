@@ -33,7 +33,7 @@
 - [x] Add minimal libc or freestanding syscall wrappers for user programs
 - [x] Shell reads input and executes programs (built-in `exit`/`help` OK)
 - [x] Linux `fork` / `execve` / `wait4` (replaced OS-specific `spawn` / syscall 548)
-  - [x] `fork` (57) — eager address-space copy (see COW note below)
+  - [x] `fork` (57) — copy-on-write address space (see [phase 7](07-copy-on-write-fork.md))
   - [x] `execve` (59)
   - [x] `wait4` (61)
   - [x] Shell runs `/BIN/*` via fork + execve + waitpid
@@ -57,5 +57,5 @@
 - Full Linux ABI compatibility is a long-term goal; document deviations.
 - FAT root (already used for boot) is sufficient for loading the first user binaries.
 - Filesystem abstraction can be thin — open by path from FAT is acceptable for this phase.
-- **`fork` uses eager page copy**, not copy-on-write — temporary; see [Phase 7 — Copy-on-write fork](07-copy-on-write-fork.md).
+- **`fork` uses copy-on-write** — see [Phase 7 — Copy-on-write fork](07-copy-on-write-fork.md) (complete).
 - **Process launch** uses Linux `fork` / `execve` / `wait4`. The old `spawn` syscall (548) was removed once the shell migrated.
