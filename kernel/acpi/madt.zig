@@ -1,5 +1,5 @@
 const access = @import("access.zig");
-const bytes = @import("common_bytes");
+const bytes = @import("common/bytes");
 
 pub const IoApic = struct {
     id: u8,

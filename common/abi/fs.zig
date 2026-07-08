@@ -1,4 +1,4 @@
-const view = @import("common_view");
+const view = @import("common/view");
 
 pub const O_RDONLY: u32 = 0;
 pub const O_WRONLY: u32 = 0o1;

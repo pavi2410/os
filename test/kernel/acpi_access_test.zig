@@ -1,5 +1,5 @@
 const std = @import("std");
-const acpi_sig = @import("common_acpi_sig");
+const acpi_sig = @import("common/acpi_sig");
 
 test "sigEq4At accepts comptime string literal signatures" {
     const table = "XSDT" ++ [_]u8{0} ** 32;

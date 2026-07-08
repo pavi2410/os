@@ -1,6 +1,6 @@
 const config = @import("../config.zig");
 const hal = @import("../../hal.zig");
-const ipv4_addr = @import("common_ipv4_addr");
+const ipv4_addr = @import("common/ipv4_addr");
 const link = @import("../link.zig");
 const pump = @import("../pump.zig");
 const resolve = @import("../resolve.zig");

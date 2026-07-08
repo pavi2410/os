@@ -1,9 +1,9 @@
 const arp = @import("arp.zig");
 const config = @import("config.zig");
 const ethernet = @import("ethernet.zig");
-const ipv4_addr = @import("common_ipv4_addr");
+const ipv4_addr = @import("common/ipv4_addr");
 const link = @import("link.zig");
-const mac = @import("common_mac");
+const mac = @import("common/mac");
 
 const cache_size = 8;
 

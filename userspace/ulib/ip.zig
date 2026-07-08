@@ -1,4 +1,4 @@
-const ip_addr = @import("common_ipv4_addr");
+const ip_addr = @import("common/ipv4_addr");
 
 pub fn parseIpv4(text: []const u8, out: *[4]u8) bool {
     const parsed = ip_addr.Addr.parseText(text) orelse return false;
@@ -11,7 +11,7 @@ pub fn formatIpv4(addr: [4]u8, out: []u8) ?[]const u8 {
 }
 
 pub fn formatMac(addr: [6]u8, out: []u8) ?[]const u8 {
-    return @import("common_mac").Mac.fromOctets(addr).formatBuf(out);
+    return @import("common/mac").Mac.fromOctets(addr).formatBuf(out);
 }
 
 pub fn networkAddr(addr: [4]u8, mask: [4]u8) [4]u8 {

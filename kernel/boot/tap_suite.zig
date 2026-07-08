@@ -1,6 +1,6 @@
 const hal = @import("../hal.zig");
 const physical = @import("../mm/physical.zig");
-const tap_mod = @import("common_tap");
+const tap_mod = @import("common/tap");
 const udp_test = @import("../net/udp_test.zig");
 const vfs = @import("../fs/vfs.zig");
 

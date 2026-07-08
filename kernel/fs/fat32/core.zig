@@ -1,4 +1,4 @@
-const bytes = @import("common_bytes");
+const bytes = @import("common/bytes");
 const block = @import("../../drivers/block.zig");
 const filesystem = @import("../filesystem.zig");
 

@@ -1,6 +1,6 @@
 const address = @import("../mm/address.zig");
-const bytes = @import("common_bytes");
-const acpi_sig = @import("common_acpi_sig");
+const bytes = @import("common/bytes");
+const acpi_sig = @import("common/acpi_sig");
 
 pub fn physBytes(phys: u64) [*]const u8 {
     return @ptrFromInt(address.physToVirt(phys));

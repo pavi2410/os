@@ -1,10 +1,10 @@
 const std = @import("std");
-const view = @import("common_view");
+const view = @import("common/view");
 const ethernet = @import("ethernet.zig");
 const icmp = @import("icmp.zig");
 const ipv4 = @import("ipv4.zig");
-const ip_addr = @import("common_ipv4_addr");
-const mac = @import("common_mac");
+const ip_addr = @import("common/ipv4_addr");
+const mac = @import("common/mac");
 
 test "matchEchoReply rejects inflated IP total length" {
     var frame: [80]u8 = undefined;

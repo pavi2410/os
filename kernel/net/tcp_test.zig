@@ -1,8 +1,8 @@
 const std = @import("std");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
-const ip_addr = @import("common_ipv4_addr");
-const mac = @import("common_mac");
+const ip_addr = @import("common/ipv4_addr");
+const mac = @import("common/mac");
 const tcp = @import("tcp.zig");
 
 test "parseSegment reads SYN-ACK with MSS option" {

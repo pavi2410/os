@@ -1,5 +1,5 @@
 const std = @import("std");
-const hex = @import("common_hex");
+const hex = @import("common/hex");
 
 pub const len = 6;
 

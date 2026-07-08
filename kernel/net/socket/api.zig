@@ -1,5 +1,5 @@
 const pump = @import("../pump.zig");
-const ipv4_addr = @import("common_ipv4_addr");
+const ipv4_addr = @import("common/ipv4_addr");
 const abi_net = @import("abi_net");
 
 pub const AF_INET = abi_net.AF_INET;

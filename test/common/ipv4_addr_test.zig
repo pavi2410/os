@@ -1,5 +1,5 @@
 const std = @import("std");
-const ip = @import("common_ipv4_addr");
+const ip = @import("common/ipv4_addr");
 
 test "Addr parse and format" {
     const addr = ip.Addr.parse("10.0.2.15");

@@ -1,5 +1,5 @@
 const std = @import("std");
-const view = @import("common_view");
+const view = @import("common/view");
 
 const Sample = extern struct {
     a: u32,

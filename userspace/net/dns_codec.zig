@@ -1,5 +1,5 @@
 /// Pure DNS message helpers (no syscalls; host-testable).
-const bytes = @import("common_bytes");
+const bytes = @import("common/bytes");
 
 pub const Answer = struct {
     name_off: usize,

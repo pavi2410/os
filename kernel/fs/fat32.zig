@@ -1,5 +1,5 @@
 const std = @import("std");
-const bytes = @import("common_bytes");
+const bytes = @import("common/bytes");
 const block = @import("../drivers/block.zig");
 const core = @import("fat32/core.zig");
 const dir = @import("fat32/dir.zig");

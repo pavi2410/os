@@ -1,5 +1,5 @@
 const std = @import("std");
-const bytes = @import("common_bytes");
+const bytes = @import("common/bytes");
 
 test "big endian integer helpers" {
     var buf: [8]u8 = .{0} ** 8;

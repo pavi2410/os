@@ -1,5 +1,5 @@
 const ethernet = @import("ethernet.zig");
-const mac = @import("common_mac");
+const mac = @import("common/mac");
 const net_device = @import("../drivers/net_device.zig");
 
 pub const max_frame_len = ethernet.max_frame_len;

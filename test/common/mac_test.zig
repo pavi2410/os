@@ -1,5 +1,5 @@
 const std = @import("std");
-const mac_mod = @import("common_mac");
+const mac_mod = @import("common/mac");
 
 test "Mac comptime constructors and formatting" {
     const mac = mac_mod.Mac.parse("52:54:00:12:34:56");

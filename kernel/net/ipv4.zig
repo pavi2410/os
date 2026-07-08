@@ -1,5 +1,5 @@
-const ip = @import("common_ipv4_addr");
-const view = @import("common_view");
+const ip = @import("common/ipv4_addr");
+const view = @import("common/view");
 
 pub const header_len = 20;
 

@@ -27,18 +27,18 @@ pub fn build(b: *std.Build) void {
     const common_bytes_user = helpers.exeModule(b, "common/bytes.zig", user_target, user_optimize);
     const common_hex_user = helpers.exeModule(b, "common/hex.zig", user_target, user_optimize);
     const common_mac_user = helpers.exeModule(b, "common/mac.zig", user_target, user_optimize);
-    common_mac_user.addImport("common_hex", common_hex_user);
+    common_mac_user.addImport("common/hex", common_hex_user);
     const common_ipv4_addr_user = helpers.exeModule(b, "common/ipv4_addr.zig", user_target, user_optimize);
     const common_view_user = helpers.exeModule(b, "common/view.zig", user_target, user_optimize);
     abi_user.attachFsView(common_view_user);
 
     const user_ulib = helpers.exeModule(b, "userspace/ulib/mod.zig", user_target, user_optimize);
-    user_ulib.addImport("common_mac", common_mac_user);
-    user_ulib.addImport("common_ipv4_addr", common_ipv4_addr_user);
+    user_ulib.addImport("common/mac", common_mac_user);
+    user_ulib.addImport("common/ipv4_addr", common_ipv4_addr_user);
     abi_user.attachTo(user_ulib);
 
     const dns_codec_user = helpers.exeModule(b, "userspace/net/dns_codec.zig", user_target, user_optimize);
-    dns_codec_user.addImport("common_bytes", common_bytes_user);
+    dns_codec_user.addImport("common/bytes", common_bytes_user);
     user_ulib.addImport("dns_codec", dns_codec_user);
 
     const std_root = helpers.exeModule(b, "userspace/std_root.zig", user_target, user_optimize);
@@ -66,7 +66,7 @@ pub fn build(b: *std.Build) void {
     const common_tap_user = helpers.exeModule(b, "common/tap.zig", user_target, user_optimize);
     const utest_tap = helpers.exeModule(b, "userspace/utest/tap.zig", user_target, user_optimize);
     utest_tap.addImport("ulib", user_ulib);
-    utest_tap.addImport("common_tap", common_tap_user);
+    utest_tap.addImport("common/tap", common_tap_user);
 
     const utest = b.addExecutable(.{
         .name = "utest",
@@ -76,11 +76,11 @@ pub fn build(b: *std.Build) void {
     utest.root_module.link_libc = false;
     utest.root_module.addImport("ulib", user_ulib);
     utest.root_module.addImport("std_root", std_root);
-    utest.root_module.addImport("common_bytes", common_bytes_user);
+    utest.root_module.addImport("common/bytes", common_bytes_user);
     utest.root_module.addImport("dns_codec", dns_codec_user);
     utest.root_module.addImport("utest_tap", utest_tap);
     const utest_tests = helpers.exeModule(b, "userspace/utest/tests.zig", user_target, user_optimize);
-    utest_tests.addImport("common_bytes", common_bytes_user);
+    utest_tests.addImport("common/bytes", common_bytes_user);
     utest_tests.addImport("dns_codec", dns_codec_user);
     utest_tests.addImport("utest_tap", utest_tap);
     utest.root_module.addImport("tests", utest_tests);
@@ -88,7 +88,7 @@ pub fn build(b: *std.Build) void {
 
     const cowtest_tap = helpers.exeModule(b, "userspace/cowtest/tap.zig", user_target, user_optimize);
     cowtest_tap.addImport("ulib", user_ulib);
-    cowtest_tap.addImport("common_tap", common_tap_user);
+    cowtest_tap.addImport("common/tap", common_tap_user);
 
     const cowtest = b.addExecutable(.{
         .name = "cowtest",
@@ -162,19 +162,19 @@ pub fn build(b: *std.Build) void {
     const common_bytes_kernel = helpers.exeModule(b, "common/bytes.zig", kernel_target, optimize);
     const common_hex_kernel = helpers.exeModule(b, "common/hex.zig", kernel_target, optimize);
     const common_mac_kernel = helpers.exeModule(b, "common/mac.zig", kernel_target, optimize);
-    common_mac_kernel.addImport("common_hex", common_hex_kernel);
+    common_mac_kernel.addImport("common/hex", common_hex_kernel);
     const common_ipv4_addr_kernel = helpers.exeModule(b, "common/ipv4_addr.zig", kernel_target, optimize);
     const common_acpi_sig_kernel = helpers.exeModule(b, "common/acpi_sig.zig", kernel_target, optimize);
     const common_view_kernel = helpers.exeModule(b, "common/view.zig", kernel_target, optimize);
     abi_kernel.attachFsView(common_view_kernel);
     abi_kernel.attachTo(kernel_mod);
-    kernel_mod.addImport("common_bytes", common_bytes_kernel);
-    kernel_mod.addImport("common_hex", common_hex_kernel);
-    kernel_mod.addImport("common_mac", common_mac_kernel);
-    kernel_mod.addImport("common_ipv4_addr", common_ipv4_addr_kernel);
-    kernel_mod.addImport("common_acpi_sig", common_acpi_sig_kernel);
-    kernel_mod.addImport("common_view", common_view_kernel);
-    kernel_mod.addImport("common_tap", helpers.exeModule(b, "common/tap.zig", kernel_target, optimize));
+    kernel_mod.addImport("common/bytes", common_bytes_kernel);
+    kernel_mod.addImport("common/hex", common_hex_kernel);
+    kernel_mod.addImport("common/mac", common_mac_kernel);
+    kernel_mod.addImport("common/ipv4_addr", common_ipv4_addr_kernel);
+    kernel_mod.addImport("common/acpi_sig", common_acpi_sig_kernel);
+    kernel_mod.addImport("common/view", common_view_kernel);
+    kernel_mod.addImport("common/tap", helpers.exeModule(b, "common/tap.zig", kernel_target, optimize));
     kernel_mod.addImport("time_unix", helpers.exeModule(b, "common/time_unix.zig", kernel_target, optimize));
 
     const kernel = b.addExecutable(.{
@@ -234,35 +234,35 @@ pub fn build(b: *std.Build) void {
     const run_virtio_descriptor_tests = helpers.runHostTest(b, virtio_descriptor_test_mod);
 
     const icmp_test_mod = helpers.hostTestModule(b, "kernel/net/icmp_test.zig");
-    icmp_test_mod.addImport("common_view", host_common.view);
-    icmp_test_mod.addImport("common_hex", host_common.hex);
-    icmp_test_mod.addImport("common_mac", host_common.mac);
-    icmp_test_mod.addImport("common_ipv4_addr", host_common.ipv4_addr);
+    icmp_test_mod.addImport("common/view", host_common.view);
+    icmp_test_mod.addImport("common/hex", host_common.hex);
+    icmp_test_mod.addImport("common/mac", host_common.mac);
+    icmp_test_mod.addImport("common/ipv4_addr", host_common.ipv4_addr);
     const run_icmp_tests = helpers.runHostTest(b, icmp_test_mod);
 
     const tcp_test_mod = helpers.hostTestModule(b, "kernel/net/tcp_test.zig");
-    tcp_test_mod.addImport("common_bytes", host_common.bytes);
-    tcp_test_mod.addImport("common_view", host_common.view);
-    tcp_test_mod.addImport("common_hex", host_common.hex);
-    tcp_test_mod.addImport("common_mac", host_common.mac);
-    tcp_test_mod.addImport("common_ipv4_addr", host_common.ipv4_addr);
+    tcp_test_mod.addImport("common/bytes", host_common.bytes);
+    tcp_test_mod.addImport("common/view", host_common.view);
+    tcp_test_mod.addImport("common/hex", host_common.hex);
+    tcp_test_mod.addImport("common/mac", host_common.mac);
+    tcp_test_mod.addImport("common/ipv4_addr", host_common.ipv4_addr);
     const run_tcp_tests = helpers.runHostTest(b, tcp_test_mod);
 
     const ulib_ip_host = helpers.hostModule(b, "userspace/ulib/ip.zig");
-    ulib_ip_host.addImport("common_mac", host_common.mac);
-    ulib_ip_host.addImport("common_ipv4_addr", host_common.ipv4_addr);
+    ulib_ip_host.addImport("common/mac", host_common.mac);
+    ulib_ip_host.addImport("common/ipv4_addr", host_common.ipv4_addr);
     const ulib_format_host = helpers.hostModule(b, "userspace/ulib/format.zig");
     const ulib_parse_host = helpers.hostModule(b, "userspace/ulib/parse.zig");
 
     const dns_codec_mod = helpers.hostModule(b, "userspace/net/dns_codec.zig");
-    dns_codec_mod.addImport("common_bytes", host_common.bytes);
+    dns_codec_mod.addImport("common/bytes", host_common.bytes);
 
     const abi_host = helpers.AbiBundle.create(b, b.graph.host, .Debug);
     abi_host.attachFsView(host_common.view);
 
     const ulib_target_support_host = helpers.hostModule(b, "userspace/ulib/target_support.zig");
-    ulib_target_support_host.addImport("common_ipv4_addr", host_common.ipv4_addr);
-    ulib_target_support_host.addImport("common_mac", host_common.mac);
+    ulib_target_support_host.addImport("common/ipv4_addr", host_common.ipv4_addr);
+    ulib_target_support_host.addImport("common/mac", host_common.mac);
 
     const curl_target_mod = helpers.hostModule(b, "userspace/curl/target.zig");
     curl_target_mod.addImport("ulib", ulib_target_support_host);
@@ -280,23 +280,23 @@ pub fn build(b: *std.Build) void {
     const run_abi_tests = helpers.runHostTest(b, abi_test_mod);
 
     const bytes_test_mod = helpers.hostTestModule(b, "test/common/bytes_test.zig");
-    bytes_test_mod.addImport("common_bytes", host_common.bytes);
+    bytes_test_mod.addImport("common/bytes", host_common.bytes);
     const run_bytes_tests = helpers.runHostTest(b, bytes_test_mod);
 
     const hex_test_mod = helpers.hostTestModule(b, "test/common/hex_test.zig");
-    hex_test_mod.addImport("common_hex", host_common.hex);
+    hex_test_mod.addImport("common/hex", host_common.hex);
     const run_hex_tests = helpers.runHostTest(b, hex_test_mod);
 
     const mac_test_mod = helpers.hostTestModule(b, "test/common/mac_test.zig");
-    mac_test_mod.addImport("common_mac", host_common.mac);
+    mac_test_mod.addImport("common/mac", host_common.mac);
     const run_mac_tests = helpers.runHostTest(b, mac_test_mod);
 
     const ipv4_addr_test_mod = helpers.hostTestModule(b, "test/common/ipv4_addr_test.zig");
-    ipv4_addr_test_mod.addImport("common_ipv4_addr", host_common.ipv4_addr);
+    ipv4_addr_test_mod.addImport("common/ipv4_addr", host_common.ipv4_addr);
     const run_ipv4_addr_tests = helpers.runHostTest(b, ipv4_addr_test_mod);
 
     const view_test_mod = helpers.hostTestModule(b, "test/common/view_test.zig");
-    view_test_mod.addImport("common_view", host_common.view);
+    view_test_mod.addImport("common/view", host_common.view);
     const run_view_tests = helpers.runHostTest(b, view_test_mod);
 
     const filesystem_host_mod = helpers.hostModule(b, "kernel/fs/filesystem.zig");
@@ -325,14 +325,14 @@ pub fn build(b: *std.Build) void {
     const run_fd_table_tests = helpers.runHostTest(b, fd_table_test_mod);
 
     const socket_table_host_mod = helpers.hostModule(b, "kernel/net/socket/table.zig");
-    socket_table_host_mod.addImport("common_ipv4_addr", host_common.ipv4_addr);
+    socket_table_host_mod.addImport("common/ipv4_addr", host_common.ipv4_addr);
 
     const socket_table_test_mod = helpers.hostTestModule(b, "test/kernel/socket_table_test.zig");
     socket_table_test_mod.addImport("socket_table", socket_table_host_mod);
     const run_socket_table_tests = helpers.runHostTest(b, socket_table_test_mod);
 
     const acpi_access_test_mod = helpers.hostTestModule(b, "test/kernel/acpi_access_test.zig");
-    acpi_access_test_mod.addImport("common_acpi_sig", host_common.acpi_sig);
+    acpi_access_test_mod.addImport("common/acpi_sig", host_common.acpi_sig);
     const run_acpi_access_tests = helpers.runHostTest(b, acpi_access_test_mod);
 
     const time_math_host = helpers.hostModule(b, "userspace/ulib/time_math.zig");

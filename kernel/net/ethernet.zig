@@ -1,4 +1,4 @@
-const mac = @import("common_mac");
+const mac = @import("common/mac");
 
 pub const header_len = 14;
 pub const min_frame_len = 60;

@@ -1,8 +1,8 @@
-const view = @import("common_view");
+const view = @import("common/view");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
-const ipv4_addr = @import("common_ipv4_addr");
-const mac = @import("common_mac");
+const ipv4_addr = @import("common/ipv4_addr");
+const mac = @import("common/mac");
 
 pub const header_len = 8;
 

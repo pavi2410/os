@@ -47,7 +47,7 @@ pub const AbiBundle = struct {
     }
 
     pub fn attachFsView(self: AbiBundle, view: *std.Build.Module) void {
-        self.fs.addImport("common_view", view);
+        self.fs.addImport("common/view", view);
     }
 };
 
@@ -103,7 +103,7 @@ pub const HostCommon = struct {
     pub fn create(b: *std.Build) HostCommon {
         const hex = hostModule(b, "common/hex.zig");
         const mac = hostModule(b, "common/mac.zig");
-        mac.addImport("common_hex", hex);
+        mac.addImport("common/hex", hex);
         return .{
             .bytes = hostModule(b, "common/bytes.zig"),
             .hex = hex,

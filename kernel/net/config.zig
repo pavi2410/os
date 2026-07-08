@@ -1,4 +1,4 @@
-const ip = @import("common_ipv4_addr");
+const ip = @import("common/ipv4_addr");
 
 /// QEMU user-mode networking defaults (10.0.2.0/24).
 pub const guest_ip = ip.Addr.parse("10.0.2.15");

@@ -1,5 +1,5 @@
 const std = @import("std");
-const hex = @import("common_hex");
+const hex = @import("common/hex");
 
 test "format colon hex" {
     var buf: [17]u8 = undefined;

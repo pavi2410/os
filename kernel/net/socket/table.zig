@@ -1,4 +1,4 @@
-const ipv4_addr = @import("common_ipv4_addr");
+const ipv4_addr = @import("common/ipv4_addr");
 
 pub const Addr = ipv4_addr.Addr;
 

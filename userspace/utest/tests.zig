@@ -1,4 +1,4 @@
-const bytes = @import("common_bytes");
+const bytes = @import("common/bytes");
 const dns_codec = @import("dns_codec");
 const tap = @import("utest_tap");
 
