@@ -1,9 +1,18 @@
 pub const max_fds = 32;
 
+const devfs = @import("../fs/devfs.zig");
+
+pub const DeviceFd = struct {
+    kind: devfs.Device,
+    readable: bool,
+    writable: bool,
+};
+
 pub const Fd = union(enum) {
     none,
     console,
     file: u32,
+    device: DeviceFd,
     socket: u32,
 };
 

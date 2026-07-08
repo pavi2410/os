@@ -12,12 +12,12 @@
 
 Interaction today is entirely over **serial**: shell, `curl` output, kernel panics. Several correctness gaps block “normal” Unix behavior:
 
-- `cd`/`pwd` are **shell-local** — children don't inherit kernel cwd ([`userspace/shell/cwd.zig`](../../userspace/shell/cwd.zig))
-- No **environment variables** — kernel `execve` ignores `envp` ([`kernel/syscall/handlers.zig`](../../kernel/syscall/handlers.zig)); loader pushes an empty environ ([`kernel/mm/user_loader.zig`](../../kernel/mm/user_loader.zig))
-- No **`PATH`** — shell hardcodes `/BIN/<NAME>` ([`userspace/shell/cmd/run.zig`](../../userspace/shell/cmd/run.zig))
+- ~~`cd`/`pwd` are **shell-local**~~ — kernel `chdir`/`getcwd` and shell wrappers (done)
+- ~~No **environment variables**~~ — `execve` delivers `envp`; shell `export` and `PATH` lookup (done)
+- ~~No **`PATH`**~~ — shell searches colon-separated `PATH` (done)
 - No **pipes** or FD duplication — no `cmd | cmd`, redirects, or `2>&1`
 - **Init is the shell** ([`kernel/proc/init_shell.zig`](../../kernel/proc/init_shell.zig)) — no PID 1 reap loop or service spawning
-- No **`/dev`** nodes — programs can't open `/dev/null` or a named TTY
+- ~~No **`/dev`** nodes~~ — kernel devfs exposes `/dev/null`, `/dev/zero`, `/dev/ttyS0` (done)
 
 Polish this layer before `mmap`, ext2, and SMP.
 
@@ -27,7 +27,7 @@ Polish this layer before `mmap`, ext2, and SMP.
 
 ### TTY / console
 
-- [ ] Document serial as primary console (`/dev/ttyS0` or equivalent)
+- [x] Document serial as primary console (`/dev/ttyS0` or equivalent) — open `/dev/ttyS0` for read/write on the serial TTY
 - [ ] Review [`drivers/tty.zig`](../../kernel/drivers/tty.zig) — echo, erase, canonical mode edge cases
 - [ ] ANSI: verify common sequences used by tools (`curl`, future pagers)
 - [ ] TTY ioctls or minimal equivalents (`tcsetattr` subset)
@@ -35,53 +35,51 @@ Polish this layer before `mmap`, ext2, and SMP.
 
 ### devfs (minimal)
 
-- [ ] Pseudo filesystem or static device nodes under `/dev`
-- [ ] `/dev/null`, `/dev/zero`
-- [ ] `/dev/ttyS0` (or console device) openable from user programs
-- [ ] Mount or populate `/dev` at boot (init or kernel thread)
+- [x] Pseudo filesystem or static device nodes under `/dev`
+- [x] `/dev/null`, `/dev/zero`
+- [x] `/dev/ttyS0` (or console device) openable from user programs
+- [x] Mount or populate `/dev` at boot (init or kernel thread)
 
 ### Kernel working directory
 
-- [ ] Per-process cwd in [`proc/process.zig`](../../kernel/proc/process.zig)
-- [ ] Syscalls: `chdir`, `getcwd`
-- [ ] Wire cwd into VFS path resolution (`open`, `stat`, `unlink`, `mkdir`, …)
-- [ ] Migrate shell `cd`/`pwd` to syscalls (remove shell-only cwd or keep as thin wrapper)
-- [ ] Integration: shell `cd` → fork/exec child opens relative path correctly
+- [x] Per-process cwd in [`proc/process.zig`](../../kernel/proc/process.zig)
+- [x] Syscalls: `chdir`, `getcwd`
+- [x] Wire cwd into VFS path resolution (`open`, `stat`, `unlink`, `mkdir`, …)
+- [x] Migrate shell `cd`/`pwd` to syscalls (remove shell-only cwd or keep as thin wrapper)
+- [x] Integration: shell `cd` → fork/exec child opens relative path correctly
 
 ### Environment variables and PATH
 
-Today the shell passes `exec_envp = { null }` and the kernel discards the third `execve` argument. Programs cannot read `getenv("…")` and command lookup does not search `PATH`.
-
 #### Kernel / loader
 
-- [ ] Parse `envp` in `sysExecve` ([`handlers.zig`](../../kernel/syscall/handlers.zig)) — stop ignoring the third argument
-- [ ] Store environ per process in [`proc/process.zig`](../../kernel/proc/process.zig) (pointer list or contiguous strings in user memory)
-- [ ] Extend [`pushArgv`](../../kernel/mm/user_loader.zig) (or sibling helper) to place **envp strings + pointers** on the user stack per SysV ABI
-- [ ] `fork` copies parent environ to child (same rules as Linux: shared until written — COW from [phase 7](07-copy-on-write-fork.md) applies once pages are mapped)
-- [ ] `execve` replaces environ entirely with the new `envp`
-- [ ] Document max env count / total env bytes (bounded, like argv limits today)
+- [x] Parse `envp` in `sysExecve` ([`handlers.zig`](../../kernel/syscall/handlers.zig)) — stop ignoring the third argument
+- [x] Store environ per process in [`proc/process.zig`](../../kernel/proc/process.zig) (pointer list or contiguous strings in user memory)
+- [x] Extend [`pushInitialStack`](../../kernel/mm/user_loader.zig) to place **envp strings + pointers** on the user stack per SysV ABI
+- [x] `fork` copies parent environ to child (same rules as Linux: shared until written — COW from [phase 7](07-copy-on-write-fork.md) applies once pages are mapped)
+- [x] `execve` replaces environ entirely with the new `envp`
+- [x] Document max env count / total env bytes (bounded, like argv limits today)
 
 #### Shell
 
-- [ ] In-process environ table (e.g. `KEY=value` strings, `export` builtin)
-- [ ] Default at startup: at least `PATH=/BIN`, `PWD=/` (or sync `PWD` with cwd)
-- [ ] Optional defaults: `HOME=/`, `SHELL=/BIN/SHELL` — document chosen values
-- [ ] `export NAME=value` and `export NAME` (inherit from shell table)
-- [ ] Pass full environ to `execve` (replace empty [`exec_envp`](../../userspace/shell/cmd/run.zig))
-- [ ] **`PATH` lookup** — for bare command names, search colon-separated directories in order
-- [ ] Still support explicit paths (`/BIN/curl`, `./tool` once cwd is kernel-side)
-- [ ] Uppercase FAT 8.3 names: document whether `PATH` entries are normalized or `/BIN` stays canonical
+- [x] In-process environ table (e.g. `KEY=value` strings, `export` builtin)
+- [x] Default at startup: at least `PATH=/BIN`, `PWD=/` (or sync `PWD` with cwd)
+- [x] Optional defaults: `HOME=/`, `SHELL=/BIN/SHELL` — document chosen values
+- [x] `export NAME=value` and `export NAME` (inherit from shell table)
+- [x] Pass full environ to `execve` (replace empty [`exec_envp`](../../userspace/shell/cmd/run.zig))
+- [x] **`PATH` lookup** — for bare command names, search colon-separated directories in order
+- [x] Still support explicit paths (`/BIN/curl`, `./tool` once cwd is kernel-side)
+- [x] Uppercase FAT 8.3 names: document whether `PATH` entries are normalized or `/BIN` stays canonical
 
 #### Userspace ulib (minimal)
 
-- [ ] `getenv(name)` — scan process environ on stack or via future syscall stub
+- [x] `getenv(name)` — scan process environ on stack or via future syscall stub
 - [ ] Optional: `setenv` / `putenv` for shell and tests (can be shell-only at first)
 
 #### Tests
 
-- [ ] Integration: `export FOO=bar`, run stub or shell builtin child that prints `FOO`
-- [ ] Integration: `PATH=/BIN` (or multi-dir once second dir exists) — bare `curl` resolves without hardcoded prefix in `run.zig`
-- [ ] Host or integration: `execve` with non-empty `envp` — child stack contains expected strings
+- [x] Integration: `export FOO=bar`, run stub or shell builtin child that prints `FOO`
+- [x] Integration: `PATH=/BIN` (or multi-dir once second dir exists) — bare `curl` resolves without hardcoded prefix in `run.zig`
+- [x] Host or integration: `execve` with non-empty `envp` — child stack contains expected strings
 
 ### IPC and file descriptors
 

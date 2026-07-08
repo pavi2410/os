@@ -6,6 +6,7 @@ const user_fork_ctx = @import("../proc/user_fork.zig");
 const user_exec = @import("../proc/exec.zig");
 const user_wait = @import("../proc/wait.zig");
 const vfs = @import("../fs/vfs.zig");
+const devfs = @import("../fs/devfs.zig");
 const socket = @import("../net/socket.zig");
 const net_info = @import("../net/info.zig");
 const hw_info = @import("../hw/info.zig");
@@ -119,6 +120,22 @@ fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
         .truncate = flags & abi_fs.O_TRUNC != 0,
         .append = flags & abi_fs.O_APPEND != 0,
     };
+
+    if (devfs.lookup(path)) |node| {
+        switch (node) {
+            .device => |dev| {
+                if (!open_flags.read and !open_flags.write) return errno.EINVAL;
+                const fd = fdtab.alloc(proc) catch return errno.EMFILE;
+                proc.fds.fds[fd] = .{ .device = .{
+                    .kind = dev,
+                    .readable = open_flags.read,
+                    .writable = open_flags.write,
+                } };
+                return @intCast(fd);
+            },
+            .root => {},
+        }
+    }
 
     const handle = vfs.open(path, open_flags) catch |err| return errno.fromVfs(err);
     const fd = fdtab.alloc(proc) catch {

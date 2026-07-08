@@ -160,6 +160,11 @@ class TestShellEnvironment:
         run_case(shell_session, "lscpu", "Architecture:", case="PATH resolves lscpu")
 
 
+class TestShellDevfs:
+    def test_devtest(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "devtest", "devtest: ok", case="devnull and devzero")
+
+
 class TestShellPrograms:
     def test_lscpu(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "lscpu", "Architecture:", case="fork/exec lscpu")

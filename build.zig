@@ -107,6 +107,7 @@ pub fn build(b: *std.Build) void {
     const install_cowtest = b.addInstallArtifact(cowtest, user_install);
 
     const install_envtest = helpers.addUserProgram(b, user_deps, "envtest", "userspace/envtest/main.zig", user_install);
+    const install_devtest = helpers.addUserProgram(b, user_deps, "devtest", "userspace/devtest/main.zig", user_install);
 
     const shell = b.addExecutable(.{
         .name = "shell",
@@ -155,6 +156,7 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_utest.step);
     b.getInstallStep().dependOn(&install_cowtest.step);
     b.getInstallStep().dependOn(&install_envtest.step);
+    b.getInstallStep().dependOn(&install_devtest.step);
 
     const limine_kernel_mod = helpers.exeModule(b, "kernel/boot/limine.zig", kernel_target, optimize);
 
@@ -326,6 +328,15 @@ pub fn build(b: *std.Build) void {
     const filesystem_host_mod = helpers.hostModule(b, "kernel/fs/filesystem.zig");
     filesystem_host_mod.addImport("abi_fs", abi_host.fs);
 
+    const devfs_host_mod = helpers.hostModule(b, "kernel/fs/devfs.zig");
+    devfs_host_mod.addImport("abi_fs", abi_host.fs);
+    devfs_host_mod.addImport("filesystem.zig", filesystem_host_mod);
+
+    const devfs_test_mod = helpers.hostTestModule(b, "test/kernel/devfs_test.zig");
+    devfs_test_mod.addImport("devfs", devfs_host_mod);
+    devfs_test_mod.addImport("filesystem", filesystem_host_mod);
+    const run_devfs_tests = helpers.runHostTest(b, devfs_test_mod);
+
     const filesystem_contract_test_mod = helpers.hostTestModule(b, "test/kernel/filesystem_contract_test.zig");
     filesystem_contract_test_mod.addImport("filesystem", filesystem_host_mod);
     const run_filesystem_contract_tests = helpers.runHostTest(b, filesystem_contract_test_mod);
@@ -343,6 +354,7 @@ pub fn build(b: *std.Build) void {
     const run_crash_tests = helpers.runHostTest(b, crash_test_mod);
 
     const fd_table_host_mod = helpers.hostModule(b, "kernel/proc/fd_table.zig");
+    fd_table_host_mod.addImport("../fs/devfs.zig", devfs_host_mod);
 
     const fd_table_test_mod = helpers.hostTestModule(b, "test/kernel/fd_table_test.zig");
     fd_table_test_mod.addImport("fd_table", fd_table_host_mod);
@@ -395,6 +407,7 @@ pub fn build(b: *std.Build) void {
         run_virtio_queue_index_tests,
         run_virtio_descriptor_tests,
         run_filesystem_contract_tests,
+        run_devfs_tests,
         run_syscall_user_tests,
         run_crash_tests,
         run_fd_table_tests,

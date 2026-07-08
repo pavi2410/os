@@ -1,4 +1,5 @@
 const process = @import("../proc/process.zig");
+const devfs = @import("../fs/devfs.zig");
 const socket = @import("../net/socket.zig");
 const tty = @import("../drivers/tty.zig");
 const vfs = @import("../fs/vfs.zig");
@@ -13,6 +14,16 @@ pub fn read(fd: u64, slot: *process.Fd, buf: []u8) i64 {
             };
             return @intCast(read_len);
         },
+        .device => |dev_fd| {
+            if (!dev_fd.readable) return errno.EBADF;
+            if (dev_fd.kind == .tty_dev) {
+                const read_len = tty.get().read(buf) catch |err| switch (err) {
+                    tty.TtyError.WouldBlock => return errno.EINTR,
+                };
+                return @intCast(read_len);
+            }
+            return @intCast(devfs.readDevice(dev_fd.kind, buf));
+        },
         .file => |handle| {
             const n = vfs.read(handle, buf) catch |err| return errno.fromVfs(err);
             return @intCast(n);
@@ -26,6 +37,13 @@ pub fn write(fd: u64, slot: *process.Fd, buf: []const u8) i64 {
         .console => {
             if (fd != 1 and fd != 2) return errno.EBADF;
             return @intCast(tty.get().write(buf));
+        },
+        .device => |dev_fd| {
+            if (!dev_fd.writable) return errno.EBADF;
+            if (dev_fd.kind == .tty_dev) {
+                return @intCast(tty.get().write(buf));
+            }
+            return @intCast(devfs.writeDevice(dev_fd.kind, buf));
         },
         .file => |handle| {
             const n = vfs.write(handle, buf) catch |err| return errno.fromVfs(err);
@@ -47,7 +65,7 @@ pub fn close(slot: *process.Fd) i64 {
             slot.* = .none;
             return 0;
         },
-        .console => {
+        .console, .device => {
             slot.* = .none;
             return 0;
         },
