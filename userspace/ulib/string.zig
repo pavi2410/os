@@ -1,5 +1,7 @@
 const std = @import("std");
 
+pub const String = @import("common/string").String;
+
 pub fn eql(a: []const u8, b: []const u8) bool {
     return std.mem.eql(u8, a, b);
 }

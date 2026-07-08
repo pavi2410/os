@@ -169,6 +169,14 @@ pub fn rmdir(path: [*:0]const u8) isize {
     return syscall6(abi_syscall.rmdir, @intFromPtr(path), 0, 0, 0, 0, 0);
 }
 
+pub fn getcwd(buf: [*]u8, size: usize) isize {
+    return syscall6(abi_syscall.getcwd, @intFromPtr(buf), size, 0, 0, 0, 0);
+}
+
+pub fn chdir(path: [*:0]const u8) isize {
+    return syscall6(abi_syscall.chdir, @intFromPtr(path), 0, 0, 0, 0, 0);
+}
+
 fn syscall6(
     nr: u64,
     arg0: u64,

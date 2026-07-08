@@ -30,11 +30,16 @@ pub fn build(b: *std.Build) void {
     common_mac_user.addImport("common/hex", common_hex_user);
     const common_ipv4_addr_user = helpers.exeModule(b, "common/ipv4_addr.zig", user_target, user_optimize);
     const common_view_user = helpers.exeModule(b, "common/view.zig", user_target, user_optimize);
+    const common_string_user = helpers.exeModule(b, "common/string.zig", user_target, user_optimize);
+    const common_path_user = helpers.exeModule(b, "common/path.zig", user_target, user_optimize);
+    common_path_user.addImport("string", common_string_user);
     abi_user.attachFsView(common_view_user);
 
     const user_ulib = helpers.exeModule(b, "userspace/ulib/mod.zig", user_target, user_optimize);
     user_ulib.addImport("common/mac", common_mac_user);
     user_ulib.addImport("common/ipv4_addr", common_ipv4_addr_user);
+    user_ulib.addImport("common/string", common_string_user);
+    user_ulib.addImport("common/path", common_path_user);
     abi_user.attachTo(user_ulib);
 
     const dns_codec_user = helpers.exeModule(b, "userspace/net/dns_codec.zig", user_target, user_optimize);
@@ -166,6 +171,9 @@ pub fn build(b: *std.Build) void {
     const common_ipv4_addr_kernel = helpers.exeModule(b, "common/ipv4_addr.zig", kernel_target, optimize);
     const common_acpi_sig_kernel = helpers.exeModule(b, "common/acpi_sig.zig", kernel_target, optimize);
     const common_view_kernel = helpers.exeModule(b, "common/view.zig", kernel_target, optimize);
+    const common_string_kernel = helpers.exeModule(b, "common/string.zig", kernel_target, optimize);
+    const common_path_kernel = helpers.exeModule(b, "common/path.zig", kernel_target, optimize);
+    common_path_kernel.addImport("string", common_string_kernel);
     abi_kernel.attachFsView(common_view_kernel);
     abi_kernel.attachTo(kernel_mod);
     kernel_mod.addImport("common/bytes", common_bytes_kernel);
@@ -174,6 +182,8 @@ pub fn build(b: *std.Build) void {
     kernel_mod.addImport("common/ipv4_addr", common_ipv4_addr_kernel);
     kernel_mod.addImport("common/acpi_sig", common_acpi_sig_kernel);
     kernel_mod.addImport("common/view", common_view_kernel);
+    kernel_mod.addImport("common/string", common_string_kernel);
+    kernel_mod.addImport("common/path", common_path_kernel);
     kernel_mod.addImport("common/tap", helpers.exeModule(b, "common/tap.zig", kernel_target, optimize));
     kernel_mod.addImport("time_unix", helpers.exeModule(b, "common/time_unix.zig", kernel_target, optimize));
 
@@ -299,6 +309,17 @@ pub fn build(b: *std.Build) void {
     view_test_mod.addImport("common/view", host_common.view);
     const run_view_tests = helpers.runHostTest(b, view_test_mod);
 
+    const string_test_mod = helpers.hostTestModule(b, "test/common/string_test.zig");
+    string_test_mod.addImport("common/string", host_common.string);
+    const run_string_tests = helpers.runHostTest(b, string_test_mod);
+
+    const path_host_string = helpers.hostModule(b, "common/string.zig");
+    const path_host = helpers.hostModule(b, "common/path.zig");
+    path_host.addImport("string", path_host_string);
+    const path_test_mod = helpers.hostTestModule(b, "test/common/path_test.zig");
+    path_test_mod.addImport("common/path", path_host);
+    const run_path_tests = helpers.runHostTest(b, path_test_mod);
+
     const filesystem_host_mod = helpers.hostModule(b, "kernel/fs/filesystem.zig");
     filesystem_host_mod.addImport("abi_fs", abi_host.fs);
 
@@ -377,6 +398,8 @@ pub fn build(b: *std.Build) void {
         run_mac_tests,
         run_ipv4_addr_tests,
         run_view_tests,
+        run_string_tests,
+        run_path_tests,
         run_ulib_helpers_tests,
         run_pci_class_tests,
         run_time_math_tests,

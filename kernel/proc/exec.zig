@@ -16,10 +16,8 @@ pub const ExecError = error{
 pub fn execve(path: []const u8, argv: []const []const u8) ExecError!noreturn {
     const proc = process.currentProcess() orelse return ExecError.NoProcess;
 
-    var path_buf: [256]u8 = undefined;
-    if (path.len >= path_buf.len) return ExecError.PathTooLong;
-    @memcpy(path_buf[0..path.len], path);
-    const path_copy = path_buf[0..path.len];
+    var path_buf: [process.cwd_max_len]u8 = undefined;
+    const resolved_path = process.resolvePath(proc, path, &path_buf) catch return ExecError.PathTooLong;
 
     var arg_bufs: [16][256]u8 = undefined;
     var argv_copy: [16][]const u8 = undefined;
@@ -31,7 +29,7 @@ pub fn execve(path: []const u8, argv: []const []const u8) ExecError!noreturn {
     }
     const argv_slice = argv_copy[0..argv.len];
 
-    const image_buf = programs.load(path_copy) catch |err| switch (err) {
+    const image_buf = programs.load(resolved_path) catch |err| switch (err) {
         programs.LoadError.NotFound => return ExecError.NotFound,
         programs.LoadError.NotFile => return ExecError.NotFile,
         programs.LoadError.PathTooLong => return ExecError.PathTooLong,

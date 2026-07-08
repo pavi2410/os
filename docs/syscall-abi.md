@@ -47,6 +47,8 @@ Negative `RAX` values follow the Linux errno convention (e.g. `-38` = `ENOSYS`).
 | 59 | `execve` | Replace process image |
 | 60 | `exit` | Terminates current thread; does not return |
 | 61 | `wait4` | Reap child process |
+| 79 | `getcwd` | Copy current working directory |
+| 80 | `chdir` | Change current working directory |
 | 83 | `mkdir` | Create directory |
 | 84 | `rmdir` | Remove directory |
 | 87 | `unlink` | Remove file |

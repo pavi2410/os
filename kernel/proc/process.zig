@@ -8,6 +8,10 @@ const user_loader = @import("../mm/user_loader.zig");
 const page_ref = @import("../mm/page_ref.zig");
 const user_entry = @import("user_entry.zig");
 const fd_table = @import("fd_table.zig");
+const path_mod = @import("common/path");
+
+pub const cwd_max_len = path_mod.default_cap;
+pub const Cwd = path_mod.Path(cwd_max_len);
 
 pub const ProcessError = error{
     OutOfMemory,
@@ -69,6 +73,7 @@ pub const Process = struct {
     exit_status: ?u32,
     state: State,
     brk: u64,
+    cwd: Cwd,
 
     pub fn destroy(self: *Process) void {
         self.address_space.destroy();
@@ -128,6 +133,7 @@ pub fn create() ProcessError!*Process {
 pub fn createWithParent(parent_id: usize) ProcessError!*Process {
     const mem = heap.kmalloc(@sizeOf(Process)) catch return ProcessError.OutOfMemory;
     const proc: *Process = @ptrCast(@alignCast(mem));
+    const cwd = Cwd.root();
     proc.* = .{
         .id = next_id,
         .parent_id = parent_id,
@@ -136,6 +142,7 @@ pub fn createWithParent(parent_id: usize) ProcessError!*Process {
         .exit_status = null,
         .state = .created,
         .brk = user_brk_base,
+        .cwd = cwd,
     };
     next_id += 1;
     try register(proc);
@@ -172,8 +179,23 @@ pub fn forkChild(parent: *Process) ProcessError!*Process {
 
     child.brk = parent.brk;
     child.fds = parent.fds;
+    child.cwd = parent.cwd;
     child.state = .created;
     return child;
+}
+
+/// Current working directory (no trailing slash except root).
+pub fn cwdSlice(proc: *const Process) []const u8 {
+    return proc.cwd.slice();
+}
+
+pub fn setCwd(proc: *Process, path: []const u8) ProcessError!void {
+    proc.cwd.set(path) catch return ProcessError.OutOfMemory;
+}
+
+/// Resolve `path` against the process cwd into `buf`.
+pub fn resolvePath(proc: *const Process, path: []const u8, buf: []u8) ProcessError![]const u8 {
+    return path_mod.resolveAgainst(cwdSlice(proc), path, buf) catch return ProcessError.OutOfMemory;
 }
 
 pub fn lookup(pid: usize) ?*Process {

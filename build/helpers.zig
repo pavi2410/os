@@ -99,6 +99,7 @@ pub const HostCommon = struct {
     ipv4_addr: *std.Build.Module,
     acpi_sig: *std.Build.Module,
     view: *std.Build.Module,
+    string: *std.Build.Module,
 
     pub fn create(b: *std.Build) HostCommon {
         const hex = hostModule(b, "common/hex.zig");
@@ -111,6 +112,7 @@ pub const HostCommon = struct {
             .ipv4_addr = hostModule(b, "common/ipv4_addr.zig"),
             .acpi_sig = hostModule(b, "common/acpi_sig.zig"),
             .view = hostModule(b, "common/view.zig"),
+            .string = hostModule(b, "common/string.zig"),
         };
     }
 };

@@ -62,6 +62,14 @@ pub fn rmdir(path: [*:0]const u8) isize {
     return syscall.rmdir(path);
 }
 
+pub fn getcwd(buf: [*]u8, size: usize) isize {
+    return syscall.getcwd(buf, size);
+}
+
+pub fn chdir(path: [*:0]const u8) isize {
+    return syscall.chdir(path);
+}
+
 pub fn isDir(mode: u32) bool {
     return mode & S_IFDIR != 0;
 }

@@ -52,6 +52,8 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.fork => sysFork(frame),
         numbers.execve => sysExecve(frame.arg0, frame.arg1, frame.arg2),
         numbers.wait4 => sysWait4(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
+        numbers.getcwd => sysGetcwd(frame.arg0, frame.arg1),
+        numbers.chdir => sysChdir(frame.arg0),
         numbers.unlink => sysUnlink(frame.arg0),
         numbers.mkdir => sysMkdir(frame.arg0, frame.arg1),
         numbers.rmdir => sysRmdir(frame.arg0),
@@ -97,9 +99,16 @@ fn sysWrite(fd: u64, buf_ptr: u64, count: u64) i64 {
     return fd_ops.write(fd, slot, buf);
 }
 
+fn resolvePathArg(path: []const u8, buf: []u8) ?[]const u8 {
+    const proc = process.currentProcess() orelse return path;
+    return process.resolvePath(proc, path, buf) catch null;
+}
+
 fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
     _ = mode;
-    const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    const path_raw = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    var path_buf: [process.cwd_max_len]u8 = undefined;
+    const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
     const proc = fdtab.currentProcess() catch return errno.EBADF;
 
     const accmode = flags & abi_fs.O_ACCMODE;
@@ -126,7 +135,9 @@ fn sysClose(fd: u64) i64 {
 }
 
 fn sysStat(path_ptr: u64, stat_ptr: u64) i64 {
-    const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    const path_raw = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    var path_buf: [process.cwd_max_len]u8 = undefined;
+    const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
     const out = user.outPtr(vfs.Stat, stat_ptr) orelse return errno.EFAULT;
     vfs.stat(path, out) catch |err| return errno.fromVfs(err);
     return 0;
@@ -167,21 +178,52 @@ fn sysWait4(pid: u64, status_ptr: u64, options: u64, rusage_ptr: u64) i64 {
     return user_wait.wait4(parent, @bitCast(pid), status_ptr, @truncate(options));
 }
 
+fn sysGetcwd(buf_ptr: u64, size: u64) i64 {
+    if (buf_ptr == 0 or size == 0) return errno.EINVAL;
+    const proc = process.currentProcess() orelse return errno.EPERM;
+    const cwd = process.cwdSlice(proc);
+    if (size < cwd.len + 1) return errno.ERANGE;
+    const buf = user.bytes(buf_ptr, cwd.len + 1) orelse return errno.EFAULT;
+    @memcpy(buf[0..cwd.len], cwd);
+    buf[cwd.len] = 0;
+    return @intCast(cwd.len);
+}
+
+fn sysChdir(path_ptr: u64) i64 {
+    const path_raw = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    const proc = process.currentProcess() orelse return errno.EPERM;
+    var path_buf: [process.cwd_max_len]u8 = undefined;
+    const path = process.resolvePath(proc, path_raw, &path_buf) catch return errno.EINVAL;
+
+    var st: vfs.Stat = .{};
+    vfs.stat(path, &st) catch |err| return errno.fromVfs(err);
+    if (st.st_mode & abi_fs.S_IFDIR == 0) return errno.ENOTDIR;
+
+    process.setCwd(proc, path) catch return errno.EINVAL;
+    return 0;
+}
+
 fn sysUnlink(path_ptr: u64) i64 {
-    const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    const path_raw = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    var path_buf: [process.cwd_max_len]u8 = undefined;
+    const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
     vfs.unlink(path) catch |err| return errno.fromVfs(err);
     return 0;
 }
 
 fn sysMkdir(path_ptr: u64, mode: u64) i64 {
     _ = mode;
-    const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    const path_raw = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    var path_buf: [process.cwd_max_len]u8 = undefined;
+    const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
     vfs.mkdir(path) catch |err| return errno.fromVfs(err);
     return 0;
 }
 
 fn sysRmdir(path_ptr: u64) i64 {
-    const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    const path_raw = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    var path_buf: [process.cwd_max_len]u8 = undefined;
+    const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
     vfs.rmdir(path) catch |err| return errno.fromVfs(err);
     return 0;
 }
