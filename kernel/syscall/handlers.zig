@@ -164,11 +164,12 @@ fn sysFork(frame: *Frame) i64 {
 }
 
 fn sysExecve(path_ptr: u64, argv_ptr: u64, envp_ptr: u64) i64 {
-    _ = envp_ptr;
     const path = user.cString(path_ptr, 256) orelse return errno.EFAULT;
     var argv_buf: [16][]const u8 = undefined;
     const argv_count = user.readArgv(argv_ptr, &argv_buf, 256) catch return errno.EFAULT;
-    user_exec.execve(path, argv_buf[0..argv_count]) catch |err| return errno.fromExec(err);
+    var envp_buf: [16][]const u8 = undefined;
+    const envp_count = user.readEnvp(envp_ptr, &envp_buf, 256) catch return errno.EFAULT;
+    user_exec.execve(path, argv_buf[0..argv_count], envp_buf[0..envp_count]) catch |err| return errno.fromExec(err);
     unreachable;
 }
 

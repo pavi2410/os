@@ -20,7 +20,11 @@ pub const LoadedImage = struct {
 pub const user_stack_top: u64 = 0x00007FFFFFFFE000;
 pub const user_stack_pages: usize = 16;
 
-pub fn load(cr3: u64, image: []const u8, argv: []const []const u8) LoadError!LoadedImage {
+pub const max_argv = 16;
+pub const max_envp = 16;
+pub const max_string_len = 256;
+
+pub fn load(cr3: u64, image: []const u8, argv: []const []const u8, envp: []const []const u8) LoadError!LoadedImage {
     if (image.len < @sizeOf(elf.Elf64_Ehdr)) return LoadError.InvalidElf;
 
     const hdr: *const elf.Elf64_Ehdr = @ptrCast(@alignCast(image.ptr));
@@ -40,7 +44,7 @@ pub fn load(cr3: u64, image: []const u8, argv: []const []const u8) LoadError!Loa
     }
 
     const stack_top = try setupUserStack(cr3);
-    const sp = try pushArgv(cr3, stack_top, argv);
+    const sp = try pushInitialStack(cr3, stack_top, argv, envp);
     return .{
         .entry = hdr.e_entry,
         .stack_top = sp,
@@ -163,36 +167,63 @@ fn writeUserByte(cr3: u64, virt: u64, byte: u8) LoadError!void {
     try writeUserBytes(cr3, virt, &.{byte});
 }
 
-fn pushArgv(cr3: u64, stack_top: u64, argv: []const []const u8) LoadError!u64 {
+fn pushInitialStack(
+    cr3: u64,
+    stack_top: u64,
+    argv: []const []const u8,
+    envp: []const []const u8,
+) LoadError!u64 {
+    if (argv.len > max_argv or envp.len > max_envp) return LoadError.OutOfMemory;
+
     var sp = stack_top & ~@as(u64, 15);
+    var env_ptrs: [max_envp]u64 = undefined;
+    var arg_ptrs: [max_argv]u64 = undefined;
 
-    var string_ptrs: [32]u64 = undefined;
-    if (argv.len > string_ptrs.len) return LoadError.OutOfMemory;
+    var i = envp.len;
+    while (i > 0) {
+        i -= 1;
+        const entry = envp[i];
+        if (entry.len >= max_string_len) return LoadError.OutOfMemory;
+        if (sp < entry.len + 16) return LoadError.OutOfMemory;
+        sp -= entry.len + 1;
+        sp &= ~@as(u64, 7);
+        try writeUserBytes(cr3, sp, entry);
+        try writeUserByte(cr3, sp + entry.len, 0);
+        env_ptrs[i] = sp;
+    }
 
-    var i: usize = argv.len;
+    i = argv.len;
     while (i > 0) {
         i -= 1;
         const arg = argv[i];
+        if (arg.len >= max_string_len) return LoadError.OutOfMemory;
         if (sp < arg.len + 16) return LoadError.OutOfMemory;
         sp -= arg.len + 1;
         sp &= ~@as(u64, 7);
         try writeUserBytes(cr3, sp, arg);
         try writeUserByte(cr3, sp + arg.len, 0);
-        string_ptrs[i] = sp;
+        arg_ptrs[i] = sp;
     }
 
     sp -= 8;
     sp &= ~@as(u64, 7);
-    try writeUserU64(cr3, sp, 0); // envp terminator
+    try writeUserU64(cr3, sp, 0);
+
+    i = envp.len;
+    while (i > 0) {
+        i -= 1;
+        sp -= 8;
+        try writeUserU64(cr3, sp, env_ptrs[i]);
+    }
 
     sp -= 8;
-    try writeUserU64(cr3, sp, 0); // argv terminator
+    try writeUserU64(cr3, sp, 0);
 
     i = argv.len;
     while (i > 0) {
         i -= 1;
         sp -= 8;
-        try writeUserU64(cr3, sp, string_ptrs[i]);
+        try writeUserU64(cr3, sp, arg_ptrs[i]);
     }
 
     sp -= 8;

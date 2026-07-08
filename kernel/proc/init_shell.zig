@@ -22,7 +22,7 @@ pub fn launch() void {
         hal.console.println("init process create failed", .{});
         return;
     };
-    init_image = process.loadElf(init_proc.?, image_buf, &.{programs.initShellPath()}) catch {
+    init_image = process.loadElf(init_proc.?, image_buf, &.{programs.initShellPath()}, &.{}) catch {
         hal.console.println("shell load failed", .{});
         return;
     };

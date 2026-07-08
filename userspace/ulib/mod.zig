@@ -3,6 +3,7 @@
 pub const syscall = @import("syscall.zig");
 pub const string = @import("string.zig");
 pub const path = @import("path.zig");
+pub const environ = @import("environ.zig");
 pub const dns = @import("dns.zig");
 pub const format = @import("format.zig");
 pub const fs = @import("fs.zig");

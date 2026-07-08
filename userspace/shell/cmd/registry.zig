@@ -12,6 +12,7 @@ const cmd_pid = @import("pid.zig");
 const cmd_pwd = @import("pwd.zig");
 const cmd_rm = @import("rm.zig");
 const cmd_rmdir = @import("rmdir.zig");
+const cmd_export = @import("export.zig");
 const cmd_run = @import("run.zig");
 const cmd_write = @import("write.zig");
 
@@ -40,6 +41,7 @@ pub const entries = [_]Entry{
     .{ .name = "cd", .handler = .{ .parsed = cmd_cd.run }, .summary = "  cd [path]  change working directory (default /)" },
     .{ .name = "pwd", .handler = .{ .none = cmd_pwd.run }, .summary = "  pwd  print working directory" },
     .{ .name = "date", .handler = .{ .none = cmd_date.run }, .summary = "  date  print RTC date and time (UTC)" },
+    .{ .name = "export", .handler = .{ .parsed = cmd_export.run }, .summary = "  export [KEY=value]  set or list environment" },
 };
 
 pub fn dispatch(cmd: []const u8, parsed: *const argv.Parsed) void {
@@ -51,11 +53,6 @@ pub fn dispatch(cmd: []const u8, parsed: *const argv.Parsed) void {
             }
             return;
         }
-    }
-
-    if (cmd.len > 0 and cmd[0] == '/') {
-        io.writeStr("unknown command\n");
-        return;
     }
 
     cmd_run.run(parsed);

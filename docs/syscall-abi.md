@@ -44,7 +44,7 @@ Negative `RAX` values follow the Linux errno convention (e.g. `-38` = `ENOSYS`).
 | 47 | `recv` | Connected socket receive |
 | 49 | `bind` | Bind socket address |
 | 57 | `fork` | Duplicate process |
-| 59 | `execve` | Replace process image |
+| 59 | `execve` | Replace process image (`argv`/`envp` up to 16 strings, 255 bytes each) |
 | 60 | `exit` | Terminates current thread; does not return |
 | 61 | `wait4` | Reap child process |
 | 79 | `getcwd` | Copy current working directory |

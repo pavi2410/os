@@ -106,6 +106,8 @@ pub fn build(b: *std.Build) void {
     cowtest.root_module.addImport("cowtest_tap", cowtest_tap);
     const install_cowtest = b.addInstallArtifact(cowtest, user_install);
 
+    const install_envtest = helpers.addUserProgram(b, user_deps, "envtest", "userspace/envtest/main.zig", user_install);
+
     const shell = b.addExecutable(.{
         .name = "shell",
         .root_module = helpers.exeModule(b, "userspace/shell/main.zig", user_target, user_optimize),
@@ -152,6 +154,7 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_lsmem.step);
     b.getInstallStep().dependOn(&install_utest.step);
     b.getInstallStep().dependOn(&install_cowtest.step);
+    b.getInstallStep().dependOn(&install_envtest.step);
 
     const limine_kernel_mod = helpers.exeModule(b, "kernel/boot/limine.zig", kernel_target, optimize);
 
@@ -358,6 +361,15 @@ pub fn build(b: *std.Build) void {
 
     const time_math_host = helpers.hostModule(b, "userspace/ulib/time_math.zig");
 
+    const ulib_string_host = helpers.hostModule(b, "userspace/ulib/string.zig");
+    ulib_string_host.addImport("common/string", host_common.string);
+    const ulib_environ_host = helpers.hostModule(b, "userspace/ulib/environ.zig");
+    ulib_environ_host.addImport("string", ulib_string_host);
+
+    const environ_test_mod = helpers.hostTestModule(b, "test/userspace/environ_test.zig");
+    environ_test_mod.addImport("environ", ulib_environ_host);
+    const run_environ_tests = helpers.runHostTest(b, environ_test_mod);
+
     const ulib_helpers_test_mod = helpers.hostTestModule(b, "test/userspace/ulib_helpers_test.zig");
     ulib_helpers_test_mod.addImport("ulib_ip", ulib_ip_host);
     ulib_helpers_test_mod.addImport("ulib_format", ulib_format_host);
@@ -400,6 +412,7 @@ pub fn build(b: *std.Build) void {
         run_view_tests,
         run_string_tests,
         run_path_tests,
+        run_environ_tests,
         run_ulib_helpers_tests,
         run_pci_class_tests,
         run_time_math_tests,

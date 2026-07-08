@@ -4,6 +4,7 @@ pub const std_options = std_root.std_options;
 
 const arg = @import("argv.zig");
 const cwd = @import("cwd.zig");
+const environ = @import("environ.zig");
 const io = @import("io.zig");
 const ulib = @import("ulib");
 const registry = @import("cmd/registry.zig");
@@ -17,6 +18,7 @@ fn writePrompt() void {
 export fn main(argc: usize, raw_argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8 {
     _ = argc;
     _ = raw_argv;
+    environ.init();
     io.writeStr("Simple shell ready. Type 'help'.\n");
 
     var line: [256]u8 = undefined;

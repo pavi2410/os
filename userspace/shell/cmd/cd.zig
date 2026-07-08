@@ -1,5 +1,6 @@
 const argv = @import("../argv.zig");
 const cwd = @import("../cwd.zig");
+const environ = @import("../environ.zig");
 const io = @import("../io.zig");
 const path = @import("../path.zig");
 const ulib = @import("ulib");
@@ -26,4 +27,5 @@ pub fn run(parsed: *const argv.Parsed) void {
         io.writeStr("cd: path too long\n");
         return;
     }
+    environ.syncPwd();
 }

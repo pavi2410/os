@@ -70,7 +70,7 @@ class TestShellBuiltins:
         run_case(
             shell_session,
             "help",
-            "Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir, rmdir, cd, pwd, date",
+            "Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir, rmdir, cd, pwd, date, export",
             case="help",
         )
 
@@ -149,6 +149,15 @@ class TestShellFilesystem:
             "persisted on disk!",
             case="cat persist",
         )
+
+
+class TestShellEnvironment:
+    def test_export_envtest(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "export FOO=bar", case="export foo")
+        run_case(shell_session, "envtest", "bar", case="envtest reads FOO")
+
+    def test_path_lookup(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "lscpu", "Architecture:", case="PATH resolves lscpu")
 
 
 class TestShellPrograms:
