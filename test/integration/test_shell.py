@@ -174,6 +174,11 @@ class TestShellEnvironment:
         run_case(shell_session, "unset FOO", case="unset foo")
         run_case(shell_session, "envtest", "(unset)", case="envtest after unset")
 
+    def test_prefix_env(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "FOO=qux envtest", "qux", case="prefix env envtest")
+        run_case(shell_session, "envtest", "(unset)", case="prefix env not persisted")
+        run_case(shell_session, "FOO=bar echo $FOO", "bar", case="prefix env echo")
+
 
 class TestShellQuotes:
     def test_double_quoted_argument(self, shell_session: QemuShell) -> None:

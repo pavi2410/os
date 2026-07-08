@@ -1,6 +1,6 @@
 const argv = @import("../argv.zig");
 const io = @import("../io.zig");
-const status = @import("../status.zig");
+const status = @import("status");
 
 const cmd_cat = @import("cat.zig");
 const cmd_cd = @import("cd.zig");

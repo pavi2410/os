@@ -68,11 +68,43 @@ pub fn unset(name: []const u8) bool {
 }
 
 pub fn fillExecEnvp(out: *[max_entries + 1]?[*:0]const u8) void {
+    const ok = fillExecEnvpWithOverrides(out, &.{});
+    _ = ok;
+}
+
+pub fn fillExecEnvpWithOverrides(
+    out: *[max_entries + 1]?[*:0]const u8,
+    overrides: []const []const u8,
+) bool {
+    var out_count: usize = 0;
+
     var i: usize = 0;
     while (i < count) : (i += 1) {
-        out[i] = @ptrCast(&entries[i]);
+        const entry = entryAt(i);
+        if (isOverridden(entry, overrides)) continue;
+        if (out_count >= max_entries) return false;
+        out[out_count] = @ptrCast(&entries[i]);
+        out_count += 1;
     }
-    out[count] = null;
+
+    for (overrides) |override| {
+        if (out_count >= max_entries) return false;
+        out[out_count] = @ptrCast(override.ptr);
+        out_count += 1;
+    }
+
+    out[out_count] = null;
+    return true;
+}
+
+fn isOverridden(entry: []const u8, overrides: []const []const u8) bool {
+    const name_end = string.indexOfScalar(entry, '=') orelse return false;
+    const name = entry[0..name_end];
+    for (overrides) |override| {
+        const override_eq = string.indexOfScalar(override, '=') orelse continue;
+        if (string.eql(override[0..override_eq], name)) return true;
+    }
+    return false;
 }
 
 fn findIndex(key: []const u8) ?usize {

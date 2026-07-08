@@ -2,7 +2,8 @@ const argv_mod = @import("../argv.zig");
 const environ = @import("../environ.zig");
 const io = @import("../io.zig");
 const path = @import("../path.zig");
-const status = @import("../status.zig");
+const prefix_env = @import("../prefix_env.zig");
+const status = @import("status");
 const ulib = @import("ulib");
 
 var exec_path: [128]u8 = undefined;
@@ -29,7 +30,9 @@ pub fn run(parsed: *const argv_mod.Parsed) u8 {
             ulib.process.exit(1);
         };
         exec_argv[argc] = null;
-        environ.fillExecEnvp(&exec_envp);
+        if (!fillExecEnvp(&exec_envp)) {
+            ulib.process.exit(1);
+        }
         _ = ulib.process.execve(@ptrCast(&exec_path), @ptrCast(&exec_argv), @ptrCast(&exec_envp));
         ulib.process.exit(1);
     }
@@ -73,7 +76,7 @@ fn resolvePath(input: []const u8, out: []u8) bool {
 }
 
 fn lookupInPath(name: []const u8, out: []u8) bool {
-    const path_value = environ.getValue("PATH") orelse "/BIN";
+    const path_value = prefix_env.lookup("PATH") orelse "/BIN";
     var start: usize = 0;
     while (start <= path_value.len) {
         const end = colonEnd(path_value, start);
@@ -111,4 +114,18 @@ fn isExecutable(path_str: []const u8) bool {
 fn toUpper(ch: u8) u8 {
     if (ch >= 'a' and ch <= 'z') return ch - 32;
     return ch;
+}
+
+fn fillExecEnvp(out: *[environ.max_entries + 1]?[*:0]const u8) bool {
+    if (prefix_env.count() == 0) {
+        environ.fillExecEnvp(out);
+        return true;
+    }
+
+    var overrides: [prefix_env.max_overrides][]const u8 = undefined;
+    var i: usize = 0;
+    while (i < prefix_env.count()) : (i += 1) {
+        overrides[i] = prefix_env.overrideAt(i);
+    }
+    return environ.fillExecEnvpWithOverrides(out, overrides[0..prefix_env.count()]);
 }
