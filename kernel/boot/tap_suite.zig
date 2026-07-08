@@ -4,17 +4,17 @@ const tap_mod = @import("common/tap");
 const udp_test = @import("../net/udp_test.zig");
 const vfs = @import("../fs/vfs.zig");
 
-const Tap = tap_mod.Harness(hal.console.writeString);
+const Tap = tap_mod.Harness(hal.console.writeAll);
 
 pub fn run() void {
-    hal.console.writeString("\r\n--- TAP kernel ---\r\n");
+    hal.console.println("\n--- TAP kernel ---", .{});
     Tap.version();
     Tap.plan(3);
     Tap.check("vfs readme read", testVfsReadme());
     Tap.check("udp dns reply", udp_test.dnsReplyOk());
     Tap.check("physical pages free", physical.freePages() > 0);
     _ = Tap.finish();
-    hal.console.writeString("--- TAP kernel end ---\r\n");
+    hal.console.println("--- TAP kernel end ---", .{});
 }
 
 fn testVfsReadme() bool {

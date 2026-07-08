@@ -52,14 +52,14 @@ pub fn init(ctx: BootContext) void {
 
     hal.console.init();
 
-    hal.console.writeString("\r\n=== Kernel Entry ===\r\n");
+    hal.console.println("\n=== Kernel Entry ===", .{});
 
     if (ctx.bootloader_info) |info| {
         if (info.name) |name| {
-            hal.console.printf("Bootloader: {s}\r\n", .{name});
+            hal.console.println("Bootloader: {s}", .{name});
         }
         if (info.version) |version| {
-            hal.console.printf("Version: {s}\r\n", .{version});
+            hal.console.println("Version: {s}", .{version});
         }
     }
 
@@ -80,7 +80,7 @@ pub fn init(ctx: BootContext) void {
         printAllocatorStats();
     }
 
-    hal.console.writeString("\r\n=== Phase 3 runtime ===\r\n");
+    hal.console.println("\n=== Phase 3 runtime ===", .{});
     syscall.init();
     process.init();
     tty.init();
@@ -112,7 +112,7 @@ fn initBlock() void {
 
 fn initVfs() void {
     vfs.init() catch {
-        hal.console.writeString("VFS init failed\r\n");
+        hal.console.println("VFS init failed", .{});
         return;
     };
     vfs.logStatus();
@@ -120,31 +120,31 @@ fn initVfs() void {
 
 fn initPci(rsdp_virt: u64) void {
     pci.init(rsdp_virt) catch {
-        hal.console.writeString("PCI init failed\r\n");
+        hal.console.println("PCI init failed", .{});
         return;
     };
     pci.logDevices();
 }
 
 fn initApic(rsdp_virt: u64) void {
-    hal.console.writeString("\r\n--- APIC ---\r\n");
+    hal.console.println("\n--- APIC ---", .{});
     apic.init(rsdp_virt) catch |err| {
-        hal.console.printf("APIC init failed: {s}\r\n", .{@errorName(err)});
+        hal.console.println("APIC init failed: {s}", .{@errorName(err)});
         hal.processor.haltForever();
     };
-    hal.console.printf("LAPIC ID: {d}\r\n", .{apic.lapicId()});
-    hal.console.printf("IOAPIC count: {d}\r\n", .{apic.ioApicCount()});
-    hal.console.writeString("Legacy PIC masked, IOAPIC pins masked\r\n");
+    hal.console.println("LAPIC ID: {d}", .{apic.lapicId()});
+    hal.console.println("IOAPIC count: {d}", .{apic.ioApicCount()});
+    hal.console.println("Legacy PIC masked, IOAPIC pins masked", .{});
 }
 
 fn initTimer() void {
-    hal.console.writeString("\r\n--- Timer ---\r\n");
+    hal.console.println("\n--- Timer ---", .{});
     interrupts.registerIrq(timer.timer_vector, interrupts.timerIrqHandler);
     const ticks_per_irq = timer.init() catch {
-        hal.console.writeString("LAPIC timer init failed\r\n");
+        hal.console.println("LAPIC timer init failed", .{});
         hal.processor.haltForever();
     };
-    hal.console.printf("LAPIC periodic timer started ({d} Hz, {d} ticks/irq)\r\n", .{
+    hal.console.println("LAPIC periodic timer started ({d} Hz, {d} ticks/irq)", .{
         100,
         ticks_per_irq,
     });
@@ -176,28 +176,28 @@ fn reserveMemoryMapBuffer(response: *const limine.MemmapResponse) void {
 }
 
 fn initMemoryAllocators() void {
-    hal.console.writeString("\r\n--- Memory Allocators ---\r\n");
+    hal.console.println("\n--- Memory Allocators ---", .{});
     physical.init();
     virtual.init();
     heap.init() catch {
-        hal.console.writeString("heap init failed\r\n");
+        hal.console.println("heap init failed", .{});
         hal.processor.haltForever();
     };
     page_ref.init(physical.maxPfn()) catch {
-        hal.console.writeString("page ref init failed\r\n");
+        hal.console.println("page ref init failed", .{});
         hal.processor.haltForever();
     };
-    hal.console.writeString("physical, virtual, and heap allocators initialized\r\n");
+    hal.console.println("physical, virtual, and heap allocators initialized", .{});
 }
 
 fn printAllocatorStats() void {
-    hal.console.printf("Physical pages: total={d} free={d} used={d}\r\n", .{
+    hal.console.println("Physical pages: total={d} free={d} used={d}", .{
         physical.totalPages(),
         physical.freePages(),
         physical.usedPages(),
     });
-    hal.console.printf("Kernel mapped pages: {d}\r\n", .{virtual.mappedPages()});
-    hal.console.printf("Heap live allocations: {d} bytes={d} allocs={d} frees={d}\r\n", .{
+    hal.console.println("Kernel mapped pages: {d}", .{virtual.mappedPages()});
+    hal.console.println("Heap live allocations: {d} bytes={d} allocs={d} frees={d}", .{
         heap.liveAllocations(),
         heap.liveBytes(),
         heap.totalAllocs(),
@@ -206,7 +206,7 @@ fn printAllocatorStats() void {
 }
 
 fn runPhysicalStressTest() void {
-    hal.console.writeString("\r\n--- Physical Page Stress ---\r\n");
+    hal.console.println("\n--- Physical Page Stress ---", .{});
 
     const initial_free = physical.freePages();
     var pages: [64]u64 = undefined;
@@ -228,15 +228,15 @@ fn runPhysicalStressTest() void {
         allocated = 0;
     }
 
-    hal.console.printf("Physical stress cycles: {d}\r\n", .{cycle});
-    hal.console.printf("Physical free pages after stress: {d} (initial {d})\r\n", .{
+    hal.console.println("Physical stress cycles: {d}", .{cycle});
+    hal.console.println("Physical free pages after stress: {d} (initial {d})", .{
         physical.freePages(),
         initial_free,
     });
 }
 
 fn runHeapStressTest() void {
-    hal.console.writeString("\r\n--- Kernel Heap Stress ---\r\n");
+    hal.console.println("\n--- Kernel Heap Stress ---", .{});
 
     const sizes = [_]usize{ 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
 
@@ -251,8 +251,8 @@ fn runHeapStressTest() void {
         heap.kfree(ptr) catch break;
     }
 
-    hal.console.printf("Heap stress cycles: {d}\r\n", .{cycle});
-    hal.console.printf("Heap counters: live={d} allocs={d} frees={d}\r\n", .{
+    hal.console.println("Heap stress cycles: {d}", .{cycle});
+    hal.console.println("Heap counters: live={d} allocs={d} frees={d}", .{
         heap.liveAllocations(),
         heap.totalAllocs(),
         heap.totalFrees(),
@@ -260,14 +260,14 @@ fn runHeapStressTest() void {
 }
 
 fn verifyMemoryMapBuffer(response: *const limine.MemmapResponse) void {
-    hal.console.writeString("\r\n--- Memory Map Buffer Check ---\r\n");
-    hal.console.printf("Memory map entries still readable: {d}\r\n", .{response.entry_count});
+    hal.console.println("\n--- Memory Map Buffer Check ---", .{});
+    hal.console.println("Memory map entries still readable: {d}", .{response.entry_count});
 
     if (response.entries) |entries| {
         var i: usize = 0;
         while (i < response.entry_count and i < 3) : (i += 1) {
             if (entries[i]) |entry| {
-                hal.console.printf("  entry {d}: base=0x{x} len=0x{x}\r\n", .{
+                hal.console.println("  entry {d}: base=0x{x} len=0x{x}", .{
                     i,
                     entry.base,
                     entry.length,
@@ -279,31 +279,31 @@ fn verifyMemoryMapBuffer(response: *const limine.MemmapResponse) void {
 
 fn verifyHigherHalfExecution() void {
     const rip = cpu.readRip();
-    hal.console.printf("RIP: 0x{x} (higher-half: {s})\r\n", .{
+    hal.console.println("RIP: 0x{x} (higher-half: {s})", .{
         rip,
         if (address.isHigherHalf(rip)) "yes" else "NO",
     });
 }
 
 fn verifyPagingHelpers() void {
-    hal.console.printf("CR3: 0x{x}\r\n", .{paging.readCr3()});
-    hal.console.printf("Page fault probe 0x{x} mapped: {s}\r\n", .{
+    hal.console.println("CR3: 0x{x}", .{paging.readCr3()});
+    hal.console.println("Page fault probe 0x{x} mapped: {s}", .{
         page_fault_test_addr,
         if (paging.isMapped(page_fault_test_addr)) "yes" else "no",
     });
 }
 
 fn triggerDeliberatePageFault() noreturn {
-    hal.console.writeString("Triggering deliberate page fault...\r\n");
+    hal.console.println("Triggering deliberate page fault...", .{});
     const bad_ptr: *volatile u8 = @ptrFromInt(page_fault_test_addr);
     _ = bad_ptr.*;
     hal.processor.haltForever();
 }
 
 fn printMemoryMap() void {
-    hal.console.writeString("\r\n--- Physical Memory Map ---\r\n");
+    hal.console.println("\n--- Physical Memory Map ---", .{});
     for (memory_map.regionsSlice()) |region| {
-        hal.console.printf("  [{s}] 0x{x} - 0x{x} ({d} pages)", .{
+        hal.console.print("  [{s}] 0x{x} - 0x{x} ({d} pages)", .{
             region.kind.name(),
             region.start,
             region.end,
@@ -311,12 +311,12 @@ fn printMemoryMap() void {
         });
 
         if (region.boot_reserved) {
-            hal.console.printf("  BOOT:{s}", .{region.reservation.?});
+            hal.console.print("  BOOT:{s}", .{region.reservation.?});
         }
 
-        hal.console.printf("  alloc={s}\r\n", .{if (region.allocatable) "yes" else "no"});
+        hal.console.println("  alloc={s}", .{if (region.allocatable) "yes" else "no"});
     }
-    hal.console.printf("Total regions: {d}\r\n", .{memory_map.regionCount()});
+    hal.console.println("Total regions: {d}", .{memory_map.regionCount()});
 }
 
 pub fn run() noreturn {

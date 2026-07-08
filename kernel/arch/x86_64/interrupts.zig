@@ -67,38 +67,38 @@ fn handleUserException(frame_ptr: *Frame) bool {
 }
 
 fn handleDoubleFault(frame_ptr: *Frame) void {
-    serial.writeString("\r\n!!! Double Fault !!!\r\n");
-    serial.printf("RIP:  0x{x}\r\n", .{frame_ptr.rip});
-    serial.printf("Code: 0x{x}\r\n", .{frame_ptr.error_code});
+    serial.println("\n!!! Double Fault !!!", .{});
+    serial.println("RIP:  0x{x}", .{frame_ptr.rip});
+    serial.println("Code: 0x{x}", .{frame_ptr.error_code});
     haltForever();
 }
 
 fn handlePageFault(frame_ptr: *Frame) void {
     const cr2 = readCr2();
-    serial.writeString("\r\n!!! Page Fault !!!\r\n");
-    serial.printf("CR2:  0x{x}\r\n", .{cr2});
-    serial.printf("RIP:  0x{x}\r\n", .{frame_ptr.rip});
-    serial.printf("Code: 0x{x}\r\n", .{frame_ptr.error_code});
+    serial.println("\n!!! Page Fault !!!", .{});
+    serial.println("CR2:  0x{x}", .{cr2});
+    serial.println("RIP:  0x{x}", .{frame_ptr.rip});
+    serial.println("Code: 0x{x}", .{frame_ptr.error_code});
     haltForever();
 }
 
 fn handleGeneralProtectionFault(frame_ptr: *Frame) void {
-    serial.writeString("\r\n!!! General Protection Fault !!!\r\n");
-    serial.printf("RIP:  0x{x}\r\n", .{frame_ptr.rip});
-    serial.printf("Code: 0x{x}\r\n", .{frame_ptr.error_code});
+    serial.println("\n!!! General Protection Fault !!!", .{});
+    serial.println("RIP:  0x{x}", .{frame_ptr.rip});
+    serial.println("Code: 0x{x}", .{frame_ptr.error_code});
     haltForever();
 }
 
 fn handleDefaultException(frame_ptr: *Frame) void {
-    serial.writeString("\r\n!!! Unhandled Exception !!!\r\n");
-    serial.printf("Vector: {d}\r\n", .{frame_ptr.vector});
-    serial.printf("RIP:    0x{x}\r\n", .{frame_ptr.rip});
-    serial.printf("Code:   0x{x}\r\n", .{frame_ptr.error_code});
+    serial.println("\n!!! Unhandled Exception !!!", .{});
+    serial.println("Vector: {d}", .{frame_ptr.vector});
+    serial.println("RIP:    0x{x}", .{frame_ptr.rip});
+    serial.println("Code:   0x{x}", .{frame_ptr.error_code});
     haltForever();
 }
 
 fn handleUnhandledIrq(vector: u8) void {
-    serial.printf("\r\n!!! Unhandled IRQ vector {d} !!!\r\n", .{vector});
+    serial.println("\n!!! Unhandled IRQ vector {d} !!!", .{vector});
     if (vector >= apic.irq_vector_base and vector < irq_vector_end) {
         apic.lapicEoi();
     }

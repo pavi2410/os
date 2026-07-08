@@ -172,7 +172,7 @@ pub fn exit() noreturn {
     if (on_exit) |handler| {
         handler();
     }
-    hal.console.writeString("\r\nthread exited without a scheduler\r\n");
+    hal.console.println("\nthread exited without a scheduler", .{});
     cpu.haltForever();
 }
 
@@ -194,7 +194,7 @@ fn initContext(stack: [*]u8, stack_size: usize, entry: EntryFn) SavedContext {
 
 /// Cooperative ping-pong between bootstrap and a worker thread.
 pub fn runSwitchTest(switch_target: usize) void {
-    hal.console.writeString("\r\n--- Thread context switch test ---\r\n");
+    hal.console.println("\n--- Thread context switch test ---", .{});
 
     var bootstrap = Thread{
         .id = 0,
@@ -210,7 +210,7 @@ pub fn runSwitchTest(switch_target: usize) void {
     switch_test_counter = 0;
 
     const worker = create(switchTestWorker, "switch-worker", default_stack_size) catch {
-        hal.console.writeString("thread create failed\r\n");
+        hal.console.println("thread create failed", .{});
         cpu.haltForever();
     };
 
@@ -220,7 +220,7 @@ pub fn runSwitchTest(switch_target: usize) void {
         bootstrap.switchTo(worker);
     }
 
-    hal.console.printf("context switches: worker={d} bootstrap={d}\r\n", .{
+    hal.console.println("context switches: worker={d} bootstrap={d}", .{
         switch_test_counter,
         bootstrap_switches,
     });

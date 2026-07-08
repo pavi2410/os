@@ -1,3 +1,4 @@
+const std = @import("std");
 const cpu_arch = @import("arch/x86_64/cpu.zig");
 const interrupts = @import("arch/x86_64/interrupts.zig");
 const rtc = @import("arch/x86_64/rtc.zig");
@@ -8,12 +9,20 @@ pub const console = struct {
         serial.init();
     }
 
-    pub fn writeString(s: []const u8) void {
-        serial.writeString(s);
+    pub fn writer() *std.Io.Writer {
+        return serial.writer();
     }
 
-    pub fn printf(comptime fmt: []const u8, args: anytype) void {
-        serial.printf(fmt, args);
+    pub fn print(comptime fmt: []const u8, args: anytype) void {
+        serial.print(fmt, args);
+    }
+
+    pub fn println(comptime fmt: []const u8, args: anytype) void {
+        serial.println(fmt, args);
+    }
+
+    pub fn writeAll(bytes: []const u8) void {
+        serial.writeAll(bytes);
     }
 };
 

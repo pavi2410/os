@@ -134,12 +134,12 @@ fn invalidateHandlesAt(id: filesystem.FileId) void {
 }
 
 pub fn logStatus() void {
-    hal.console.writeString("\r\n--- VFS ---\r\n");
+    hal.console.println("\n--- VFS ---", .{});
     if (!isReady()) {
-        hal.console.writeString("FAT32 not mounted\r\n");
+        hal.console.println("FAT32 not mounted", .{});
         return;
     }
-    hal.console.writeString("FAT32 mounted (read/write)\r\n");
+    hal.console.println("FAT32 mounted (read/write)", .{});
 }
 
 fn getHandle(handle: u32) VfsError!*Handle {

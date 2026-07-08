@@ -10,7 +10,7 @@ var init_image: ?user_loader.LoadedImage = null;
 
 pub fn launch() void {
     const image_buf = programs.load(programs.initShellPath()) catch |err| {
-        hal.console.printf("shell not found on disk ({s}): {s} (run: mise run disk)\r\n", .{
+        hal.console.println("shell not found on disk ({s}): {s} (run: mise run disk)", .{
             programs.initShellPath(),
             @errorName(err),
         });
@@ -19,20 +19,20 @@ pub fn launch() void {
     defer programs.free(image_buf);
 
     init_proc = process.create() catch {
-        hal.console.writeString("init process create failed\r\n");
+        hal.console.println("init process create failed", .{});
         return;
     };
     init_image = process.loadElf(init_proc.?, image_buf, &.{programs.initShellPath()}) catch {
-        hal.console.writeString("shell load failed\r\n");
+        hal.console.println("shell load failed", .{});
         return;
     };
 
     scheduler.spawn(initShellEntry, "init-shell") catch {
-        hal.console.writeString("init-shell spawn failed\r\n");
+        hal.console.println("init-shell spawn failed", .{});
         return;
     };
 
-    hal.console.writeString("Starting shell\r\n");
+    hal.console.println("Starting shell", .{});
 }
 
 fn initShellEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {

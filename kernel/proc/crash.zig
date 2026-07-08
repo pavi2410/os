@@ -81,38 +81,38 @@ pub fn log(trap: *const exc_frame.Frame, info: Info) void {
     const cr3 = if (proc) |p| p.address_space.cr3 else 0;
     const signal = signalForVector(info.vector);
 
-    serial.writeString("\r\n--- userspace crash ---\r\n");
-    serial.printf("pid: {d}\r\n", .{pid});
-    serial.printf("exception: {s} (vector {d})\r\n", .{ exceptionName(info.vector), info.vector });
-    serial.printf("signal: {s} ({d})\r\n", .{ signalName(signal), signal });
+    serial.println("\n--- userspace crash ---", .{});
+    serial.println("pid: {d}", .{pid});
+    serial.println("exception: {s} (vector {d})", .{ exceptionName(info.vector), info.vector });
+    serial.println("signal: {s} ({d})", .{ signalName(signal), signal });
 
     if (info.vector == 14) {
         const addr = info.fault_addr orelse 0;
-        serial.printf("fault address: 0x{x}\r\n", .{addr});
-        serial.printf("reason: {s}\r\n", .{pageFaultDescription(info.error_code)});
+        serial.println("fault address: 0x{x}", .{addr});
+        serial.println("reason: {s}", .{pageFaultDescription(info.error_code)});
     } else if (info.fault_addr) |addr| {
-        serial.printf("fault address: 0x{x}\r\n", .{addr});
+        serial.println("fault address: 0x{x}", .{addr});
     }
 
-    serial.printf("rip: 0x{x}\r\n", .{trap.rip});
-    serial.printf("rbp: 0x{x}\r\n", .{trap.rbp});
+    serial.println("rip: 0x{x}", .{trap.rip});
+    serial.println("rbp: 0x{x}", .{trap.rbp});
 
     if (cr3 != 0) {
         var frames: [max_backtrace_frames]u64 = undefined;
         const n = walkBacktrace(cr3, trap.rbp, trap.rip, &frames);
         if (n > 0) {
-            serial.writeString("backtrace:\r\n");
+            serial.println("backtrace:", .{});
             var i: usize = 0;
             while (i < n) : (i += 1) {
-                serial.printf("  #{d} 0x{x}\r\n", .{ i, frames[i] });
+                serial.println("  #{d} 0x{x}", .{ i, frames[i] });
             }
         } else {
-            serial.writeString("backtrace: (unavailable)\r\n");
+            serial.println("backtrace: (unavailable)", .{});
         }
     }
 
-    serial.printf("exit status: {d}\r\n", .{exitStatusForVector(info.vector)});
-    serial.writeString("-----------------------\r\n");
+    serial.println("exit status: {d}", .{exitStatusForVector(info.vector)});
+    serial.println("-----------------------", .{});
 }
 
 pub fn handleUserFault(trap: *exc_frame.Frame, info: Info) noreturn {

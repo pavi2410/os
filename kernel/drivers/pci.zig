@@ -199,18 +199,16 @@ pub fn writeConfig32(addr: Addr, offset: u8, value: u32) void {
 }
 
 pub fn logDevices() void {
-    hal.console.writeString("\r\n--- PCI ---\r\n");
+    hal.console.println("\n--- PCI ---", .{});
     if (use_mcfg) {
-        hal.console.printf("Config access: MCFG ({d} allocation(s))\r\n", .{mcfg_allocs.len});
+        hal.console.println("Config access: MCFG ({d} allocation(s))", .{mcfg_allocs.len});
     } else {
-        hal.console.writeString("Config access: legacy I/O ports\r\n");
+        hal.console.println("Config access: legacy I/O ports", .{});
     }
-    hal.console.printf("Devices found: {d}\r\n", .{device_count});
+    hal.console.println("Devices found: {d}", .{device_count});
 
     for (devices()) |dev| {
-        hal.console.printf(
-            "  {x:0>2}:{x:0>2}.{d} {x:0>4}:{x:0>4} class {x:0>2}.{x:0>2}\r\n",
-            .{
+        hal.console.println("  {x:0>2}:{x:0>2}.{d} {x:0>4}:{x:0>4} class {x:0>2}.{x:0>2}", .{
                 dev.bus,
                 dev.device,
                 dev.function,
@@ -218,8 +216,7 @@ pub fn logDevices() void {
                 dev.device_id,
                 dev.class_code,
                 dev.subclass,
-            },
-        );
+            },);
     }
 }
 

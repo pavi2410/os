@@ -2,10 +2,10 @@ const numbers = @import("numbers.zig");
 const hal = @import("../hal.zig");
 const thread = @import("../proc/thread.zig");
 
-const msg = "syscall test ok\r\n";
+const msg = "syscall test ok\n";
 
 pub fn runInThread() void {
-    hal.console.writeString("\r\n--- Syscall test ---\r\n");
+    hal.console.println("\n--- Syscall test ---", .{});
 
     const written = invokeSyscall(.{
         .nr = numbers.write,
@@ -15,11 +15,11 @@ pub fn runInThread() void {
     });
 
     if (written != @as(i64, @intCast(msg.len))) {
-        hal.console.printf("syscall write failed: {d}\r\n", .{written});
+        hal.console.println("syscall write failed: {d}", .{written});
         return;
     }
 
-    hal.console.writeString("syscall write ok\r\n");
+    hal.console.println("syscall write ok", .{});
 }
 
 /// Issue a syscall from ring 0; the entry stub returns via `jmp` for kernel callers.
@@ -49,6 +49,6 @@ fn invokeSyscall(args: struct {
 pub fn threadEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
     runInThread();
     _ = invokeSyscall(.{ .nr = numbers.exit });
-    hal.console.writeString("syscall exit returned unexpectedly\r\n");
+    hal.console.println("syscall exit returned unexpectedly", .{});
     thread.exit();
 }

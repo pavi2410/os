@@ -45,10 +45,6 @@ pub const Tty = struct {
 
     fn writeOut(self: *Tty, ch: u8) void {
         _ = self;
-        if (ch == '\n') {
-            serial.writeString("\r\n");
-            return;
-        }
         serial.writeByte(ch);
     }
 
@@ -87,7 +83,7 @@ pub const Tty = struct {
     fn handleGround(self: *Tty, ch: u8) TtyError!void {
         switch (ch) {
             0x03 => {
-                if (self.echo) serial.writeString("^C\r\n");
+                if (self.echo) serial.println("^C", .{});
                 self.line_len = 0;
                 self.line_ready = false;
                 return TtyError.WouldBlock;
@@ -114,7 +110,7 @@ pub const Tty = struct {
     fn backspace(self: *Tty) TtyError!void {
         if (self.line_len == 0) return;
         self.line_len -= 1;
-        if (self.echo) serial.writeString("\x08 \x08");
+        if (self.echo) serial.writeAll("\x08 \x08");
     }
 
     fn pushLine(self: *Tty, ch: u8) TtyError!void {

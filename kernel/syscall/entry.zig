@@ -101,5 +101,5 @@ pub fn init() void {
     cpu.wrmsr(LSTAR_MSR, @intFromPtr(&syscall_entry));
     cpu.wrmsr(SFMASK_MSR, SFMASK_IF);
 
-    hal.console.writeString("syscall/sysret entry configured (Linux x86_64 ABI)\r\n");
+    hal.console.println("syscall/sysret entry configured (Linux x86_64 ABI)", .{});
 }

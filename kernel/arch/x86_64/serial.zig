@@ -12,6 +12,14 @@ const LINE_CTRL: u16 = 3; // Line control register
 const MODEM_CTRL: u16 = 4; // Modem control register
 const LINE_STATUS: u16 = 5; // Line status register
 
+/// Unbuffered so `print` and raw `writeByte` stay ordered on the UART.
+var serial_writer: std.Io.Writer = .{
+    .vtable = &.{
+        .drain = drain,
+    },
+    .buffer = &.{},
+};
+
 /// Initialize the serial port (COM1)
 pub fn init() void {
     // Disable all interrupts
@@ -55,12 +63,16 @@ fn isTransmitEmpty() bool {
     return (inb(COM1 + LINE_STATUS) & 0x20) != 0;
 }
 
-/// Write a single byte to the serial port
-pub fn writeByte(byte: u8) void {
-    // Wait for transmit buffer to be empty
+/// Write a single byte to the UART with no newline translation.
+pub fn writeByteRaw(byte: u8) void {
     while (!isTransmitEmpty()) {}
-
     outb(COM1 + DATA, byte);
+}
+
+/// Write a single byte, mapping `\n` to `\r\n` for serial terminals.
+pub fn writeByte(byte: u8) void {
+    if (byte == '\n') writeByteRaw('\r');
+    writeByteRaw(byte);
 }
 
 /// Check if receive buffer has data
@@ -84,26 +96,43 @@ pub fn readByteBlocking() u8 {
     return inb(COM1 + DATA);
 }
 
-/// Write a string to the serial port
-pub fn writeString(str: []const u8) void {
-    for (str) |c| {
-        writeByte(c);
-    }
+/// Serial console writer (`\n` → `\r\n` on drain).
+pub fn writer() *std.Io.Writer {
+    return &serial_writer;
 }
 
-/// Write a null-terminated string to the serial port
-pub fn writeStringZ(str: [*:0]const u8) void {
+/// Formatted print via `std.Io.Writer.print`.
+pub fn print(comptime fmt: []const u8, args: anytype) void {
+    writer().print(fmt, args) catch {};
+}
+
+/// Formatted print with a trailing newline.
+pub fn println(comptime fmt: []const u8, args: anytype) void {
+    writer().print(fmt ++ "\n", args) catch {};
+}
+
+/// Write bytes through the console writer (applies `\n` → `\r\n`).
+pub fn writeAll(bytes: []const u8) void {
+    writer().writeAll(bytes) catch {};
+}
+
+fn drain(w: *std.Io.Writer, data: []const []const u8, splat: usize) std.Io.Writer.Error!usize {
+    _ = w;
+    var consumed: usize = 0;
+    if (data.len == 0) return 0;
+
+    for (data[0 .. data.len - 1]) |chunk| {
+        for (chunk) |byte| writeByte(byte);
+        consumed += chunk.len;
+    }
+
+    const pattern = data[data.len - 1];
     var i: usize = 0;
-    while (str[i] != 0) : (i += 1) {
-        writeByte(str[i]);
+    while (i < splat) : (i += 1) {
+        for (pattern) |byte| writeByte(byte);
+        consumed += pattern.len;
     }
-}
-
-/// Printf-style function for serial output
-pub fn printf(comptime format: []const u8, args: anytype) void {
-    var buffer: [1024]u8 = undefined;
-    const result = std.fmt.bufPrint(&buffer, format, args) catch return;
-    writeString(result);
+    return consumed;
 }
 
 /// Output a byte to a port

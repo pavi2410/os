@@ -112,13 +112,13 @@ fn blockError(err: BlkError) block.Error {
 }
 
 pub fn logStatus() void {
-    hal.console.writeString("\r\n--- VirtIO Block ---\r\n");
+    hal.console.println("\n--- VirtIO Block ---", .{});
     if (!ready) {
-        hal.console.writeString("Not available\r\n");
+        hal.console.println("Not available", .{});
         return;
     }
-    hal.console.printf("Queue size: {d}\r\n", .{queue.size});
-    hal.console.printf("Capacity: {d} sectors ({d} MiB)\r\n", .{
+    hal.console.println("Queue size: {d}", .{queue.size});
+    hal.console.println("Capacity: {d} sectors ({d} MiB)", .{
         capacity_sectors,
         (capacity_sectors * sector_size) / (1024 * 1024),
     });
@@ -132,14 +132,14 @@ pub fn selfTest() void {
 
     const sector = @as([*]u8, @ptrFromInt(test_sector_page))[0..sector_size];
     readSectors(0, sector) catch {
-        hal.console.writeString("virtio-blk read test failed\r\n");
+        hal.console.println("virtio-blk read test failed", .{});
         return;
     };
 
     if (sector[510] == 0x55 and sector[511] == 0xAA) {
-        hal.console.writeString("virtio-blk sector 0 boot signature ok\r\n");
+        hal.console.println("virtio-blk sector 0 boot signature ok", .{});
     } else {
-        hal.console.writeString("virtio-blk sector 0 read ok (no MBR signature)\r\n");
+        hal.console.println("virtio-blk sector 0 read ok (no MBR signature)", .{});
     }
 }
 

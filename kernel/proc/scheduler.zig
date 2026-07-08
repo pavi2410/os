@@ -68,7 +68,7 @@ pub fn init() void {
     thread.setCurrent(&bootstrap);
 
     idle_thread = thread.create(idleEntry, "idle", thread.default_stack_size) catch {
-        hal.console.writeString("idle thread create failed\r\n");
+        hal.console.println("idle thread create failed", .{});
         cpu.haltForever();
     };
 
@@ -107,7 +107,7 @@ pub fn yield() void {
     const self = thread.currentThread() orelse return;
     if (self.state != .dead and self != idle_thread) {
         ready_queue.push(self) catch {
-            hal.console.writeString("ready queue push failed\r\n");
+            hal.console.println("ready queue push failed", .{});
             cpu.haltForever();
         };
     }
@@ -115,11 +115,11 @@ pub fn yield() void {
 }
 
 pub fn start() noreturn {
-    hal.console.writeString("\r\n--- Scheduler ---\r\n");
+    hal.console.println("\n--- Scheduler ---", .{});
 
     init_shell.launch();
 
-    hal.console.writeString("Enabling interrupts\r\n");
+    hal.console.println("Enabling interrupts", .{});
     cpu.sti();
     schedule();
     cpu.haltForever();
@@ -146,14 +146,14 @@ fn idleEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
 
 fn demoThreadA() callconv(.{ .x86_64_sysv = .{} }) noreturn {
     while (true) {
-        hal.console.writeString("A");
+        hal.console.writeAll("A");
         yieldIfRequested();
     }
 }
 
 fn demoThreadB() callconv(.{ .x86_64_sysv = .{} }) noreturn {
     while (true) {
-        hal.console.writeString("B");
+        hal.console.writeAll("B");
         yieldIfRequested();
     }
 }

@@ -213,16 +213,16 @@ fn netError(err: NetError) net_device.Error {
 }
 
 pub fn logStatus() void {
-    hal.console.writeString("\r\n--- VirtIO Net ---\r\n");
+    hal.console.println("\n--- VirtIO Net ---", .{});
     if (!ready) {
-        hal.console.writeString("Not available\r\n");
+        hal.console.println("Not available", .{});
         return;
     }
     var mac_buf: [net_mac.Mac.format_len]u8 = undefined;
     if (hw_mac.formatBuf(&mac_buf)) |s| {
-        hal.console.printf("MAC: {s}\r\n", .{s});
+        hal.console.println("MAC: {s}", .{s});
     }
-    hal.console.printf("RX slots: {d}, TX queue: {d}\r\n", .{ rx_slots, tx_queue.size });
+    hal.console.println("RX slots: {d}, TX queue: {d}", .{ rx_slots, tx_queue.size });
 }
 
 fn setupRxSlots() NetError!void {
