@@ -382,6 +382,14 @@ pub fn build(b: *std.Build) void {
     environ_test_mod.addImport("environ", ulib_environ_host);
     const run_environ_tests = helpers.runHostTest(b, environ_test_mod);
 
+    const shell_environ_stub = helpers.hostModule(b, "test/stub/shell_environ_stub.zig");
+    const shell_expand_host = helpers.hostModule(b, "userspace/shell/expand.zig");
+    shell_expand_host.addImport("environ", shell_environ_stub);
+
+    const shell_expand_test_mod = helpers.hostTestModule(b, "test/userspace/shell_expand_test.zig");
+    shell_expand_test_mod.addImport("expand", shell_expand_host);
+    const run_shell_expand_tests = helpers.runHostTest(b, shell_expand_test_mod);
+
     const ulib_helpers_test_mod = helpers.hostTestModule(b, "test/userspace/ulib_helpers_test.zig");
     ulib_helpers_test_mod.addImport("ulib_ip", ulib_ip_host);
     ulib_helpers_test_mod.addImport("ulib_format", ulib_format_host);
@@ -426,6 +434,7 @@ pub fn build(b: *std.Build) void {
         run_string_tests,
         run_path_tests,
         run_environ_tests,
+        run_shell_expand_tests,
         run_ulib_helpers_tests,
         run_pci_class_tests,
         run_time_math_tests,

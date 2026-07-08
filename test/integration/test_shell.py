@@ -85,6 +85,11 @@ class TestShellBuiltins:
     def test_echo(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "echo hello from echo", "hello from echo", case="echo")
 
+    def test_echo_variable(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "echo $PATH", "/BIN", case="echo PATH")
+        run_case(shell_session, "export FOO=bar", case="export foo for echo")
+        run_case(shell_session, "echo $FOO", "bar", case="echo FOO")
+
     def test_cat_readme(self, shell_session: QemuShell) -> None:
         run_case(
             shell_session,
