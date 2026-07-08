@@ -32,14 +32,14 @@ pub fn reserveAddressRange(end_exclusive: u64) void {
     if (next_virt < end_exclusive) next_virt = end_exclusive;
 }
 
-pub fn mapPages(virt: u64, phys: u64, count: usize, flags: u64) VirtError!void {
+pub fn mapPages(virt: u64, phys: u64, count: usize, perm: paging.Pte) VirtError!void {
     if (virt & (page_size - 1) != 0 or phys & (page_size - 1) != 0) {
         return VirtError.UnalignedAddress;
     }
 
     var i: usize = 0;
     while (i < count) : (i += 1) {
-        paging.mapPage(virt + @as(u64, @intCast(i)) * page_size, phys + @as(u64, @intCast(i)) * page_size, flags) catch |err| switch (err) {
+        paging.mapPage(virt + @as(u64, @intCast(i)) * page_size, phys + @as(u64, @intCast(i)) * page_size, perm) catch |err| switch (err) {
             paging.MapError.OutOfTables => return VirtError.OutOfMemory,
             paging.MapError.AlreadyMapped => return VirtError.OutOfVirtualMemory,
             paging.MapError.UnalignedAddress => return VirtError.UnalignedAddress,
@@ -82,7 +82,7 @@ pub fn mapMmioPages(phys: u64, count: usize) VirtError!u64 {
             virt_page + @as(u64, @intCast(i)) * page_size,
             page_phys + @as(u64, @intCast(i)) * page_size,
             1,
-            paging.Flags.mmio,
+            paging.Pte.mmio,
         );
     }
     return virt_page + page_off;
@@ -99,7 +99,7 @@ pub fn allocPages(count: usize) VirtError!u64 {
     var i: usize = 0;
     while (i < count) : (i += 1) {
         const phys = physical.allocPage() catch return VirtError.OutOfMemory;
-        try mapPages(virt + @as(u64, @intCast(i)) * page_size, phys, 1, paging.Flags.kernel_data);
+        try mapPages(virt + @as(u64, @intCast(i)) * page_size, phys, 1, paging.Pte.kernel_data);
     }
 
     return virt;

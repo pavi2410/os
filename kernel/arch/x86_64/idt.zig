@@ -119,6 +119,25 @@ comptime {
         \\  push %rax
         \\  mov %rsp, %rdi
         \\  call exception_dispatch
+        \\  test %al, %al
+        \\  jz 1f
+        \\  pop %rax
+        \\  pop %rbx
+        \\  pop %rcx
+        \\  pop %rdx
+        \\  pop %rbp
+        \\  pop %rdi
+        \\  pop %rsi
+        \\  pop %r8
+        \\  pop %r9
+        \\  pop %r10
+        \\  pop %r11
+        \\  pop %r12
+        \\  pop %r13
+        \\  pop %r14
+        \\  pop %r15
+        \\  add $16, %rsp
+        \\  iretq
         \\1:
         \\  hlt
         \\  jmp 1b
@@ -183,8 +202,8 @@ comptime {
     }
 }
 
-export fn exception_dispatch(frame: *ExceptionFrame) callconv(.{ .x86_64_sysv = .{} }) void {
-    interrupts.dispatchException(frame);
+export fn exception_dispatch(frame: *ExceptionFrame) callconv(.{ .x86_64_sysv = .{} }) u8 {
+    return @intFromBool(interrupts.dispatchException(frame));
 }
 
 export fn irq_dispatch(frame: *ExceptionFrame) callconv(.{ .x86_64_sysv = .{} }) void {

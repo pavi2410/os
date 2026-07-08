@@ -80,6 +80,21 @@ pub fn build(b: *std.Build) void {
     utest.root_module.addImport("tests", utest_tests);
     const install_utest = b.addInstallArtifact(utest, user_install);
 
+    const cowtest_tap = helpers.exeModule(b, "userspace/cowtest/tap.zig", user_target, user_optimize);
+    cowtest_tap.addImport("ulib", user_ulib);
+    cowtest_tap.addImport("common_tap", common_tap_user);
+
+    const cowtest = b.addExecutable(.{
+        .name = "cowtest",
+        .root_module = helpers.exeModule(b, "userspace/cowtest/main.zig", user_target, user_optimize),
+    });
+    cowtest.setLinkerScript(b.path("userspace/linker.ld"));
+    cowtest.root_module.link_libc = false;
+    cowtest.root_module.addImport("ulib", user_ulib);
+    cowtest.root_module.addImport("std_root", std_root);
+    cowtest.root_module.addImport("cowtest_tap", cowtest_tap);
+    const install_cowtest = b.addInstallArtifact(cowtest, user_install);
+
     const shell = b.addExecutable(.{
         .name = "shell",
         .root_module = helpers.exeModule(b, "userspace/shell/main.zig", user_target, user_optimize),
@@ -125,6 +140,7 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_lsblk.step);
     b.getInstallStep().dependOn(&install_lsmem.step);
     b.getInstallStep().dependOn(&install_utest.step);
+    b.getInstallStep().dependOn(&install_cowtest.step);
 
     const limine_kernel_mod = helpers.exeModule(b, "kernel/boot/limine.zig", kernel_target, optimize);
 
@@ -173,6 +189,12 @@ pub fn build(b: *std.Build) void {
     const run_memory_map_tests = helpers.runHostTest(b, memory_map_test_mod);
 
     const physical_bitmap_host_mod = helpers.hostModule(b, "kernel/mm/physical_bitmap.zig");
+
+    const page_ref_host_mod = helpers.hostModule(b, "kernel/mm/page_ref_table.zig");
+
+    const page_ref_test_mod = helpers.hostTestModule(b, "test/kernel/page_ref_test.zig");
+    page_ref_test_mod.addImport("page_ref", page_ref_host_mod);
+    const run_page_ref_tests = helpers.runHostTest(b, page_ref_test_mod);
 
     const physical_test_mod = helpers.hostTestModule(b, "test/kernel/physical_test.zig");
     physical_test_mod.addImport("physical_bitmap", physical_bitmap_host_mod);
@@ -298,6 +320,7 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     helpers.dependOnTests(test_step, &.{
         run_memory_map_tests,
+        run_page_ref_tests,
         run_physical_tests,
         run_device_registry_tests,
         run_virtio_queue_index_tests,

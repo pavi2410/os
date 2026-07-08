@@ -1,4 +1,5 @@
 const apic = @import("apic.zig");
+const cow = @import("../../mm/cow.zig");
 const cpu = @import("cpu.zig");
 const crash = @import("../../proc/crash.zig");
 const exc_frame = @import("frame.zig");
@@ -23,10 +24,9 @@ pub fn timerTickCount() u64 {
     return timer_ticks.load(.monotonic);
 }
 
-pub fn dispatchException(frame_ptr: *Frame) void {
+pub fn dispatchException(frame_ptr: *Frame) bool {
     if (frame_ptr.cs & 3 == 3) {
-        handleUserException(frame_ptr);
-        return;
+        return handleUserException(frame_ptr);
     }
 
     switch (frame_ptr.vector) {
@@ -35,6 +35,7 @@ pub fn dispatchException(frame_ptr: *Frame) void {
         14 => handlePageFault(frame_ptr),
         else => handleDefaultException(frame_ptr),
     }
+    unreachable;
 }
 
 pub fn dispatchIrq(frame_ptr: *Frame) void {
@@ -50,13 +51,19 @@ pub fn dispatchIrq(frame_ptr: *Frame) void {
     handleUnhandledIrq(vector);
 }
 
-fn handleUserException(frame_ptr: *Frame) void {
+fn handleUserException(frame_ptr: *Frame) bool {
+    if (frame_ptr.vector == 14) {
+        const cr2 = readCr2();
+        if (cow.tryHandleUserPageFault(cr2, frame_ptr.error_code)) return true;
+    }
+
     const info = crash.Info{
         .vector = frame_ptr.vector,
         .error_code = frame_ptr.error_code,
         .fault_addr = if (frame_ptr.vector == 14) readCr2() else null,
     };
     crash.handleUserFault(frame_ptr, info);
+    unreachable;
 }
 
 fn handleDoubleFault(frame_ptr: *Frame) void {

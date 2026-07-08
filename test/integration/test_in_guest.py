@@ -48,6 +48,17 @@ def utest_output(repo_root: Path) -> str:
         shell.close()
 
 
+@pytest.fixture(scope="module")
+def cowtest_output(repo_root: Path) -> str:
+    shell = QemuShell(repo_root)
+    shell.start()
+    try:
+        shell.wait_ready()
+        return shell.run("cowtest")
+    finally:
+        shell.close()
+
+
 class TestKernelTap:
     def test_vfs_readme_read(self, kernel_boot_log: str) -> None:
         report = parse_tap(extract_between(kernel_boot_log, KERNEL_TAP_START, KERNEL_TAP_END))
@@ -90,3 +101,17 @@ class TestUtestTap:
     def test_utest_plan(self, utest_output: str) -> None:
         report = parse_tap(utest_output)
         report.assert_all_passed("utest TAP")
+
+
+class TestCowtestTap:
+    def test_child_write_parent_unchanged(self, cowtest_output: str) -> None:
+        report = parse_tap(cowtest_output)
+        assert any(case.name == "child write parent unchanged" and case.passed for case in report.cases)
+
+    def test_both_sides_write(self, cowtest_output: str) -> None:
+        report = parse_tap(cowtest_output)
+        assert any(case.name == "both sides write" and case.passed for case in report.cases)
+
+    def test_cowtest_plan(self, cowtest_output: str) -> None:
+        report = parse_tap(cowtest_output)
+        report.assert_all_passed("cowtest TAP")

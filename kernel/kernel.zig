@@ -10,6 +10,7 @@ const rtc = @import("arch/x86_64/rtc.zig");
 const limine = @import("limine");
 const memory_map = @import("mm/memory_map.zig");
 const paging = @import("arch/x86_64/paging.zig");
+const page_ref = @import("mm/page_ref.zig");
 const physical = @import("mm/physical.zig");
 const hal = @import("hal.zig");
 const scheduler = @import("proc/scheduler.zig");
@@ -180,6 +181,10 @@ fn initMemoryAllocators() void {
     virtual.init();
     heap.init() catch {
         hal.console.writeString("heap init failed\r\n");
+        hal.processor.haltForever();
+    };
+    page_ref.init(physical.maxPfn()) catch {
+        hal.console.writeString("page ref init failed\r\n");
         hal.processor.haltForever();
     };
     hal.console.writeString("physical, virtual, and heap allocators initialized\r\n");

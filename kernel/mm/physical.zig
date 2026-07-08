@@ -19,6 +19,7 @@ pub const PhysAddr = u64;
 var allocator: PageBitmap = undefined;
 var bitmap_storage: [*]u8 = undefined;
 var bitmap_byte_len: usize = 0;
+var max_pfn: usize = 0;
 
 pub fn init() void {
     const regions = memory_map.regionsSlice();
@@ -32,8 +33,9 @@ pub fn init() void {
         @panic("no allocatable conventional memory");
     }
 
-    const max_pfn = max_addr / page_size;
-    bitmap_byte_len = (max_pfn + 7) / 8;
+    const max_pfn_val = max_addr / page_size;
+    max_pfn = max_pfn_val;
+    bitmap_byte_len = (max_pfn_val + 7) / 8;
     const bitmap_page_count = (bitmap_byte_len + page_size - 1) / page_size;
 
     const bitmap_phys = findBitmapLocation(regions, bitmap_page_count) orelse {
@@ -84,6 +86,10 @@ pub fn freePages() usize {
 
 pub fn usedPages() usize {
     return allocator.usedPages();
+}
+
+pub fn maxPfn() usize {
+    return max_pfn;
 }
 
 fn findBitmapLocation(regions: []const memory_map.Region, pages_needed: usize) ?PhysAddr {

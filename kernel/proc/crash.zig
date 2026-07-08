@@ -25,7 +25,7 @@ pub fn isUserTextAddr(cr3: u64, addr: u64) bool {
     if (addr >= 0x0000800000000000) return false;
     const page = addr & ~@as(u64, paging.page_size - 1);
     const flags = paging.getPageFlagsIn(cr3, page) orelse return false;
-    return flags & paging.Flags.present != 0 and flags & paging.Flags.no_exec == 0;
+    return flags.present != 0 and flags.no_exec == 0;
 }
 
 pub fn readUserU64(cr3: u64, virt: u64) ?u64 {

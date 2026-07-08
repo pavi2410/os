@@ -5,6 +5,7 @@ const physical = @import("../mm/physical.zig");
 const gdt = @import("../arch/x86_64/gdt.zig");
 const thread = @import("thread.zig");
 const user_loader = @import("../mm/user_loader.zig");
+const page_ref = @import("../mm/page_ref.zig");
 const user_entry = @import("user_entry.zig");
 const fd_table = @import("fd_table.zig");
 
@@ -55,8 +56,8 @@ pub const AddressSpace = struct {
         paging.writeCr3(self.cr3);
     }
 
-    pub fn mapUserPage(self: *const AddressSpace, virt: u64, phys: u64, flags: u64) ProcessError!void {
-        paging.mapUserPageIn(self.cr3, virt, phys, flags) catch return ProcessError.OutOfMemory;
+    pub fn mapUserPage(self: *const AddressSpace, virt: u64, phys: u64, perm: paging.Pte) ProcessError!void {
+        paging.mapUserPageIn(self.cr3, virt, phys, perm) catch return ProcessError.OutOfMemory;
     }
 };
 
@@ -161,12 +162,11 @@ fn unregister(proc: *Process) void {
 }
 
 /// Duplicate `parent` into a new child process (Linux `fork`).
-/// Uses eager page copy; see docs/roadmap/04-userspace.md before adding COW.
 pub fn forkChild(parent: *Process) ProcessError!*Process {
     const child = try createWithParent(parent.id);
     errdefer destroy(child);
 
-    paging.cloneUserAddressSpace(parent.address_space.cr3, child.address_space.cr3) catch {
+    paging.shareUserAddressSpace(parent.address_space.cr3, child.address_space.cr3) catch {
         return ProcessError.OutOfMemory;
     };
 
@@ -276,13 +276,16 @@ pub fn sysBrk(proc: *Process, addr: u64) i64 {
     const page_size = paging.page_size;
     const new_end = (addr + page_size - 1) & ~(page_size - 1);
     const old_end = (proc.brk + page_size - 1) & ~(page_size - 1);
-    const heap_flags = paging.Flags.user | paging.Flags.present | paging.Flags.writable | paging.Flags.no_exec;
+    const heap_flags = paging.Pte.user_heap;
 
     if (new_end > old_end) {
         var page = old_end;
         while (page < new_end) : (page += page_size) {
             const phys = physical.allocPage() catch return @bitCast(@as(i64, @intCast(proc.brk)));
             proc.address_space.mapUserPage(page, phys, heap_flags) catch {
+                return @bitCast(@as(i64, @intCast(proc.brk)));
+            };
+            page_ref.retain(phys) catch {
                 return @bitCast(@as(i64, @intCast(proc.brk)));
             };
         }

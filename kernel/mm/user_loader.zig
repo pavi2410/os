@@ -1,4 +1,5 @@
 const address = @import("address.zig");
+const page_ref = @import("page_ref.zig");
 const paging = @import("../arch/x86_64/paging.zig");
 const physical = @import("physical.zig");
 const std = @import("std");
@@ -58,22 +59,15 @@ fn validateHeader(hdr: *const elf.Elf64_Ehdr, image_len: usize) LoadError!void {
     _ = hdr.e_shnum;
 }
 
-fn segmentFlags(p_flags: u32) u64 {
-    var flags: u64 = paging.Flags.user | paging.Flags.present;
-    if (p_flags & elf.PF_W != 0) flags |= paging.Flags.writable;
-    if (p_flags & elf.PF_X == 0) flags |= paging.Flags.no_exec;
-    return flags;
+fn segmentFlags(p_flags: u32) paging.Pte {
+    var pte = paging.Pte{ .present = 1, .user = 1 };
+    if (p_flags & elf.PF_W != 0) pte.writable = 1;
+    if (p_flags & elf.PF_X == 0) pte.no_exec = 1;
+    return pte;
 }
 
-fn mergeSegmentPageFlags(existing: u64, incoming: u64) u64 {
-    var merged = (existing | incoming) | paging.Flags.present | paging.Flags.user;
-    if ((existing & paging.Flags.writable) != 0 or (incoming & paging.Flags.writable) != 0) {
-        merged |= paging.Flags.writable;
-    }
-    if ((existing & paging.Flags.no_exec) == 0 or (incoming & paging.Flags.no_exec) == 0) {
-        merged &= ~@as(u64, paging.Flags.no_exec);
-    }
-    return merged;
+fn mergeSegmentPageFlags(existing: paging.Pte, incoming: paging.Pte) paging.Pte {
+    return paging.Pte.mergePermissions(existing, incoming);
 }
 
 fn loadSegment(cr3: u64, image: []const u8, ph: elf.Elf64_Phdr) LoadError!void {
@@ -92,13 +86,15 @@ fn loadSegment(cr3: u64, image: []const u8, ph: elf.Elf64_Phdr) LoadError!void {
         const seg_start = @max(page, ph.p_vaddr);
         const seg_end = @min(page_end, ph.p_vaddr + ph.p_memsz);
 
-        const page_buf: []u8 = if (paging.getPhysIn(cr3, page)) |mapped_phys|
-            @as([*]u8, @ptrFromInt(address.physToVirt(mapped_phys)))[0..paging.page_size]
-        else blk: {
+        const page_buf: []u8 = if (paging.getPhysIn(cr3, page)) |mapped_phys| blk: {
+            if (page_ref.count(mapped_phys) == 0) page_ref.retain(mapped_phys) catch return LoadError.OutOfMemory;
+            break :blk @as([*]u8, @ptrFromInt(address.physToVirt(mapped_phys)))[0..paging.page_size];
+        } else blk: {
             const phys = physical.allocPage() catch return LoadError.OutOfMemory;
             const buf = @as([*]u8, @ptrFromInt(address.physToVirt(phys)))[0..paging.page_size];
             @memset(buf, 0);
             paging.mapUserPageIn(cr3, page, phys, flags) catch return LoadError.OutOfMemory;
+            page_ref.retain(phys) catch return LoadError.OutOfMemory;
             break :blk buf;
         };
 
@@ -131,8 +127,9 @@ fn setupUserStack(cr3: u64) LoadError!u64 {
             cr3,
             page,
             phys,
-            paging.Flags.user | paging.Flags.present | paging.Flags.writable | paging.Flags.no_exec,
+            paging.Pte.user_heap,
         ) catch return LoadError.OutOfMemory;
+        page_ref.retain(phys) catch return LoadError.OutOfMemory;
     }
 
     return user_stack_top;
