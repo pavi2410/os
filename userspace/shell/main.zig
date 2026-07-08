@@ -7,6 +7,7 @@ const cwd = @import("cwd.zig");
 const environ = @import("environ.zig");
 const expand = @import("expand.zig");
 const io = @import("io.zig");
+const line_mod = @import("line.zig");
 const ulib = @import("ulib");
 const registry = @import("cmd/registry.zig");
 
@@ -30,7 +31,9 @@ export fn main(argc: usize, raw_argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }
         const n = ulib.io.readStdin(&line);
         if (n <= 0) continue;
 
-        var parsed = arg.parse(&line, @intCast(n)) catch {
+        const effective_len = line_mod.stripComment(&line, @intCast(n));
+
+        var parsed = arg.parse(&line, effective_len) catch {
             io.writeStr("too many arguments\n");
             continue;
         };

@@ -169,6 +169,11 @@ class TestShellEnvironment:
         run_case(shell_session, "ls $HOME/BIN", "SHELL", case="ls HOME/BIN")
 
 
+class TestShellComments:
+    def test_hash_comment(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "echo hello # goodbye", "hello", case="hash comment")
+
+
 class TestShellExitStatus:
     def test_exit_status_after_failure(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "cat /NOPE", "cat: open failed", case="cat missing file")
