@@ -13,6 +13,9 @@ pub fn read(fd: u64, slot: *process.Fd, buf: []u8) i64 {
             const read_len = tty.get().read(buf) catch |err| switch (err) {
                 tty.TtyError.WouldBlock => return errno.EINTR,
             };
+            if (process.currentProcess()) |proc| {
+                tty.get().markConsoleReader(proc.id);
+            }
             return @intCast(read_len);
         },
         .device => |dev_fd| {
@@ -21,6 +24,9 @@ pub fn read(fd: u64, slot: *process.Fd, buf: []u8) i64 {
                 const read_len = tty.get().read(buf) catch |err| switch (err) {
                     tty.TtyError.WouldBlock => return errno.EINTR,
                 };
+                if (process.currentProcess()) |proc| {
+                    tty.get().markConsoleReader(proc.id);
+                }
                 return @intCast(read_len);
             }
             return @intCast(devfs.readDevice(dev_fd.kind, buf));

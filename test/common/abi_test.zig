@@ -8,6 +8,9 @@ test "syscall numbers stay Linux-compatible for implemented calls" {
     try std.testing.expectEqual(@as(comptime_int, 0), abi_syscall.read);
     try std.testing.expectEqual(@as(comptime_int, 1), abi_syscall.write);
     try std.testing.expectEqual(@as(comptime_int, 57), abi_syscall.fork);
+    try std.testing.expectEqual(@as(comptime_int, 13), abi_syscall.rt_sigaction);
+    try std.testing.expectEqual(@as(comptime_int, 14), abi_syscall.rt_sigprocmask);
+    try std.testing.expectEqual(@as(comptime_int, 62), abi_syscall.kill);
     try std.testing.expectEqual(@as(comptime_int, 228), abi_syscall.clock_gettime);
     try std.testing.expectEqual(@as(comptime_int, 1024), abi_syscall.getnetconfig);
     try std.testing.expectEqual(@as(comptime_int, 1029), abi_syscall.getmemregions);

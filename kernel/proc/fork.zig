@@ -4,6 +4,7 @@ const thread = @import("thread.zig");
 const user_fork = @import("user_fork.zig");
 const gdt = @import("../arch/x86_64/gdt.zig");
 const hal = @import("../hal.zig");
+const tty = @import("../drivers/tty.zig");
 
 var pending_child: ?*process.Process = null;
 var pending_ctx: user_fork.ForkUserContext = undefined;
@@ -26,6 +27,7 @@ pub fn forkFromSyscall(ctx: user_fork.ForkUserContext) i64 {
         return -12;
     };
 
+    tty.get().noteFork(parent.id, child.id);
     scheduler.yield();
     hal.console.println("fork parent={d} child={d}", .{ parent.id, child.id });
     return @intCast(child.id);

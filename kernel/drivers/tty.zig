@@ -12,6 +12,10 @@ pub const Tty = struct {
     line_len: usize = 0,
     line_ready: bool = false,
     parse_state: AnsiState = .ground,
+    fg_pid: usize = 0,
+    console_reader_pid: usize = 0,
+    peek_byte: ?u8 = null,
+    pending_ctrlc_pid: usize = 0,
 
     pub fn init() Tty {
         return .{};
@@ -27,11 +31,19 @@ pub const Tty = struct {
         if (buf.len == 0) return 0;
 
         if (!self.canonical) {
+            if (self.takePeek()) |ch| {
+                buf[0] = ch;
+                return 1;
+            }
             buf[0] = serial.readByteBlocking();
             return 1;
         }
 
         while (!self.line_ready) {
+            if (self.takePeek()) |ch| {
+                try self.handleInput(ch);
+                continue;
+            }
             const ch = serial.readByteBlocking();
             try self.handleInput(ch);
         }
@@ -41,6 +53,44 @@ pub const Tty = struct {
         @memcpy(buf[0..copy_len], self.line_buf[0..copy_len]);
         self.consumeLine(copy_len);
         return copy_len;
+    }
+
+    pub fn pollCtrlC(self: *Tty) void {
+        const ch = serial.readByte() orelse return;
+        if (ch == 0x03 and self.fg_pid != 0) {
+            if (self.echo) serial.println("^C", .{});
+            self.pending_ctrlc_pid = self.fg_pid;
+            return;
+        }
+        self.peek_byte = ch;
+    }
+
+    pub fn takePendingCtrlC(self: *Tty) ?usize {
+        const pid = self.pending_ctrlc_pid;
+        if (pid == 0) return null;
+        self.pending_ctrlc_pid = 0;
+        return pid;
+    }
+
+    pub fn markConsoleReader(self: *Tty, pid: usize) void {
+        self.console_reader_pid = pid;
+    }
+
+    pub fn noteFork(self: *Tty, parent_pid: usize, child_pid: usize) void {
+        if (self.fg_pid == parent_pid or self.console_reader_pid == parent_pid) {
+            self.fg_pid = child_pid;
+        }
+    }
+
+    pub fn clearForegroundIf(self: *Tty, pid: usize) void {
+        if (self.fg_pid == pid) self.fg_pid = 0;
+        if (self.console_reader_pid == pid) self.console_reader_pid = 0;
+    }
+
+    fn takePeek(self: *Tty) ?u8 {
+        const ch = self.peek_byte orelse return null;
+        self.peek_byte = null;
+        return ch;
     }
 
     fn writeOut(self: *Tty, ch: u8) void {
@@ -83,6 +133,11 @@ pub const Tty = struct {
     fn handleGround(self: *Tty, ch: u8) TtyError!void {
         switch (ch) {
             0x03 => {
+                if (self.fg_pid != 0) {
+                    if (self.echo) serial.println("^C", .{});
+                    self.pending_ctrlc_pid = self.fg_pid;
+                    return;
+                }
                 if (self.echo) serial.println("^C", .{});
                 self.line_len = 0;
                 self.line_ready = false;

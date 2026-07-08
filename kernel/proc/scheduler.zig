@@ -1,8 +1,12 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
 const hal = @import("../hal.zig");
 const heap = @import("../mm/heap.zig");
+const abi_signal = @import("abi_signal");
 const init_shell = @import("init_shell.zig");
+const process = @import("process.zig");
+const signal = @import("signal.zig");
 const thread = @import("thread.zig");
+const tty = @import("../drivers/tty.zig");
 const std = @import("std");
 
 pub const SchedulerError = error{
@@ -103,7 +107,22 @@ pub fn yieldIfRequested() void {
     }
 }
 
+pub fn cooperativePoll() void {
+    cpu.sti();
+    if (thread.currentProcessPtr()) |raw| {
+        const proc: *process.Process = @ptrCast(@alignCast(raw));
+        signal.tryApply(proc);
+    }
+    yieldIfRequested();
+    yield();
+    cpu.cli();
+}
+
 pub fn yield() void {
+    tty.get().pollCtrlC();
+    if (tty.get().takePendingCtrlC()) |pid| {
+        _ = signal.send(pid, abi_signal.SIGINT);
+    }
     const self = thread.currentThread() orelse return;
     if (self.state != .dead and self != idle_thread) {
         ready_queue.push(self) catch {
@@ -130,6 +149,10 @@ fn schedule() void {
     const next = ready_queue.pop() orelse idle_thread;
     if (next == self) return;
     self.switchTo(next);
+    if (next.process) |raw| {
+        const proc: *process.Process = @ptrCast(@alignCast(raw));
+        signal.tryApply(proc);
+    }
 }
 
 fn exitCurrent() noreturn {

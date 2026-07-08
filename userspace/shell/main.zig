@@ -20,6 +20,7 @@ export fn main(argc: usize, raw_argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }
     _ = argc;
     _ = raw_argv;
     environ.init();
+    _ = ulib.signal.ignore(ulib.signal.SIGINT);
     io.writeStr("Simple shell ready. Type 'help'.\n");
 
     var line: [256]u8 = undefined;

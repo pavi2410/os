@@ -4,6 +4,7 @@ const ipv4_addr = @import("common/ipv4_addr");
 const link = @import("../link.zig");
 const pump = @import("../pump.zig");
 const resolve = @import("../resolve.zig");
+const scheduler = @import("../../proc/scheduler.zig");
 const tcp = @import("../tcp.zig");
 const api = @import("api.zig");
 const table = @import("table.zig");
@@ -86,6 +87,7 @@ pub fn recv(handle: u32, buf: []u8, max_spins: usize) api.SocketError!usize {
             continue;
         }
         hal.processor.relaxInterruptible();
+        scheduler.cooperativePoll();
     }
     return api.SocketError.Timeout;
 }

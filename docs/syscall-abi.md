@@ -35,6 +35,8 @@ Negative `RAX` values follow the Linux errno convention (e.g. `-38` = `ENOSYS`).
 | 4 | `stat` | Minimal stat metadata |
 | 8 | `lseek` | File offset seek |
 | 12 | `brk` | Userspace heap break |
+| 13 | `rt_sigaction` | Install `SIG_DFL` / `SIG_IGN` handler (no user handlers yet) |
+| 14 | `rt_sigprocmask` | Block/unblock signals (`sigsetsize` = 8) |
 | 39 | `getpid` | Current process ID |
 | 41 | `socket` | `AF_INET` datagram/stream sockets |
 | 42 | `connect` | TCP client connect |
@@ -47,6 +49,7 @@ Negative `RAX` values follow the Linux errno convention (e.g. `-38` = `ENOSYS`).
 | 59 | `execve` | Replace process image (`argv`/`envp` up to 16 strings, 255 bytes each) |
 | 60 | `exit` | Terminates current thread; does not return |
 | 61 | `wait4` | Reap child process |
+| 62 | `kill` | Send signal to process (`pid` > 0) |
 | 79 | `getcwd` | Copy current working directory |
 | 80 | `chdir` | Change current working directory |
 | 83 | `mkdir` | Create directory |

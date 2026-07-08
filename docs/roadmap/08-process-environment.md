@@ -91,11 +91,11 @@ Polish this layer before `mmap`, ext2, and SMP.
 
 ### Signals (minimal Linux subset)
 
-- [ ] Signal numbers and `sigaction` table per process (or minimal handler dispatch)
-- [ ] Deliver `SIGCHLD` to parent on child exit (shell `wait` UX)
-- [ ] Deliver `SIGINT` on serial break or `^C` equivalent
-- [ ] Syscalls: `rt_sigaction`, `rt_sigprocmask`, `kill` (smallest viable subset)
-- [ ] Default dispositions: terminate, ignore, stop — document deviations from Linux
+- [x] Signal numbers and `sigaction` table per process (`SIG_DFL` / `SIG_IGN` only)
+- [x] Deliver `SIGCHLD` to parent on child exit
+- [x] Deliver `SIGINT` on serial break or `^C` equivalent (foreground child via `fg_pid`)
+- [x] Syscalls: `rt_sigaction`, `rt_sigprocmask`, `kill` (smallest viable subset)
+- [x] Default dispositions: terminate, ignore, stop — document deviations from Linux
 
 ### Init / PID 1
 
@@ -106,7 +106,7 @@ Polish this layer before `mmap`, ext2, and SMP.
 
 ### Shell integration
 
-- [ ] Shell ignores `SIGINT` while running builtins; child receives `SIGINT`
+- [x] Shell ignores `SIGINT` while running builtins; child receives `SIGINT`
 - [ ] Optional: background jobs (`cmd &`, `fg`, `bg`) — stretch goal
 
 ### Process groups / sessions (stretch)
@@ -117,7 +117,7 @@ Polish this layer before `mmap`, ext2, and SMP.
 ### Tests
 
 - [ ] Integration: `^C` during `curl` or `ping`; shell returns to prompt
-- [ ] Integration: child exit wakes blocked parent (`wait4`)
+- [x] Integration: child exit wakes blocked parent (`wait4`)
 - [ ] Integration: `echo foo | cat` or equivalent pipeline
 - [ ] Integration: `cd subdir && /BIN/cat relative-path`
 - [ ] Integration: `export VAR=1` then exec child that reads `VAR` via `getenv`
@@ -144,3 +144,4 @@ Polish this layer before `mmap`, ext2, and SMP.
 - GUI input ([phase 14](14-gui.md)) should reuse the same TTY/input dispatch where possible.
 - Do not block on procfs; `/proc/self/fd` can come later in [phase 11](11-procfs-and-sysfs.md).
 - Framebuffer text mode is optional here or early in phase 14 — mouse/windows are not required.
+- **Signals (phase 8):** only `SIG_DFL` and `SIG_IGN` via `rt_sigaction`; no user handler frames / `rt_sigreturn` yet. Foreground process tracking uses `fg_pid` on the serial TTY until `setpgid` / job control. `SIGCHLD` is delivered but defaults to ignore. `SIGSTOP` is not implemented.

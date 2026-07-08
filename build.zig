@@ -296,6 +296,10 @@ pub fn build(b: *std.Build) void {
     abi_host.attachTo(abi_test_mod);
     const run_abi_tests = helpers.runHostTest(b, abi_test_mod);
 
+    const signal_test_mod = helpers.hostTestModule(b, "test/common/signal_test.zig");
+    abi_host.attachTo(signal_test_mod);
+    const run_signal_tests = helpers.runHostTest(b, signal_test_mod);
+
     const bytes_test_mod = helpers.hostTestModule(b, "test/common/bytes_test.zig");
     bytes_test_mod.addImport("common/bytes", host_common.bytes);
     const run_bytes_tests = helpers.runHostTest(b, bytes_test_mod);
@@ -447,6 +451,7 @@ pub fn build(b: *std.Build) void {
         run_curl_target_tests,
         run_dns_codec_tests,
         run_abi_tests,
+        run_signal_tests,
         run_bytes_tests,
         run_hex_tests,
         run_mac_tests,

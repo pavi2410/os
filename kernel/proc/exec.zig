@@ -1,5 +1,6 @@
 const process = @import("process.zig");
 const programs = @import("programs.zig");
+const signal_mod = @import("signal.zig");
 const thread = @import("thread.zig");
 const user_loader = @import("../mm/user_loader.zig");
 
@@ -51,6 +52,7 @@ pub fn execve(path: []const u8, argv: []const []const u8, envp: []const []const 
     defer programs.free(image_buf);
 
     process.resetAddressSpace(proc) catch return ExecError.OutOfMemory;
+    signal_mod.resetOnExec(proc);
 
     const loaded = process.loadElf(proc, image_buf, argv_slice, envp_slice) catch return ExecError.InvalidElf;
     proc.brk = process.user_brk_base;

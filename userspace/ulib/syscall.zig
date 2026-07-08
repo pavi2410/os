@@ -189,6 +189,18 @@ pub fn chdir(path: [*:0]const u8) isize {
     return syscall6(abi_syscall.chdir, @intFromPtr(path), 0, 0, 0, 0, 0);
 }
 
+pub fn rtSigaction(signum: u32, act_ptr: u64, oldact_ptr: u64, sigsetsize: usize) isize {
+    return syscall6(abi_syscall.rt_sigaction, signum, act_ptr, oldact_ptr, sigsetsize, 0, 0);
+}
+
+pub fn rtSigprocmask(how: u32, set_ptr: u64, oldset_ptr: u64, sigsetsize: usize) isize {
+    return syscall6(abi_syscall.rt_sigprocmask, how, set_ptr, oldset_ptr, sigsetsize, 0, 0);
+}
+
+pub fn kill(pid: u64, signum: u32) isize {
+    return syscall6(abi_syscall.kill, pid, signum, 0, 0, 0, 0);
+}
+
 fn syscall6(
     nr: u64,
     arg0: u64,

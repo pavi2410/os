@@ -1,4 +1,5 @@
 const address = @import("../mm/address.zig");
+const abi_signal = @import("abi_signal");
 const crash_util = @import("crash_util.zig");
 const exc_frame = @import("../arch/x86_64/frame.zig");
 const paging = @import("../arch/x86_64/paging.zig");
@@ -117,5 +118,6 @@ pub fn log(trap: *const exc_frame.Frame, info: Info) void {
 
 pub fn handleUserFault(trap: *exc_frame.Frame, info: Info) noreturn {
     log(trap, info);
-    process.terminateCurrent(exitStatusForVector(info.vector));
+    const sig = signalForVector(info.vector);
+    process.terminateCurrent(abi_signal.waitStatusForSignal(sig));
 }

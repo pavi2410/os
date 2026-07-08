@@ -9,6 +9,7 @@ const page_ref = @import("../mm/page_ref.zig");
 const user_entry = @import("user_entry.zig");
 const fd_table = @import("fd_table.zig");
 const path_mod = @import("common/path");
+const signal_mod = @import("signal.zig");
 
 pub const cwd_max_len = path_mod.default_cap;
 pub const Cwd = path_mod.Path(cwd_max_len);
@@ -74,6 +75,7 @@ pub const Process = struct {
     state: State,
     brk: u64,
     cwd: Cwd,
+    signals: signal_mod.SignalState,
 
     pub fn destroy(self: *Process) void {
         self.address_space.destroy();
@@ -143,6 +145,7 @@ pub fn createWithParent(parent_id: usize) ProcessError!*Process {
         .state = .created,
         .brk = user_brk_base,
         .cwd = cwd,
+        .signals = signal_mod.SignalState.init(),
     };
     next_id += 1;
     try register(proc);
@@ -181,6 +184,7 @@ pub fn forkChild(parent: *Process) ProcessError!*Process {
     child.fds = parent.fds;
     child.cwd = parent.cwd;
     child.state = .created;
+    signal_mod.inheritFromParent(child, parent);
     return child;
 }
 
@@ -322,18 +326,21 @@ pub fn sysBrk(proc: *Process, addr: u64) i64 {
     return @bitCast(@as(i64, @intCast(addr)));
 }
 
-/// Tear down the current user process after `exit` / `exit_group`.
-pub fn terminateCurrent(status: u32) noreturn {
+/// Tear down the current user process after `exit` / `exit_group` or fatal signal.
+pub fn terminateCurrent(wait_status: u32) noreturn {
     const proc = currentProcess() orelse {
         while (true) cpu.hlt();
     };
 
     const pid = proc.id;
     const parent_id = proc.parent_id;
-    proc.exit_status = status;
+    proc.exit_status = wait_status;
+
+    signal_mod.onProcessExit(pid);
 
     if (parent_id != no_parent) {
-        enqueueZombie(pid, parent_id, status) catch {};
+        enqueueZombie(pid, parent_id, wait_status) catch {};
+        signal_mod.notifyChildExit(parent_id);
     }
 
     proc.address_space.destroy();

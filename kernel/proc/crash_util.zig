@@ -33,11 +33,13 @@ pub fn exceptionName(vector: u64) []const u8 {
 
 pub fn signalName(signal: u32) []const u8 {
     return switch (signal) {
+        2 => "SIGINT",
         4 => "SIGILL",
         5 => "SIGTRAP",
         7 => "SIGBUS",
         8 => "SIGFPE",
         11 => "SIGSEGV",
+        17 => "SIGCHLD",
         else => "SIG???",
     };
 }

@@ -2,6 +2,7 @@ const icmp = @import("icmp.zig");
 const hal = @import("../hal.zig");
 const ipv4_addr = @import("common/ipv4_addr");
 const link = @import("link.zig");
+const scheduler = @import("../proc/scheduler.zig");
 const tcp = @import("tcp.zig");
 const udp = @import("udp.zig");
 
@@ -45,7 +46,7 @@ pub fn pollFrame(buf: []u8, max_spins: usize, matcher: anytype) Error!usize {
     while (spins < max_spins) : (spins += 1) {
         const len = link.receive(buf) catch |err| switch (err) {
             error.NoPacket => {
-                hal.processor.relaxInterruptible();
+                scheduler.cooperativePoll();
                 continue;
             },
             else => return Error.IoError,

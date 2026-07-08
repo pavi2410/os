@@ -12,6 +12,7 @@ pub const ip = @import("ip.zig");
 pub const net = @import("net.zig");
 pub const parse = @import("parse.zig");
 pub const process = @import("process.zig");
+pub const signal = @import("signal.zig");
 pub const time = @import("time.zig");
 pub const hw = @import("hw.zig");
 

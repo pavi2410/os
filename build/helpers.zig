@@ -22,6 +22,7 @@ pub fn hostModule(b: *std.Build, root: []const u8) *std.Build.Module {
 
 pub const AbiBundle = struct {
     syscall: *std.Build.Module,
+    signal: *std.Build.Module,
     fs: *std.Build.Module,
     net: *std.Build.Module,
     hw: *std.Build.Module,
@@ -33,6 +34,7 @@ pub const AbiBundle = struct {
     ) AbiBundle {
         return .{
             .syscall = exeModule(b, "common/abi/syscall.zig", target, optimize),
+            .signal = exeModule(b, "common/abi/signal.zig", target, optimize),
             .fs = exeModule(b, "common/abi/fs.zig", target, optimize),
             .net = exeModule(b, "common/abi/net.zig", target, optimize),
             .hw = exeModule(b, "common/abi/hw.zig", target, optimize),
@@ -41,6 +43,7 @@ pub const AbiBundle = struct {
 
     pub fn attachTo(self: AbiBundle, mod: *std.Build.Module) void {
         mod.addImport("abi_syscall", self.syscall);
+        mod.addImport("abi_signal", self.signal);
         mod.addImport("abi_fs", self.fs);
         mod.addImport("abi_net", self.net);
         mod.addImport("abi_hw", self.hw);

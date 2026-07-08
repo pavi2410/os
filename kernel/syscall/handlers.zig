@@ -13,10 +13,12 @@ const hw_info = @import("../hw/info.zig");
 const hal = @import("../hal.zig");
 const pipe = @import("../ipc/pipe.zig");
 const abi_fs = @import("abi_fs");
+const abi_signal = @import("abi_signal");
 const abi_syscall = @import("abi_syscall");
 const errno = @import("errno.zig");
 const fdtab = @import("fd.zig");
 const fd_ops = @import("fd_ops.zig");
+const signal = @import("../proc/signal.zig");
 const user = @import("user.zig");
 const copy_out = @import("copy_out.zig");
 const std = @import("std");
@@ -42,6 +44,14 @@ pub const Frame = extern struct {
 };
 
 pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) i64 {
+    const ret = dispatchSyscall(frame);
+    if (process.currentProcess()) |proc| {
+        signal.tryApply(proc);
+    }
+    return ret;
+}
+
+fn dispatchSyscall(frame: *Frame) i64 {
     return switch (frame.nr) {
         numbers.read => sysRead(frame.arg0, frame.arg1, frame.arg2),
         numbers.write => sysWrite(frame.arg0, frame.arg1, frame.arg2),
@@ -50,6 +60,8 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.stat => sysStat(frame.arg0, frame.arg1),
         numbers.lseek => sysLseek(frame.arg0, @bitCast(@as(i64, @intCast(frame.arg1))), @truncate(frame.arg2)),
         numbers.brk => sysBrk(frame.arg0),
+        numbers.rt_sigaction => sysRtSigaction(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
+        numbers.rt_sigprocmask => sysRtSigprocmask(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
         numbers.pipe => sysPipe(frame.arg0),
         numbers.dup => sysDup(frame.arg0),
         numbers.dup2 => sysDup2(frame.arg0, frame.arg1),
@@ -57,6 +69,7 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
         numbers.fork => sysFork(frame),
         numbers.execve => sysExecve(frame.arg0, frame.arg1, frame.arg2),
         numbers.wait4 => sysWait4(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
+        numbers.kill => sysKill(frame.arg0, frame.arg1),
         numbers.getcwd => sysGetcwd(frame.arg0, frame.arg1),
         numbers.chdir => sysChdir(frame.arg0),
         numbers.unlink => sysUnlink(frame.arg0),
@@ -502,8 +515,53 @@ fn sysDup2(old_fd: u64, new_fd: u64) i64 {
 
 fn sysExit(status: u64) i64 {
     if (process.currentProcess() != null) {
-        process.terminateCurrent(@truncate(status));
+        process.terminateCurrent(abi_signal.waitStatusForExit(@truncate(status)));
     }
     thread.exit();
+}
+
+fn sysRtSigaction(signum: u64, act_ptr: u64, oldact_ptr: u64, sigsetsize: u64) i64 {
+    if (sigsetsize != abi_signal.sigset_wordsize) return errno.EINVAL;
+    const proc = process.currentProcess() orelse return errno.EPERM;
+    const sig = @as(u32, @intCast(signum));
+    if (!abi_signal.isValid(sig)) return errno.EINVAL;
+
+    const act = if (act_ptr != 0) user.value(abi_signal.Sigaction, act_ptr) else null;
+    const old_action = signal.sigaction(proc, sig, act) catch return errno.EINVAL;
+
+    if (oldact_ptr != 0) {
+        const old = abi_signal.Sigaction{
+            .sa_handler = signal.actionToHandler(old_action),
+            .sa_flags = 0,
+            .sa_restorer = 0,
+            .sa_mask = 0,
+        };
+        copy_out.copyOut(oldact_ptr, std.mem.asBytes(&old)) catch return errno.EFAULT;
+    }
+    return 0;
+}
+
+fn sysRtSigprocmask(how: u64, set_ptr: u64, oldset_ptr: u64, sigsetsize: u64) i64 {
+    if (sigsetsize != abi_signal.sigset_wordsize) return errno.EINVAL;
+    const proc = process.currentProcess() orelse return errno.EPERM;
+    const set: u64 = if (set_ptr != 0)
+        user.value(u64, set_ptr) orelse return errno.EFAULT
+    else
+        0;
+    const old = signal.sigprocmask(proc, @intCast(how), set);
+    if (old < 0) return old;
+    if (oldset_ptr != 0) {
+        const old_u64: u64 = @intCast(old);
+        copy_out.copyOut(oldset_ptr, std.mem.asBytes(&old_u64)) catch return errno.EFAULT;
+    }
+    return 0;
+}
+
+fn sysKill(pid: u64, sig: u64) i64 {
+    if (pid == 0 or @as(i64, @bitCast(pid)) < 0) return errno.EINVAL;
+    const signum = @as(u32, @intCast(sig));
+    if (!abi_signal.isValid(signum)) return errno.EINVAL;
+    if (!signal.send(@intCast(pid), signum)) return errno.ESRCH;
+    return 0;
 }
 
