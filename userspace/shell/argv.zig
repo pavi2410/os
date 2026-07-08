@@ -4,6 +4,7 @@ pub const max_args = 16;
 
 pub const ParseError = error{
     TooManyArgs,
+    UnclosedQuote,
 };
 
 pub const Parsed = struct {
@@ -90,13 +91,45 @@ pub fn parse(line: []u8, len: usize) ParseError!Parsed {
 
         if (parsed.argc >= max_args) return ParseError.TooManyArgs;
 
-        const start = i;
-        while (i < end and line[i] != ' ') i += 1;
-        line[i] = 0;
-        parsed.args[parsed.argc] = line[start..i];
+        const token = try readToken(line, end, &i);
+        parsed.args[parsed.argc] = token;
         parsed.argc += 1;
-        i += 1;
     }
 
     return parsed;
+}
+
+fn readToken(line: []u8, end: usize, i: *usize) ParseError![]const u8 {
+    if (line[i.*] == '"') {
+        i.* += 1;
+        const start = i.*;
+        var write = start;
+        while (i.* < end) {
+            const ch = line[i.*];
+            if (ch == '"') {
+                line[write] = 0;
+                i.* += 1;
+                return line[start..write];
+            }
+            if (ch == '\\' and i.* + 1 < end) {
+                i.* += 1;
+                line[write] = line[i.*];
+            } else {
+                line[write] = ch;
+            }
+            write += 1;
+            i.* += 1;
+        }
+        return ParseError.UnclosedQuote;
+    }
+
+    const start = i.*;
+    while (i.* < end and line[i.*] != ' ') i.* += 1;
+    if (i.* < end) {
+        line[i.*] = 0;
+        const token = line[start..i.*];
+        i.* += 1;
+        return token;
+    }
+    return line[start..i.*];
 }

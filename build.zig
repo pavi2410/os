@@ -390,6 +390,10 @@ pub fn build(b: *std.Build) void {
     const run_shell_line_tests = helpers.runHostTest(b, shell_line_test_mod);
 
     const shell_argv_host = helpers.hostModule(b, "userspace/shell/argv.zig");
+    const shell_argv_test_mod = helpers.hostTestModule(b, "test/userspace/shell_argv_test.zig");
+    shell_argv_test_mod.addImport("argv", shell_argv_host);
+    const run_shell_argv_tests = helpers.runHostTest(b, shell_argv_test_mod);
+
     const shell_environ_stub = helpers.hostModule(b, "test/stub/shell_environ_stub.zig");
     const shell_status_host = helpers.hostModule(b, "userspace/shell/status.zig");
     const shell_expand_host = helpers.hostModule(b, "userspace/shell/expand.zig");
@@ -448,6 +452,7 @@ pub fn build(b: *std.Build) void {
         run_path_tests,
         run_environ_tests,
         run_shell_line_tests,
+        run_shell_argv_tests,
         run_shell_expand_tests,
         run_ulib_helpers_tests,
         run_pci_class_tests,
