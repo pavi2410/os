@@ -13,17 +13,16 @@ const PfErr = packed struct(u64) {
     _: u59 = 0,
 };
 
-/// Handle a user write fault to a present read-only COW page. Returns true if the fault was resolved.
-pub fn tryHandleUserPageFault(fault_addr: u64, error_code: u64) bool {
-    const err: PfErr = @bitCast(error_code);
-    if (err.fetch != 0 or err.user == 0 or err.present == 0 or err.write == 0) return false;
+/// Break copy-on-write sharing for `virt` in `proc`, making the page writable.
+pub fn ensureWritable(proc: *process.Process, addr: u64) bool {
+    return breakCowPage(proc.address_space.cr3, addr);
+}
 
-    const proc = process.currentProcess() orelse return false;
-    const cr3 = proc.address_space.cr3;
+fn breakCowPage(cr3: u64, fault_addr: u64) bool {
     const virt = fault_addr & ~(paging.page_size - 1);
 
     var pte = paging.getLeafEntryIn(cr3, virt) orelse return false;
-    if (pte.cow == 0) return false;
+    if (pte.cow == 0) return pte.writable != 0;
 
     const old_phys = pte.framePhys();
 
@@ -49,4 +48,13 @@ pub fn tryHandleUserPageFault(fault_addr: u64, error_code: u64) bool {
 
     if (paging.readCr3() == cr3) paging.invlpg(virt);
     return true;
+}
+
+/// Handle a user write fault to a present read-only COW page. Returns true if the fault was resolved.
+pub fn tryHandleUserPageFault(fault_addr: u64, error_code: u64) bool {
+    const err: PfErr = @bitCast(error_code);
+    if (err.fetch != 0 or err.user == 0 or err.present == 0 or err.write == 0) return false;
+
+    const proc = process.currentProcess() orelse return false;
+    return breakCowPage(proc.address_space.cr3, fault_addr);
 }

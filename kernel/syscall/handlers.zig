@@ -193,7 +193,6 @@ fn sysGetpid() i64 {
 }
 
 fn sysFork(frame: *Frame) i64 {
-    hal.console.println("sysFork rip=0x{x}", .{frame.user_rip});
     const ctx = user_fork_ctx.ForkUserContext.captureFromFrame(frame.*);
     return user_fork.forkFromSyscall(ctx);
 }

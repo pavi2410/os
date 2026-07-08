@@ -176,7 +176,7 @@ pub fn forkChild(parent: *Process) ProcessError!*Process {
     const child = try createWithParent(parent.id);
     errdefer destroy(child);
 
-    paging.shareUserAddressSpace(parent.address_space.cr3, child.address_space.cr3) catch {
+    paging.cloneUserAddressSpace(parent.address_space.cr3, child.address_space.cr3) catch {
         return ProcessError.OutOfMemory;
     };
 
