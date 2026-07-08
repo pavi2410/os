@@ -1,13 +1,14 @@
 const std = @import("std");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
+const mac = @import("common_mac");
 const tcp = @import("tcp.zig");
 
 test "parseSegment reads SYN-ACK with MSS option" {
     var frame: [128]u8 = undefined;
     @memset(&frame, 0);
 
-    ethernet.putHeader(&frame, .{0} ** 6, .{0} ** 6, ethernet.ethertype_ipv4);
+    ethernet.putHeader(&frame, mac.Mac.zero, mac.Mac.zero, ethernet.Ethertype.ipv4);
     ipv4.putHeader(frame[ethernet.header_len..], .{ 10, 0, 2, 2 }, .{ 10, 0, 2, 15 }, ipv4.proto_tcp, 24);
 
     const tcp_off = ethernet.header_len + ipv4.header_len;

@@ -13,7 +13,7 @@ pub fn fillConfig(out: *NetConfig) void {
     out.mask = config.lan_mask;
     out.gateway = config.gateway_ip;
     out.dns = config.dns_ip;
-    out.mac = link.localMac();
+    out.mac = link.localMac().octets;
 }
 
 pub fn fillNeighbors(buf: []NeighEntry) usize {
@@ -22,7 +22,7 @@ pub fn fillNeighbors(buf: []NeighEntry) usize {
     var i: usize = 0;
     while (i < count) : (i += 1) {
         buf[i].ip = scratch[i].ip;
-        buf[i].mac = scratch[i].mac;
+        buf[i].mac = scratch[i].mac.octets;
     }
     return count;
 }

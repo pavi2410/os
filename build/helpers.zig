@@ -94,12 +94,19 @@ pub fn hostTestModule(b: *std.Build, test_path: []const u8) *std.Build.Module {
 
 pub const HostCommon = struct {
     bytes: *std.Build.Module,
+    hex: *std.Build.Module,
+    mac: *std.Build.Module,
     acpi_sig: *std.Build.Module,
     view: *std.Build.Module,
 
     pub fn create(b: *std.Build) HostCommon {
+        const hex = hostModule(b, "common/hex.zig");
+        const mac = hostModule(b, "common/mac.zig");
+        mac.addImport("common_hex", hex);
         return .{
             .bytes = hostModule(b, "common/bytes.zig"),
+            .hex = hex,
+            .mac = mac,
             .acpi_sig = hostModule(b, "common/acpi_sig.zig"),
             .view = hostModule(b, "common/view.zig"),
         };

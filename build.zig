@@ -25,10 +25,14 @@ pub fn build(b: *std.Build) void {
 
     const abi_user = helpers.AbiBundle.create(b, user_target, user_optimize);
     const common_bytes_user = helpers.exeModule(b, "common/bytes.zig", user_target, user_optimize);
+    const common_hex_user = helpers.exeModule(b, "common/hex.zig", user_target, user_optimize);
+    const common_mac_user = helpers.exeModule(b, "common/mac.zig", user_target, user_optimize);
+    common_mac_user.addImport("common_hex", common_hex_user);
     const common_view_user = helpers.exeModule(b, "common/view.zig", user_target, user_optimize);
     abi_user.attachFsView(common_view_user);
 
     const user_ulib = helpers.exeModule(b, "userspace/ulib/mod.zig", user_target, user_optimize);
+    user_ulib.addImport("common_mac", common_mac_user);
     abi_user.attachTo(user_ulib);
 
     const dns_codec_user = helpers.exeModule(b, "userspace/net/dns_codec.zig", user_target, user_optimize);
@@ -154,11 +158,16 @@ pub fn build(b: *std.Build) void {
 
     const abi_kernel = helpers.AbiBundle.create(b, kernel_target, optimize);
     const common_bytes_kernel = helpers.exeModule(b, "common/bytes.zig", kernel_target, optimize);
+    const common_hex_kernel = helpers.exeModule(b, "common/hex.zig", kernel_target, optimize);
+    const common_mac_kernel = helpers.exeModule(b, "common/mac.zig", kernel_target, optimize);
+    common_mac_kernel.addImport("common_hex", common_hex_kernel);
     const common_acpi_sig_kernel = helpers.exeModule(b, "common/acpi_sig.zig", kernel_target, optimize);
     const common_view_kernel = helpers.exeModule(b, "common/view.zig", kernel_target, optimize);
     abi_kernel.attachFsView(common_view_kernel);
     abi_kernel.attachTo(kernel_mod);
     kernel_mod.addImport("common_bytes", common_bytes_kernel);
+    kernel_mod.addImport("common_hex", common_hex_kernel);
+    kernel_mod.addImport("common_mac", common_mac_kernel);
     kernel_mod.addImport("common_acpi_sig", common_acpi_sig_kernel);
     kernel_mod.addImport("common_view", common_view_kernel);
     kernel_mod.addImport("common_tap", helpers.exeModule(b, "common/tap.zig", kernel_target, optimize));
@@ -222,14 +231,19 @@ pub fn build(b: *std.Build) void {
 
     const icmp_test_mod = helpers.hostTestModule(b, "kernel/net/icmp_test.zig");
     icmp_test_mod.addImport("common_view", host_common.view);
+    icmp_test_mod.addImport("common_hex", host_common.hex);
+    icmp_test_mod.addImport("common_mac", host_common.mac);
     const run_icmp_tests = helpers.runHostTest(b, icmp_test_mod);
 
     const tcp_test_mod = helpers.hostTestModule(b, "kernel/net/tcp_test.zig");
     tcp_test_mod.addImport("common_bytes", host_common.bytes);
     tcp_test_mod.addImport("common_view", host_common.view);
+    tcp_test_mod.addImport("common_hex", host_common.hex);
+    tcp_test_mod.addImport("common_mac", host_common.mac);
     const run_tcp_tests = helpers.runHostTest(b, tcp_test_mod);
 
     const ulib_ip_host = helpers.hostModule(b, "userspace/ulib/ip.zig");
+    ulib_ip_host.addImport("common_mac", host_common.mac);
     const ulib_format_host = helpers.hostModule(b, "userspace/ulib/format.zig");
     const ulib_parse_host = helpers.hostModule(b, "userspace/ulib/parse.zig");
 
@@ -259,6 +273,14 @@ pub fn build(b: *std.Build) void {
     const bytes_test_mod = helpers.hostTestModule(b, "test/common/bytes_test.zig");
     bytes_test_mod.addImport("common_bytes", host_common.bytes);
     const run_bytes_tests = helpers.runHostTest(b, bytes_test_mod);
+
+    const hex_test_mod = helpers.hostTestModule(b, "test/common/hex_test.zig");
+    hex_test_mod.addImport("common_hex", host_common.hex);
+    const run_hex_tests = helpers.runHostTest(b, hex_test_mod);
+
+    const mac_test_mod = helpers.hostTestModule(b, "test/common/mac_test.zig");
+    mac_test_mod.addImport("common_mac", host_common.mac);
+    const run_mac_tests = helpers.runHostTest(b, mac_test_mod);
 
     const view_test_mod = helpers.hostTestModule(b, "test/common/view_test.zig");
     view_test_mod.addImport("common_view", host_common.view);
@@ -337,6 +359,8 @@ pub fn build(b: *std.Build) void {
         run_dns_codec_tests,
         run_abi_tests,
         run_bytes_tests,
+        run_hex_tests,
+        run_mac_tests,
         run_view_tests,
         run_ulib_helpers_tests,
         run_pci_class_tests,

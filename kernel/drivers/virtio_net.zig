@@ -1,6 +1,7 @@
 const hal = @import("../hal.zig");
 const virtual = @import("../mm/virtual.zig");
 const ethernet = @import("../net/ethernet.zig");
+const net_mac = @import("common_mac");
 const net_device = @import("net_device.zig");
 const virtio_pci = @import("virtio_pci.zig");
 const virtio_queue = @import("virtio_queue.zig");
@@ -39,7 +40,7 @@ const RxSlot = struct {
 
 var device: virtio_pci.Device = undefined;
 var ready = false;
-var mac: ethernet.Mac = undefined;
+var hw_mac: net_mac.Mac = undefined;
 
 var rx_queue: virtio_queue.Queue = .{};
 var tx_queue: virtio_queue.Queue = .{};
@@ -68,12 +69,14 @@ pub fn init() NetError!void {
 
     const lo = device.readDevice32(0);
     const hi = device.readDevice32(4);
-    mac[0] = @truncate(lo);
-    mac[1] = @truncate(lo >> 8);
-    mac[2] = @truncate(lo >> 16);
-    mac[3] = @truncate(lo >> 24);
-    mac[4] = @truncate(hi);
-    mac[5] = @truncate(hi >> 8);
+    hw_mac = net_mac.Mac.init(
+        @truncate(lo),
+        @truncate(lo >> 8),
+        @truncate(lo >> 16),
+        @truncate(lo >> 24),
+        @truncate(hi),
+        @truncate(hi >> 8),
+    );
 
     try setupRxSlots();
     ready = true;
@@ -84,8 +87,8 @@ pub fn isReady() bool {
     return ready;
 }
 
-pub fn macAddress() ethernet.Mac {
-    return mac;
+pub fn macAddress() net_mac.Mac {
+    return hw_mac;
 }
 
 pub fn sendFrame(frame: []const u8) NetError!void {
@@ -181,7 +184,7 @@ fn netIsReady(ctx: ?*anyopaque) bool {
 
 fn netMacAddress(ctx: ?*anyopaque) net_device.Mac {
     _ = ctx;
-    return macAddress();
+    return macAddress().octets;
 }
 
 fn netSendFrame(ctx: ?*anyopaque, frame: []const u8) net_device.Error!void {
@@ -215,8 +218,8 @@ pub fn logStatus() void {
         hal.console.writeString("Not available\r\n");
         return;
     }
-    var mac_buf: [ethernet.format_len]u8 = undefined;
-    if (ethernet.format(mac, &mac_buf)) |s| {
+    var mac_buf: [net_mac.Mac.format_len]u8 = undefined;
+    if (hw_mac.formatBuf(&mac_buf)) |s| {
         hal.console.printf("MAC: {s}\r\n", .{s});
     }
     hal.console.printf("RX slots: {d}, TX queue: {d}\r\n", .{ rx_slots, tx_queue.size });

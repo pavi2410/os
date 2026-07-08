@@ -1,4 +1,5 @@
 const ethernet = @import("ethernet.zig");
+const mac = @import("common_mac");
 const net_device = @import("../drivers/net_device.zig");
 
 pub const max_frame_len = ethernet.max_frame_len;
@@ -13,9 +14,9 @@ pub fn isReady() bool {
     return dev.isReady();
 }
 
-pub fn localMac() ethernet.Mac {
-    const dev = net_device.default() orelse return .{ 0, 0, 0, 0, 0, 0 };
-    return dev.macAddress();
+pub fn localMac() mac.Mac {
+    const dev = net_device.default() orelse return mac.Mac.zero;
+    return mac.Mac.fromOctets(dev.macAddress());
 }
 
 pub fn transmitOrFail(frame: []const u8) net_device.Error!void {

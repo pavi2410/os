@@ -37,21 +37,8 @@ pub fn formatIpv4(addr: [4]u8, out: []u8) ?[]const u8 {
     return out[0..pos];
 }
 
-pub fn formatMac(mac: [6]u8, out: []u8) ?[]const u8 {
-    if (out.len < 17) return null;
-    const hex = "0123456789abcdef";
-    var pos: usize = 0;
-    var i: usize = 0;
-    while (i < 6) : (i += 1) {
-        if (i > 0) {
-            out[pos] = ':';
-            pos += 1;
-        }
-        out[pos] = hex[mac[i] >> 4];
-        out[pos + 1] = hex[mac[i] & 0x0F];
-        pos += 2;
-    }
-    return out[0..pos];
+pub fn formatMac(addr: [6]u8, out: []u8) ?[]const u8 {
+    return @import("common_mac").Mac.fromOctets(addr).formatBuf(out);
 }
 
 pub fn networkAddr(addr: [4]u8, mask: [4]u8) [4]u8 {

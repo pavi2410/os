@@ -3,30 +3,31 @@ const config = @import("config.zig");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
 const link = @import("link.zig");
+const mac = @import("common_mac");
 
 const cache_size = 8;
 
 const CacheEntry = struct {
     ip: ipv4.Addr = .{ 0, 0, 0, 0 },
-    mac: ethernet.Mac = undefined,
+    mac: mac.Mac = undefined,
     valid: bool = false,
 };
 
 pub const Neighbor = struct {
     ip: ipv4.Addr,
-    mac: ethernet.Mac,
+    mac: mac.Mac,
 };
 
 var cache: [cache_size]CacheEntry = [_]CacheEntry{.{}} ** cache_size;
 var next_slot: usize = 0;
 
 /// L2 next-hop MAC for reaching @p ip (ARP the host on-link, else the gateway).
-pub fn resolve(ip: ipv4.Addr, src_mac: ethernet.Mac) ?ethernet.Mac {
+pub fn resolve(ip: ipv4.Addr, src_mac: mac.Mac) ?mac.Mac {
     const next_hop = if (config.onGuestLan(ip)) ip else config.gateway_ip;
     return resolveMac(next_hop, src_mac);
 }
 
-fn resolveMac(ip: ipv4.Addr, src_mac: ethernet.Mac) ?ethernet.Mac {
+fn resolveMac(ip: ipv4.Addr, src_mac: mac.Mac) ?mac.Mac {
     for (&cache) |entry| {
         if (entry.valid and ipv4.equal(entry.ip, ip)) return entry.mac;
     }
@@ -65,14 +66,14 @@ pub fn listNeighbors(out: []Neighbor) usize {
     return count;
 }
 
-fn store(ip: ipv4.Addr, mac: ethernet.Mac) void {
+fn store(ip: ipv4.Addr, entry_mac: mac.Mac) void {
     for (&cache) |*entry| {
         if (entry.valid and ipv4.equal(entry.ip, ip)) {
-            entry.mac = mac;
+            entry.mac = entry_mac;
             return;
         }
     }
 
-    cache[next_slot] = .{ .ip = ip, .mac = mac, .valid = true };
+    cache[next_slot] = .{ .ip = ip, .mac = entry_mac, .valid = true };
     next_slot = (next_slot + 1) % cache_size;
 }

@@ -1,6 +1,7 @@
 const view = @import("common_view");
 const ethernet = @import("ethernet.zig");
 const ipv4 = @import("ipv4.zig");
+const mac = @import("common_mac");
 
 pub const header_len = 8;
 pub const echo_request: u8 = 8;
@@ -26,8 +27,8 @@ pub fn sequenceHost(hdr: *const Header) u16 {
 
 pub fn buildEchoRequest(
     out: []u8,
-    dst_mac: ethernet.Mac,
-    src_mac: ethernet.Mac,
+    dst_mac: mac.Mac,
+    src_mac: mac.Mac,
     src_ip: ipv4.Addr,
     dst_ip: ipv4.Addr,
     id: u16,
@@ -39,7 +40,7 @@ pub fn buildEchoRequest(
     if (frame_len < ethernet.min_frame_len) frame_len = ethernet.min_frame_len;
     @memset(out[0..frame_len], 0);
 
-    ethernet.putHeader(out, dst_mac, src_mac, ethernet.ethertype_ipv4);
+    ethernet.putHeader(out, dst_mac, src_mac, ethernet.Ethertype.ipv4);
     ipv4.putHeader(out[ethernet.header_len..], src_ip, dst_ip, ipv4.proto_icmp, icmp_len);
 
     const icmp_off = ethernet.header_len + ipv4.header_len;
@@ -71,7 +72,7 @@ pub fn matchEchoReply(
     if (frame.len < ethernet.header_len + ipv4.header_len + header_len) return null;
 
     const eth = view.get(ethernet.Header, frame, 0) orelse return null;
-    if (ethernet.ethertypeHost(eth) != ethernet.ethertype_ipv4) return null;
+    if (ethernet.headerEthertype(eth) != .ipv4) return null;
 
     const ip = view.get(ipv4.Header, frame, ethernet.header_len) orelse return null;
     if (ip.protocol != ipv4.proto_icmp) return null;

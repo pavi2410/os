@@ -3,12 +3,13 @@ const view = @import("common_view");
 const ethernet = @import("ethernet.zig");
 const icmp = @import("icmp.zig");
 const ipv4 = @import("ipv4.zig");
+const mac = @import("common_mac");
 
 test "matchEchoReply rejects inflated IP total length" {
     var frame: [80]u8 = undefined;
     @memset(&frame, 0);
 
-    ethernet.putHeader(&frame, .{0} ** 6, .{0} ** 6, ethernet.ethertype_ipv4);
+    ethernet.putHeader(&frame, mac.Mac.zero, mac.Mac.zero, ethernet.Ethertype.ipv4);
     ipv4.putHeader(frame[ethernet.header_len..], .{ 10, 0, 2, 2 }, .{ 10, 0, 2, 15 }, ipv4.proto_icmp, 1500);
 
     const icmp_off = ethernet.header_len + ipv4.header_len;
