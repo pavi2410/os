@@ -61,7 +61,7 @@ pub fn checksum(src_ip: ipv4.Addr, dst_ip: ipv4.Addr, tcp: []const u8) u16 {
     @memcpy(pseudo[0..4], &src_ip);
     @memcpy(pseudo[4..8], &dst_ip);
     pseudo[8] = 0;
-    pseudo[9] = ipv4.proto_tcp;
+    pseudo[9] = @intFromEnum(ipv4.Protocol.tcp);
     const tcp_len: u16 = @intCast(tcp.len);
     bytes.writeU16Be(&pseudo, 10, tcp_len);
 
@@ -102,7 +102,7 @@ pub fn build(
     @memset(out[0..frame_len], 0);
 
     ethernet.putHeader(out, dst_mac, src_mac, ethernet.Ethertype.ipv4);
-    ipv4.putHeader(out[ethernet.header_len..], src_ip, dst_ip, ipv4.proto_tcp, tcp_len);
+    ipv4.putHeader(out[ethernet.header_len..], src_ip, dst_ip, ipv4.Protocol.tcp, tcp_len);
 
     const tcp_off = ethernet.header_len + ipv4.header_len;
     bytes.writeU16Be(out, tcp_off, src_port);
@@ -132,7 +132,7 @@ pub fn parseSegment(frame: []const u8) ?Segment {
     if (ethernet.Ethertype.fromHost(bytes.readU16Be(frame, 12)) != .ipv4) return null;
 
     const ip_off = ethernet.header_len;
-    if (frame[ip_off + 9] != ipv4.proto_tcp) return null;
+    if (ipv4.Protocol.fromByte(frame[ip_off + 9]) != .tcp) return null;
 
     const ip_total = bytes.readU16Be(frame, ip_off + 2);
     if (ip_total < ipv4.header_len + header_len) return null;

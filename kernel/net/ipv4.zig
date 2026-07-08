@@ -8,9 +8,26 @@ pub const Addr = [addr_len]u8;
 /// Buffer size for `format` (`ddd.ddd.ddd.ddd`).
 pub const format_len = 15;
 
-pub const proto_icmp: u8 = 1;
-pub const proto_tcp: u8 = 6;
-pub const proto_udp: u8 = 17;
+pub const Protocol = enum(u8) {
+    icmp = 1,
+    tcp = 6,
+    udp = 17,
+
+    pub inline fn fromByte(byte: u8) ?Protocol {
+        return switch (byte) {
+            @intFromEnum(Protocol.icmp) => .icmp,
+            @intFromEnum(Protocol.tcp) => .tcp,
+            @intFromEnum(Protocol.udp) => .udp,
+            else => null,
+        };
+    }
+};
+
+comptime {
+    if (@intFromEnum(Protocol.icmp) != 1) @compileError("Protocol.icmp must be 1");
+    if (@intFromEnum(Protocol.tcp) != 6) @compileError("Protocol.tcp must be 6");
+    if (@intFromEnum(Protocol.udp) != 17) @compileError("Protocol.udp must be 17");
+}
 
 pub const Header = extern struct {
     version_ihl: u8,
@@ -69,6 +86,10 @@ pub fn totalLengthHost(hdr: *const Header) u16 {
     return @byteSwap(hdr.total_length_be);
 }
 
+pub fn headerProtocol(hdr: *const Header) ?Protocol {
+    return Protocol.fromByte(hdr.protocol);
+}
+
 pub fn internetChecksum(data: []const u8) u16 {
     var sum: u32 = 0;
     var i: usize = 0;
@@ -89,7 +110,7 @@ pub fn putHeader(
     buf: []u8,
     src: Addr,
     dst: Addr,
-    protocol: u8,
+    protocol: Protocol,
     payload_len: u16,
 ) void {
     const ip = view.mut(Header, buf, 0).?;
@@ -100,7 +121,7 @@ pub fn putHeader(
     ip.identification_be = 0;
     ip.flags_fragment_be = @byteSwap(@as(u16, 0x4000)); // don't fragment
     ip.ttl = 64;
-    ip.protocol = protocol;
+    ip.protocol = @intFromEnum(protocol);
     ip.checksum_be = 0;
     @memcpy(&ip.src, &src);
     @memcpy(&ip.dst, &dst);

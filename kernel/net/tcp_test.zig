@@ -9,7 +9,7 @@ test "parseSegment reads SYN-ACK with MSS option" {
     @memset(&frame, 0);
 
     ethernet.putHeader(&frame, mac.Mac.zero, mac.Mac.zero, ethernet.Ethertype.ipv4);
-    ipv4.putHeader(frame[ethernet.header_len..], .{ 10, 0, 2, 2 }, .{ 10, 0, 2, 15 }, ipv4.proto_tcp, 24);
+    ipv4.putHeader(frame[ethernet.header_len..], .{ 10, 0, 2, 2 }, .{ 10, 0, 2, 15 }, ipv4.Protocol.tcp, 24);
 
     const tcp_off = ethernet.header_len + ipv4.header_len;
     frame[tcp_off + 0] = 0xC0;

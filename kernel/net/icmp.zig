@@ -41,7 +41,7 @@ pub fn buildEchoRequest(
     @memset(out[0..frame_len], 0);
 
     ethernet.putHeader(out, dst_mac, src_mac, ethernet.Ethertype.ipv4);
-    ipv4.putHeader(out[ethernet.header_len..], src_ip, dst_ip, ipv4.proto_icmp, icmp_len);
+    ipv4.putHeader(out[ethernet.header_len..], src_ip, dst_ip, ipv4.Protocol.icmp, icmp_len);
 
     const icmp_off = ethernet.header_len + ipv4.header_len;
     const icmp = view.mut(Header, out, icmp_off).?;
@@ -75,7 +75,7 @@ pub fn matchEchoReply(
     if (ethernet.headerEthertype(eth) != .ipv4) return null;
 
     const ip = view.get(ipv4.Header, frame, ethernet.header_len) orelse return null;
-    if (ip.protocol != ipv4.proto_icmp) return null;
+    if (ipv4.headerProtocol(ip) != .icmp) return null;
 
     const ip_total = ipv4.totalLengthHost(ip);
     if (ip_total < ipv4.header_len + header_len) return null;
