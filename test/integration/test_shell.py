@@ -168,6 +168,12 @@ class TestShellEnvironment:
         run_case(shell_session, "ls $HOME", "README.TXT", case="ls HOME")
         run_case(shell_session, "ls $HOME/BIN", "SHELL", case="ls HOME/BIN")
 
+    def test_unset(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "export FOO=bar", case="export foo for unset")
+        run_case(shell_session, "envtest", "bar", case="envtest before unset")
+        run_case(shell_session, "unset FOO", case="unset foo")
+        run_case(shell_session, "envtest", "(unset)", case="envtest after unset")
+
 
 class TestShellQuotes:
     def test_double_quoted_argument(self, shell_session: QemuShell) -> None:

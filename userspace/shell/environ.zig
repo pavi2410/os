@@ -56,6 +56,17 @@ pub fn syncPwd() void {
     _ = setPair("PWD", cwd.get());
 }
 
+pub fn unset(name: []const u8) bool {
+    const idx = findIndex(name) orelse return false;
+    var i = idx;
+    while (i + 1 < count) : (i += 1) {
+        entries[i] = entries[i + 1];
+        entry_lens[i] = entry_lens[i + 1];
+    }
+    count -= 1;
+    return true;
+}
+
 pub fn fillExecEnvp(out: *[max_entries + 1]?[*:0]const u8) void {
     var i: usize = 0;
     while (i < count) : (i += 1) {
