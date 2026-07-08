@@ -180,6 +180,27 @@ class TestShellEnvironment:
         run_case(shell_session, "FOO=bar echo $FOO", "bar", case="prefix env echo")
 
 
+class TestShellOperators:
+    def test_and_short_circuit(self, shell_session: QemuShell) -> None:
+        window = shell_session.run("false && echo no")
+        if "\nno\n" in window or window.rstrip().endswith("no"):
+            raise AssertionError(f"&& short-circuit failed:\n{window}")
+
+    def test_or_fallback(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "false || echo yes", "yes", case="or runs on failure")
+
+    def test_and_before_or(self, shell_session: QemuShell) -> None:
+        window = shell_session.run("true && echo a || echo b")
+        assert_contains(window, "a", "and then or")
+        if "b" in window.split("true && echo a || echo b", 1)[-1]:
+            raise AssertionError(f"unexpected b in:\n{window}")
+
+    def test_semicolon_with_and(self, shell_session: QemuShell) -> None:
+        window = shell_session.run("false; false && echo x")
+        if "x" in window.split("false; false && echo x", 1)[-1]:
+            raise AssertionError(f"unexpected x in:\n{window}")
+
+
 class TestShellSemicolon:
     def test_semicolon_runs_last_status(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "false; echo ok", "ok", case="semicolon second command")

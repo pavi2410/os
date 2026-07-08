@@ -27,3 +27,8 @@ test "segmentCount keeps semicolon inside quotes" {
     const input = "echo \"a;b\"";
     try std.testing.expectEqual(@as(usize, 1), line.segmentCount(input, input.len));
 }
+
+test "chainPartCount splits on && and ||" {
+    try std.testing.expectEqual(@as(usize, 3), line.chainPartCount("false && echo a || echo b"));
+    try std.testing.expectEqual(@as(usize, 1), line.chainPartCount("echo only"));
+}

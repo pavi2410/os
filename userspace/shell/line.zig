@@ -63,10 +63,88 @@ pub fn segmentCount(buf: []const u8, len: usize) usize {
     return count;
 }
 
+const Op = enum { and_op, or_op };
+
+const max_chain_parts = 8;
+
+const PartRange = struct {
+    start: usize,
+    end: usize,
+};
+
+pub fn chainPartCount(segment: []const u8) usize {
+    var parts: [max_chain_parts]PartRange = undefined;
+    var ops: [max_chain_parts - 1]Op = undefined;
+    return splitByOperators(segment, &parts, &ops) catch 0;
+}
+
 fn runSegment(segment: []u8, expand_bufs: *[argv.max_args][expand.max_arg_len]u8) void {
     const trimmed_len = trimSegment(segment, 0, segment.len);
     if (trimmed_len == 0) return;
-    _ = executeCommand(segment[0..trimmed_len], expand_bufs);
+
+    var part_ranges: [max_chain_parts]PartRange = undefined;
+    var ops: [max_chain_parts - 1]Op = undefined;
+    const part_count = splitByOperators(segment[0..trimmed_len], &part_ranges, &ops) catch {
+        io.writeStr("command chain too long\n");
+        return;
+    };
+    if (part_count == 0) return;
+
+    var exit_code: u8 = 0;
+    var i: usize = 0;
+    while (i < part_count) : (i += 1) {
+        if (i > 0) {
+            switch (ops[i - 1]) {
+                .and_op => if (exit_code != 0) continue,
+                .or_op => if (exit_code == 0) continue,
+            }
+        }
+
+        const range = part_ranges[i];
+        const cmd_len = trimSegment(segment, range.start, range.end);
+        if (cmd_len <= range.start) continue;
+        exit_code = executeCommand(segment[range.start..cmd_len], expand_bufs);
+    }
+}
+
+fn splitByOperators(
+    segment: []const u8,
+    parts: *[max_chain_parts]PartRange,
+    ops: *[max_chain_parts - 1]Op,
+) error{TooManyParts}!usize {
+    var part_count: usize = 0;
+    var start: usize = 0;
+    var i: usize = 0;
+    while (i < segment.len) {
+        if (matchOperator(segment, i)) |op| {
+            if (part_count >= max_chain_parts) return error.TooManyParts;
+            parts[part_count] = .{ .start = start, .end = i };
+            part_count += 1;
+            if (part_count - 1 >= ops.len) return error.TooManyParts;
+            ops[part_count - 1] = op;
+            i += operatorLen(op);
+            start = i;
+            continue;
+        }
+        i += 1;
+    }
+
+    if (part_count >= max_chain_parts) return error.TooManyParts;
+    parts[part_count] = .{ .start = start, .end = segment.len };
+    return part_count + 1;
+}
+
+fn matchOperator(segment: []const u8, i: usize) ?Op {
+    if (isQuotedAt(segment, i)) return null;
+    if (i + 1 < segment.len and segment[i] == '&' and segment[i + 1] == '&') return .and_op;
+    if (i + 1 < segment.len and segment[i] == '|' and segment[i + 1] == '|') return .or_op;
+    return null;
+}
+
+fn operatorLen(op: Op) usize {
+    return switch (op) {
+        .and_op, .or_op => 2,
+    };
 }
 
 fn executeCommand(segment: []u8, expand_bufs: *[argv.max_args][expand.max_arg_len]u8) u8 {
