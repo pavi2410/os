@@ -45,18 +45,18 @@ Automated coverage is cheaper than manual QEMU bisection.
 
 - [x] Shell smoke test: [`test/integration/test_shell.py`](../../test/integration/test_shell.py)
 - [x] Per-case pytest reporting (class-scoped `shell_session`; one QEMU boot for smoke, one for persistence)
-- [~] Cover `lscpu` — test exists (`Architecture:`) but does not yet assert vendor string; **currently fails** (QEMU dies after `lscpu` output)
+- [x] Cover `lscpu` — PATH/fork/exec smoke test asserts `Architecture:` and QEMU remains alive for subsequent cases
 - [ ] Cover `lspci` — at least one PCI line (`class` field)
 - [ ] Cover `lsblk` — `virtio-blk` and size column
 - [ ] Cover `lsmem` — header + at least one memory region line
-- [~] Cover `fork/exec` via `lscpu` — test present; blocked on `lscpu` crash above
+- [x] Cover `fork/exec` via `lscpu` — covered by the PATH lookup smoke test
 - [x] Document required workflow (see [Pre-merge checklist](#pre-merge-checklist) below)
 
 ### Build and CI gate
 
 - [x] `mise run test` — host unit tests (`zig build test`)
 - [x] `mise run test-in-guest` — kernel + userspace TAP gate
-- [x] `mise run test-shell` — shell integration task (defined; **not fully green** until `lscpu` crash is fixed)
+- [x] `mise run test-shell` — shell integration task (defined)
 - [ ] Optional CI job (GitHub Actions): build + host tests + `test-in-guest` + `test-shell` on push
 
 ### Kernel self-tests (optional, medium effort)
@@ -88,7 +88,7 @@ If integration tests fail after code changes, rebuild ISO and disk — stale art
 
 1. **`zig build test` passes** on a clean tree and covers all shared ABI structs used across the user/kernel boundary.
 2. **`mise run test-in-guest` passes** after a full rebuild (kernel + userspace + ISO + disk).
-3. **`mise run test-shell` passes** after a full rebuild — **currently blocked** on post-`lscpu` QEMU crash; fix before calling phase 6 done.
+3. **`mise run test-shell` passes** after a full rebuild.
 4. **A deliberate ABI break** (e.g. reordering a field in `common/abi/hw.zig` without updating tests) fails at compile time or in integration tests — not silently at runtime in QEMU.
 5. **Contributors use the pre-merge checklist** above (also linked from README when phase 6 closes).
 

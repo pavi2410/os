@@ -189,7 +189,7 @@ Full details and recommended order: [docs/roadmap/README.md](docs/roadmap/README
 
 **Phase 6 — next**
 
-* [ ] Integration tests for `lscpu`, `lspci`, `lsblk`, `lsmem`
+* [x] Integration test for `lscpu`; [ ] cover `lspci`, `lsblk`, `lsmem`
 * [ ] Expand ABI layout tests; document rebuild-before-QEMU workflow
 * [ ] Optional CI: `zig build test` + `mise run test-shell`
 
