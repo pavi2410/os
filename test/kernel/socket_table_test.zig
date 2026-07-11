@@ -41,9 +41,18 @@ test "ensureLocalPort only affects udp sockets" {
 
 test "release clears slot back to default" {
     const handle = socket_table.create(.tcp).?;
-    socket_table.release(handle);
+    _ = socket_table.release(handle);
     const sock = socket_table.get(handle);
     try std.testing.expect(sock == null);
+}
+
+test "retained socket remains live until final release" {
+    const handle = socket_table.create(.udp).?;
+    try std.testing.expect(socket_table.retain(handle));
+    try std.testing.expect(!socket_table.release(handle));
+    try std.testing.expect(socket_table.get(handle) != null);
+    try std.testing.expect(socket_table.release(handle));
+    try std.testing.expect(socket_table.get(handle) == null);
 }
 
 test "tag coercion mirrors active socket kind" {

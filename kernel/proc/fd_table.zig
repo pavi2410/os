@@ -48,14 +48,4 @@ pub const FdTable = struct {
         return self.fds[fd] != .none;
     }
 
-    /// Retain resources copied into a child table during fork.
-    pub fn retainAll(self: *const FdTable) void {
-        for (self.fds) |entry| {
-            switch (entry) {
-                .pipe_fd => |pfd| pipe.dupRef(pfd.handle, pfd.is_read),
-                else => {},
-            }
-        }
-    }
-
 };

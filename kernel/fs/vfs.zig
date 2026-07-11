@@ -2,6 +2,7 @@ const fat32 = @import("fat32.zig");
 const devfs = @import("devfs.zig");
 const filesystem = @import("filesystem.zig");
 const hal = @import("../hal.zig");
+const std = @import("std");
 
 pub const VfsError = filesystem.Error;
 
@@ -19,6 +20,7 @@ const HandleKind = enum {
 
 const Handle = struct {
     in_use: bool = false,
+    refs: u16 = 0,
     kind: HandleKind = .fat,
     open: filesystem.OpenFile = .{},
     offset: u64 = 0,
@@ -56,6 +58,7 @@ pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
     const slot = allocHandle() orelse return VfsError.TooManyOpenFiles;
     handles[slot] = .{
         .in_use = true,
+        .refs = 1,
         .kind = .fat,
         .open = opened,
         .offset = if (flags.append and !is_directory) opened.size else 0,
@@ -69,7 +72,16 @@ pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
 
 pub fn close(handle: u32) void {
     if (handle >= max_handles) return;
-    handles[handle] = .{};
+    const h = &handles[handle];
+    if (!h.in_use or h.refs == 0) return;
+    h.refs -= 1;
+    if (h.refs == 0) h.* = .{};
+}
+
+pub fn retain(handle: u32) VfsError!void {
+    const h = try getHandle(handle);
+    if (h.refs == std.math.maxInt(u16)) return VfsError.TooManyOpenFiles;
+    h.refs += 1;
 }
 
 pub fn read(handle: u32, buf: []u8) VfsError!usize {
@@ -185,6 +197,7 @@ fn openDevRoot(flags: OpenFlags) VfsError!u32 {
     const slot = allocHandle() orelse return VfsError.TooManyOpenFiles;
     handles[slot] = .{
         .in_use = true,
+        .refs = 1,
         .kind = .dev_root,
         .is_directory = true,
     };

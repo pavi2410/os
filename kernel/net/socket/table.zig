@@ -1,4 +1,5 @@
 const ipv4_addr = @import("common/ipv4_addr");
+const std = @import("std");
 
 pub const Addr = ipv4_addr.Addr;
 
@@ -47,6 +48,7 @@ pub const TcpSocket = struct {
 
 pub const Socket = struct {
     in_use: bool = false,
+    refs: u16 = 0,
     active: Active = .{ .udp = .{} },
 
     pub const Active = union(Kind) {
@@ -73,12 +75,13 @@ pub fn create(kind: Kind) ?u32 {
     while (i < max_sockets) : (i += 1) {
         if (!sockets[i].in_use) {
             sockets[i] = switch (kind) {
-                .udp => .{ .in_use = true, .active = .{ .udp = .{} } },
+                .udp => .{ .in_use = true, .refs = 1, .active = .{ .udp = .{} } },
                 .icmp => .{
                     .in_use = true,
+                    .refs = 1,
                     .active = .{ .icmp = .{ .icmp_id = allocIcmpId() } },
                 },
-                .tcp => .{ .in_use = true, .active = .{ .tcp = .{} } },
+                .tcp => .{ .in_use = true, .refs = 1, .active = .{ .tcp = .{} } },
             };
             return @intCast(i);
         }
@@ -86,9 +89,22 @@ pub fn create(kind: Kind) ?u32 {
     return null;
 }
 
-pub fn release(handle: u32) void {
-    if (handle >= max_sockets) return;
+pub fn retain(handle: u32) bool {
+    const sock = get(handle) orelse return false;
+    if (sock.refs == std.math.maxInt(u16)) return false;
+    sock.refs += 1;
+    return true;
+}
+
+/// Returns true when the caller released the final reference.
+pub fn release(handle: u32) bool {
+    if (handle >= max_sockets) return false;
+    const sock = get(handle) orelse return false;
+    if (sock.refs == 0) return false;
+    sock.refs -= 1;
+    if (sock.refs != 0) return false;
     sockets[handle] = .{};
+    return true;
 }
 
 pub fn allocEphemeralPort() u16 {

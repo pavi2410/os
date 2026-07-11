@@ -18,6 +18,7 @@ const abi_syscall = @import("abi_syscall");
 const errno = @import("errno.zig");
 const fdtab = @import("fd.zig");
 const fd_ops = @import("fd_ops.zig");
+const fd_retain = @import("../proc/fd_retain.zig");
 const signal = @import("../proc/signal.zig");
 const user = @import("user.zig");
 const copy_out = @import("copy_out.zig");
@@ -478,14 +479,10 @@ fn sysDup(old_fd: u64) i64 {
     const proc = fdtab.currentProcess() catch return errno.EPERM;
     _ = fdtab.slot(proc, old_fd) catch return errno.EBADF;
 
-    const new_fd = fdtab.alloc(proc) catch return errno.EMFILE;
     const old_entry = proc.fds.fds[@intCast(old_fd)];
+    const new_fd = fdtab.alloc(proc) catch return errno.EMFILE;
+    if (!fd_retain.retain(old_entry)) return errno.EBADF;
     proc.fds.fds[new_fd] = old_entry;
-
-    switch (old_entry) {
-        .pipe_fd => |pfd| pipe.dupRef(pfd.handle, pfd.is_read),
-        else => {},
-    }
 
     return @intCast(new_fd);
 }
@@ -502,12 +499,8 @@ fn sysDup2(old_fd: u64, new_fd: u64) i64 {
         _ = fd_ops.close(&proc.fds.fds[@intCast(new_fd)]);
     }
 
+    if (!fd_retain.retain(old_entry.*)) return errno.EBADF;
     proc.fds.fds[@intCast(new_fd)] = old_entry.*;
-
-    switch (old_entry.*) {
-        .pipe_fd => |pfd| pipe.dupRef(pfd.handle, pfd.is_read),
-        else => {},
-    }
 
     return @intCast(new_fd);
 }

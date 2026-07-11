@@ -9,6 +9,7 @@ const page_ref = @import("../mm/page_ref.zig");
 const user_entry = @import("user_entry.zig");
 const fd_table = @import("fd_table.zig");
 const fd_cleanup = @import("fd_cleanup.zig");
+const fd_retain = @import("fd_retain.zig");
 const path_mod = @import("common/path");
 const signal_mod = @import("signal.zig");
 
@@ -185,7 +186,7 @@ pub fn forkChild(parent: *Process) ProcessError!*Process {
 
     child.brk = parent.brk;
     child.fds = parent.fds;
-    child.fds.retainAll();
+    if (!fd_retain.retainAll(&child.fds)) return ProcessError.OutOfMemory;
     child.cwd = parent.cwd;
     child.state = .created;
     signal_mod.inheritFromParent(child, parent);

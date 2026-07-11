@@ -38,9 +38,13 @@ pub fn create(domain: u32, sock_type: u32, protocol: i32) SocketError!u32 {
 
 pub fn close(handle: u32) void {
     if (table.get(handle)) |sock| {
-        sock_tcp.close(sock);
+        if (sock.refs == 1) sock_tcp.close(sock);
     }
-    table.release(handle);
+    _ = table.release(handle);
+}
+
+pub fn retain(handle: u32) bool {
+    return table.retain(handle);
 }
 
 pub fn bind(handle: u32, addr: *const SockaddrIn) SocketError!void {
