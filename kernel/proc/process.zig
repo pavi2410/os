@@ -107,6 +107,32 @@ pub const ProcessManager = struct {
     zombies: [max_zombies]Zombie = @splat(.{}),
     live: [max_processes]?*Process = .{null} ** max_processes,
     next_id: usize = 1,
+
+    pub fn lookup(self: *const ProcessManager, pid: usize) ?*Process {
+        for (self.live) |slot| {
+            if (slot) |proc| if (proc.id == pid) return proc;
+        }
+        return null;
+    }
+
+    fn register(self: *ProcessManager, proc: *Process) ProcessError!void {
+        for (&self.live) |*slot| {
+            if (slot.* == null) {
+                slot.* = proc;
+                return;
+            }
+        }
+        return ProcessError.TooManyProcesses;
+    }
+
+    fn unregister(self: *ProcessManager, proc: *Process) void {
+        for (&self.live) |*slot| {
+            if (slot.* == proc) {
+                slot.* = null;
+                return;
+            }
+        }
+    }
 };
 var default_table: ProcessManager = .{};
 var table: *ProcessManager = &default_table;
@@ -166,27 +192,16 @@ pub fn createWithParent(parent_id: usize) ProcessError!*Process {
         .signals = signal_mod.SignalState.init(),
     };
     table.next_id += 1;
-    try register(proc);
+    try table.register(proc);
     return proc;
 }
 
 fn register(proc: *Process) ProcessError!void {
-    for (&table.live) |*slot| {
-        if (slot.* == null) {
-            slot.* = proc;
-            return;
-        }
-    }
-    return ProcessError.TooManyProcesses;
+    return table.register(proc);
 }
 
 fn unregister(proc: *Process) void {
-    for (&table.live) |*slot| {
-        if (slot.* == proc) {
-            slot.* = null;
-            return;
-        }
-    }
+    table.unregister(proc);
 }
 
 /// Duplicate `parent` into a new child process (Linux `fork`).
@@ -225,12 +240,7 @@ pub fn resolvePath(proc: *const Process, path: []const u8, buf: []u8) ProcessErr
 }
 
 pub fn lookup(pid: usize) ?*Process {
-    for (table.live) |slot| {
-        if (slot) |proc| {
-            if (proc.id == pid) return proc;
-        }
-    }
-    return null;
+    return table.lookup(pid);
 }
 
 pub fn enqueueZombie(pid: usize, parent_id: usize, status: u32) ProcessError!void {
