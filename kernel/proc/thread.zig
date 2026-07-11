@@ -3,6 +3,7 @@ const gdt = @import("../arch/x86_64/gdt.zig");
 const heap = @import("../mm/heap.zig");
 const hal = @import("../hal.zig");
 const user_mode = @import("../arch/x86_64/user.zig");
+const arch_context = @import("../arch/x86_64/context.zig");
 
 const ActivateCr3Fn = *const fn (?*anyopaque) void;
 
@@ -60,7 +61,7 @@ pub const Thread = struct {
         current = other;
         other.activateKernelStack();
         activate_cr3(other.process);
-        switch_context(&self.context, &other.context);
+        arch_context.switchContext(@ptrCast(&self.context), @ptrCast(&other.context));
         if (self.state != .dead) {
             activate_cr3(self.process);
         } else {
@@ -93,8 +94,6 @@ var next_id: usize = 1;
 var current: ?*Thread = null;
 var on_exit: ?*const fn () noreturn = null;
 
-extern fn switch_context(from: *SavedContext, to: *SavedContext) callconv(.{ .x86_64_sysv = .{} }) void;
-
 comptime {
     if (@offsetOf(SavedContext, "rbx") != 0) @compileError("SavedContext layout mismatch");
     if (@offsetOf(SavedContext, "rbp") != 8) @compileError("SavedContext layout mismatch");
@@ -105,32 +104,6 @@ comptime {
     if (@offsetOf(SavedContext, "rsp") != 48) @compileError("SavedContext layout mismatch");
     if (@offsetOf(SavedContext, "rip") != 56) @compileError("SavedContext layout mismatch");
     if (@sizeOf(SavedContext) != 64) @compileError("SavedContext must be 64 bytes");
-}
-
-comptime {
-    asm (
-        \\.global switch_context
-        \\.type switch_context, @function
-        \\switch_context:
-        \\  mov %rbx, 0(%rdi)
-        \\  mov %rbp, 8(%rdi)
-        \\  mov %r12, 16(%rdi)
-        \\  mov %r13, 24(%rdi)
-        \\  mov %r14, 32(%rdi)
-        \\  mov %r15, 40(%rdi)
-        \\  mov %rsp, 48(%rdi)
-        \\  mov (%rsp), %rax
-        \\  mov %rax, 56(%rdi)
-        \\
-        \\  mov 0(%rsi), %rbx
-        \\  mov 8(%rsi), %rbp
-        \\  mov 16(%rsi), %r12
-        \\  mov 24(%rsi), %r13
-        \\  mov 32(%rsi), %r14
-        \\  mov 40(%rsi), %r15
-        \\  mov 48(%rsi), %rsp
-        \\  ret
-    );
 }
 
 pub fn currentThread() ?*Thread {
