@@ -14,8 +14,25 @@ pub fn retain(entry: fd_table.Fd) bool {
 }
 
 pub fn retainAll(table: *const fd_table.FdTable) bool {
-    for (table.fds) |entry| {
-        if (!retain(entry)) return false;
+    var i: usize = 0;
+    while (i < table.fds.len) : (i += 1) {
+        if (retain(table.fds[i])) continue;
+        while (i > 0) {
+            i -= 1;
+            release(table.fds[i]);
+        }
+        return false;
     }
     return true;
+}
+
+fn release(entry: fd_table.Fd) void {
+    switch (entry) {
+        .file => |handle| vfs.close(handle),
+        .socket => |handle| socket.close(handle),
+        .pipe_fd => |pfd| {
+            if (pfd.is_read) pipe.closeRead(pfd.handle) else pipe.closeWrite(pfd.handle);
+        },
+        .none, .console, .device => {},
+    }
 }

@@ -186,7 +186,10 @@ pub fn forkChild(parent: *Process) ProcessError!*Process {
 
     child.brk = parent.brk;
     child.fds = parent.fds;
-    if (!fd_retain.retainAll(&child.fds)) return ProcessError.OutOfMemory;
+    if (!fd_retain.retainAll(&child.fds)) {
+        child.fds = FdTable.init();
+        return ProcessError.OutOfMemory;
+    }
     child.cwd = parent.cwd;
     child.state = .created;
     signal_mod.inheritFromParent(child, parent);
