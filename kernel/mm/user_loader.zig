@@ -210,6 +210,16 @@ fn pushInitialStack(
         arg_ptrs[i] = sp;
     }
 
+    // `_start` issues a normal `call main`, so the initial process stack must
+    // be 16-byte aligned. The argv/envp vector has a known number of words;
+    // reserve one unused word when needed before constructing it.
+    const vector_words = argv.len + envp.len + 3; // argc, two nulls, pointers
+    const vector_bytes = @as(u64, @intCast(vector_words)) * @sizeOf(u64);
+    if ((sp -% vector_bytes) & 15 != 0) {
+        if (sp < @sizeOf(u64)) return LoadError.OutOfMemory;
+        sp -= @sizeOf(u64);
+    }
+
     sp -= 8;
     sp &= ~@as(u64, 7);
     try writeUserU64(cr3, sp, 0);

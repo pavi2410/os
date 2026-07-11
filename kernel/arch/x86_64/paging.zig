@@ -130,6 +130,13 @@ const pool_size = 128;
 var table_pool: [pool_size][page_size]u8 align(page_size) = undefined;
 var table_pool_used: usize = 0;
 
+/// All process page tables share the kernel half. Keep this small registry so
+/// mappings added after process creation (kernel heaps, stacks and MMIO) are
+/// propagated when they introduce a previously absent top-level entry.
+const max_user_address_spaces = 16;
+var kernel_cr3: u64 = 0;
+var user_address_spaces: [max_user_address_spaces]?u64 = .{null} ** max_user_address_spaces;
+
 pub inline fn isPresent(entry: Pte) bool {
     return entry.present != 0;
 }
@@ -166,6 +173,29 @@ pub inline fn invlpg(virt: u64) void {
         :
         : [virt] "r" (virt),
     );
+}
+
+pub fn initKernelAddressSpace(cr3: u64) void {
+    kernel_cr3 = cr3;
+}
+
+fn registerUserAddressSpace(cr3: u64) MapError!void {
+    for (&user_address_spaces) |*slot| {
+        if (slot.* == null) {
+            slot.* = cr3;
+            return;
+        }
+    }
+    return MapError.OutOfTables;
+}
+
+fn unregisterUserAddressSpace(cr3: u64) void {
+    for (&user_address_spaces) |*slot| {
+        if (slot.* == cr3) {
+            slot.* = null;
+            return;
+        }
+    }
 }
 
 fn virtIndices(virt: u64) VirtIndices {
@@ -250,6 +280,29 @@ pub fn mapPage(virt: u64, phys: u64, perm: Pte) MapError!void {
     invlpg(virt);
 }
 
+fn syncKernelTopLevelMappings() void {
+    const kernel_pml4 = tableFromPhys(kernel_cr3);
+    for (user_address_spaces) |maybe_cr3| {
+        const cr3 = maybe_cr3 orelse continue;
+        const pml4 = tableFromPhys(cr3);
+        var i: usize = kernel_pml4_start;
+        while (i < entries_per_table) : (i += 1) {
+            pml4[i] = kernel_pml4[i];
+        }
+    }
+}
+
+/// Add a kernel-only mapping to the shared kernel page tables. User address
+/// spaces use their own PML4, so refresh their kernel-half roots afterwards.
+pub fn mapKernelPage(virt: u64, phys: u64, perm: Pte) MapError!void {
+    if (kernel_cr3 == 0) return MapError.OutOfTables;
+    const active_cr3 = readCr3();
+    writeCr3(kernel_cr3);
+    defer writeCr3(active_cr3);
+    try mapPage(virt, phys, perm);
+    syncKernelTopLevelMappings();
+}
+
 /// Map a page for ring-3 access; sets the user flag on intermediate tables too.
 pub fn mapUserPage(virt: u64, phys: u64, perm: Pte) MapError!void {
     if (virt & (page_size - 1) != 0 or phys & (page_size - 1) != 0) {
@@ -322,6 +375,15 @@ pub fn unmapPage(virt: u64) MapError!void {
 
     leaf.* = .{};
     invlpg(virt);
+}
+
+pub fn unmapKernelPage(virt: u64) MapError!void {
+    if (kernel_cr3 == 0) return MapError.NotMapped;
+    const active_cr3 = readCr3();
+    writeCr3(kernel_cr3);
+    defer writeCr3(active_cr3);
+    try unmapPage(virt);
+    syncKernelTopLevelMappings();
 }
 
 pub fn isMapped(virt: u64) bool {
@@ -455,15 +517,21 @@ pub fn cloneUserAddressSpace(src_cr3: u64, dst_cr3: u64) MapError!void {
 
 /// Allocate a fresh PML4 with the kernel higher-half entries shared from the boot tables.
 pub fn createUserAddressSpace() MapError!u64 {
+    if (kernel_cr3 == 0) return MapError.OutOfTables;
     const pml4 = try allocTablePhys();
-    const kernel_pml4 = tableFromPhys(readCr3());
+    const kernel_pml4 = tableFromPhys(kernel_cr3);
 
     var i: usize = kernel_pml4_start;
     while (i < entries_per_table) : (i += 1) {
         pml4[i] = kernel_pml4[i];
     }
 
-    return tablePhysFrom(pml4);
+    const cr3 = tablePhysFrom(pml4);
+    registerUserAddressSpace(cr3) catch {
+        physical.freePage(cr3) catch {};
+        return MapError.OutOfTables;
+    };
+    return cr3;
 }
 
 fn freeUserPageTableSubtree(table: *PageTable, level: usize) void {
@@ -491,6 +559,7 @@ fn freeUserPageTableSubtree(table: *PageTable, level: usize) void {
 pub fn destroyUserAddressSpace(cr3_phys: u64) MapError!void {
     if (cr3_phys & (page_size - 1) != 0) return MapError.UnalignedAddress;
 
+    unregisterUserAddressSpace(cr3_phys);
     const pml4 = tableFromPhys(cr3_phys);
 
     var i: usize = 0;

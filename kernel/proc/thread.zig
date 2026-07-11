@@ -81,6 +81,13 @@ pub const Thread = struct {
 };
 
 pub const default_stack_size: usize = 32 * 1024;
+const max_thread_stacks = 32;
+
+// Ring-3 entries use TSS.rsp0 before any Zig code can run. Keep these stacks
+// in the statically mapped kernel image rather than the dynamically mapped
+// heap, so every process CR3 can always service an interrupt or syscall.
+var thread_stacks: [max_thread_stacks][default_stack_size]u8 align(16) = undefined;
+var next_stack: usize = 0;
 
 var next_id: usize = 1;
 var current: ?*Thread = null;
@@ -149,11 +156,12 @@ pub fn setExitHandler(handler: *const fn () noreturn) void {
 }
 
 pub fn create(entry: EntryFn, name: []const u8, stack_size: usize) ThreadError!*Thread {
-    const thread_mem = heap.kmalloc(@sizeOf(Thread)) catch return ThreadError.OutOfMemory;
-    const stack_mem = heap.kmalloc(stack_size) catch {
-        heap.kfree(thread_mem) catch {};
+    if (stack_size > default_stack_size or next_stack >= thread_stacks.len) {
         return ThreadError.OutOfMemory;
-    };
+    }
+    const thread_mem = heap.kmalloc(@sizeOf(Thread)) catch return ThreadError.OutOfMemory;
+    const stack_mem: [*]u8 = &thread_stacks[next_stack];
+    next_stack += 1;
 
     const thread: *Thread = @ptrCast(@alignCast(thread_mem));
     thread.* = .{

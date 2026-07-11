@@ -39,7 +39,7 @@ pub fn mapPages(virt: u64, phys: u64, count: usize, perm: paging.Pte) VirtError!
 
     var i: usize = 0;
     while (i < count) : (i += 1) {
-        paging.mapPage(virt + @as(u64, @intCast(i)) * page_size, phys + @as(u64, @intCast(i)) * page_size, perm) catch |err| switch (err) {
+        paging.mapKernelPage(virt + @as(u64, @intCast(i)) * page_size, phys + @as(u64, @intCast(i)) * page_size, perm) catch |err| switch (err) {
             paging.MapError.OutOfTables => return VirtError.OutOfMemory,
             paging.MapError.AlreadyMapped => return VirtError.OutOfVirtualMemory,
             paging.MapError.UnalignedAddress => return VirtError.UnalignedAddress,
@@ -54,7 +54,7 @@ pub fn unmapPages(virt: u64, count: usize) VirtError!void {
 
     var i: usize = 0;
     while (i < count) : (i += 1) {
-        paging.unmapPage(virt + @as(u64, @intCast(i)) * page_size) catch |err| switch (err) {
+        paging.unmapKernelPage(virt + @as(u64, @intCast(i)) * page_size) catch |err| switch (err) {
             paging.MapError.NotMapped => return VirtError.NotMapped,
             paging.MapError.UnalignedAddress => return VirtError.UnalignedAddress,
             else => return VirtError.NotMapped,

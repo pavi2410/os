@@ -20,7 +20,10 @@ var ist_stack: [ist_stack_size]u8 align(16) = undefined;
 pub const exception_ist: u8 = 1;
 
 /// Minimal 64-bit TSS; `rsp0` for syscalls/interrupts, `ist1` for fault handlers.
-pub const Tss = extern struct {
+/// Architectural 64-bit TSS layout. `rsp0` begins at byte 4, so this must be
+/// packed; an aligned Zig struct inserts four bytes of padding and makes the
+/// CPU load a corrupt ring-0 stack pointer on every privilege transition.
+pub const Tss = packed struct {
     reserved0: u32 = 0,
     rsp0: u64 = 0,
     rsp1: u64 = 0,

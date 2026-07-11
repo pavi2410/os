@@ -71,6 +71,7 @@ pub fn init(ctx: BootContext) void {
 
     verifyHigherHalfExecution();
     verifyPagingHelpers();
+    paging.initKernelAddressSpace(paging.readCr3());
 
     initMemoryAllocators();
     printAllocatorStats();
