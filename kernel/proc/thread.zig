@@ -7,13 +7,7 @@ const arch_context = @import("../arch/x86_64/context.zig");
 
 const ActivateCr3Fn = *const fn (?*anyopaque) void;
 
-var activate_cr3: ActivateCr3Fn = &noopActivateCr3;
-
 fn noopActivateCr3(_: ?*anyopaque) void {}
-
-pub fn setActivateCr3Hook(hook: ActivateCr3Fn) void {
-    activate_cr3 = hook;
-}
 
 pub const ThreadError = error{
     OutOfMemory,
@@ -58,16 +52,16 @@ pub const Thread = struct {
             self.state = .ready;
         }
         other.state = .running;
-        current = other;
+        runtime.current = other;
         other.activateKernelStack();
-        activate_cr3(other.process);
+        runtime.activate_cr3(other.process);
         arch_context.switchContext(@ptrCast(&self.context), @ptrCast(&other.context));
         if (self.state != .dead) {
-            activate_cr3(self.process);
+            runtime.activate_cr3(self.process);
         } else {
-            activate_cr3(null);
+            runtime.activate_cr3(null);
         }
-        current = self;
+        runtime.current = self;
         self.state = prev_state;
         self.activateKernelStack();
     }
@@ -88,11 +82,19 @@ const max_thread_stacks = 32;
 // in the statically mapped kernel image rather than the dynamically mapped
 // heap, so every process CR3 can always service an interrupt or syscall.
 var thread_stacks: [max_thread_stacks][default_stack_size]u8 align(16) = undefined;
-var next_stack: usize = 0;
 
-var next_id: usize = 1;
-var current: ?*Thread = null;
-var on_exit: ?*const fn () noreturn = null;
+pub const Runtime = struct {
+    activate_cr3: ActivateCr3Fn = &noopActivateCr3,
+    next_stack: usize = 0,
+    next_id: usize = 1,
+    current: ?*Thread = null,
+    on_exit: ?*const fn () noreturn = null,
+};
+var default_runtime: Runtime = .{};
+var runtime: *Runtime = &default_runtime;
+
+pub fn installRuntime(next: *Runtime) void { runtime = next; runtime.* = .{}; }
+pub fn setActivateCr3Hook(hook: ActivateCr3Fn) void { runtime.activate_cr3 = hook; }
 
 comptime {
     if (@offsetOf(SavedContext, "rbx") != 0) @compileError("SavedContext layout mismatch");
@@ -107,53 +109,53 @@ comptime {
 }
 
 pub fn currentThread() ?*Thread {
-    return current;
+    return runtime.current;
 }
 
 pub fn setCurrent(t: ?*Thread) void {
-    current = t;
+    runtime.current = t;
 }
 
 pub fn setProcess(proc: ?*anyopaque) void {
-    const t = current orelse return;
+    const t = runtime.current orelse return;
     t.process = proc;
 }
 
 pub fn currentProcessPtr() ?*anyopaque {
-    const t = current orelse return null;
+    const t = runtime.current orelse return null;
     return t.process;
 }
 
 pub fn setExitHandler(handler: *const fn () noreturn) void {
-    on_exit = handler;
+    runtime.on_exit = handler;
 }
 
 pub fn create(entry: EntryFn, name: []const u8, stack_size: usize) ThreadError!*Thread {
-    if (stack_size > default_stack_size or next_stack >= thread_stacks.len) {
+    if (stack_size > default_stack_size or runtime.next_stack >= thread_stacks.len) {
         return ThreadError.OutOfMemory;
     }
     const thread_mem = heap.kmalloc(@sizeOf(Thread)) catch return ThreadError.OutOfMemory;
-    const stack_mem: [*]u8 = &thread_stacks[next_stack];
-    next_stack += 1;
+    const stack_mem: [*]u8 = &thread_stacks[runtime.next_stack];
+    runtime.next_stack += 1;
 
     const thread: *Thread = @ptrCast(@alignCast(thread_mem));
     thread.* = .{
-        .id = next_id,
+        .id = runtime.next_id,
         .name = name,
         .stack = stack_mem,
         .stack_size = stack_size,
         .context = initContext(stack_mem, stack_size, entry),
         .state = .ready,
     };
-    next_id += 1;
+    runtime.next_id += 1;
     return thread;
 }
 
 pub fn exit() noreturn {
-    if (current) |thread| {
+    if (runtime.current) |thread| {
         thread.state = .dead;
     }
-    if (on_exit) |handler| {
+    if (runtime.on_exit) |handler| {
         handler();
     }
     hal.console.println("\nthread exited without a scheduler", .{});
@@ -188,7 +190,7 @@ pub fn runSwitchTest(switch_target: usize) void {
         .context = undefined,
         .state = .running,
     };
-    current = &bootstrap;
+    runtime.current = &bootstrap;
     switch_test_bootstrap = &bootstrap;
     switch_test_target = switch_target;
     switch_test_counter = 0;
@@ -208,7 +210,7 @@ pub fn runSwitchTest(switch_target: usize) void {
         switch_test_counter,
         bootstrap_switches,
     });
-    current = &bootstrap;
+    runtime.current = &bootstrap;
     switch_test_bootstrap = null;
 }
 
