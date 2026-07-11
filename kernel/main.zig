@@ -22,16 +22,8 @@ export var limine_requests_end: [2]u64 linksection(".limine_requests_end") = lim
 /// 64 KiB kernel stack in BSS (16-byte aligned).
 export var kernel_stack: [64 * 1024]u8 align(16) = undefined;
 
-inline fn switchToKernelStack() void {
-    const stack_top = @intFromPtr(&kernel_stack) + kernel_stack.len;
-    asm volatile ("mov %[stack], %%rsp"
-        :
-        : [stack] "r" (stack_top),
-    );
-}
-
 export fn _start() callconv(.c) noreturn {
-    switchToKernelStack();
+    cpu.switchStack(@intFromPtr(&kernel_stack) + kernel_stack.len);
 
     if (!limine.baseRevisionSupported(&limine_base_revision)) {
         cpu.haltForever();

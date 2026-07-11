@@ -85,3 +85,8 @@ pub inline fn inl(port: u16) u32 {
 pub inline fn compilerMemoryBarrier() void {
     asm volatile ("" ::: .{ .memory = true });
 }
+
+/// Replace the current stack pointer during early architecture bootstrap.
+pub inline fn switchStack(stack_top: usize) void {
+    asm volatile ("mov %[stack], %%rsp" : : [stack] "r" (stack_top));
+}
