@@ -54,14 +54,18 @@ const ReadyQueue = struct {
     }
 };
 
-var bootstrap: thread.Thread = undefined;
-var idle_thread: *thread.Thread = undefined;
-var ready_queue: ReadyQueue = .{};
-var preempt_requested = std.atomic.Value(bool).init(false);
-var scheduler_ticks: u64 = 0;
+pub const SchedulerState = struct {
+    bootstrap: thread.Thread = undefined,
+    idle_thread: *thread.Thread = undefined,
+    ready_queue: ReadyQueue = .{},
+    preempt_requested: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    ticks: u64 = 0,
+};
+var state: SchedulerState = .{};
 
 pub fn init() void {
-    bootstrap = .{
+    state = .{};
+    state.bootstrap = .{
         .id = 0,
         .name = "bootstrap",
         .stack = undefined,
@@ -69,9 +73,9 @@ pub fn init() void {
         .context = undefined,
         .state = .running,
     };
-    thread.setCurrent(&bootstrap);
+    thread.setCurrent(&state.bootstrap);
 
-    idle_thread = thread.create(idleEntry, "idle", thread.default_stack_size) catch {
+    state.idle_thread = thread.create(idleEntry, "idle", thread.default_stack_size) catch {
         hal.console.println("idle thread create failed", .{});
         cpu.haltForever();
     };
@@ -90,19 +94,19 @@ pub fn spawnWithProcess(
 ) SchedulerError!*thread.Thread {
     const t = thread.create(entry, name, thread.default_stack_size) catch return SchedulerError.OutOfMemory;
     t.process = proc;
-    try ready_queue.push(t);
+    try state.ready_queue.push(t);
     return t;
 }
 
 pub fn onTimerTick() void {
-    scheduler_ticks += 1;
-    if (scheduler_ticks % time_slice_ticks == 0) {
-        preempt_requested.store(true, .monotonic);
+    state.ticks += 1;
+    if (state.ticks % time_slice_ticks == 0) {
+        state.preempt_requested.store(true, .monotonic);
     }
 }
 
 pub fn yieldIfRequested() void {
-    if (preempt_requested.swap(false, .monotonic)) {
+    if (state.preempt_requested.swap(false, .monotonic)) {
         yield();
     }
 }
@@ -124,8 +128,8 @@ pub fn yield() void {
         _ = signal.send(pid, abi_signal.SIGINT);
     }
     const self = thread.currentThread() orelse return;
-    if (self.state != .dead and self != idle_thread) {
-        ready_queue.push(self) catch {
+    if (self.state != .dead and self != state.idle_thread) {
+        state.ready_queue.push(self) catch {
             hal.console.println("ready queue push failed", .{});
             cpu.haltForever();
         };
@@ -146,7 +150,7 @@ pub fn start() noreturn {
 
 fn schedule() void {
     const self = thread.currentThread() orelse return;
-    const next = ready_queue.pop() orelse idle_thread;
+    const next = state.ready_queue.pop() orelse state.idle_thread;
     if (next == self) return;
     self.switchTo(next);
     if (next.process) |raw| {
