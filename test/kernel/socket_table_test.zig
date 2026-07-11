@@ -61,3 +61,14 @@ test "tag coercion mirrors active socket kind" {
     try std.testing.expectEqual(socket_table.Kind.tcp, @as(socket_table.Kind, sock.active));
     try std.testing.expectEqualStrings("tcp", @tagName(sock.active));
 }
+
+test "independent socket tables own their allocation cursors" {
+    var left: socket_table.SocketTable = .{};
+    var right: socket_table.SocketTable = .{};
+    const left_handle = left.create(.icmp).?;
+    const right_handle = right.create(.icmp).?;
+    try std.testing.expectEqual(@as(u32, 0), left_handle);
+    try std.testing.expectEqual(@as(u32, 0), right_handle);
+    try std.testing.expectEqual(@as(u16, 0x4000), left.get(left_handle).?.active.icmp.icmp_id);
+    try std.testing.expectEqual(@as(u16, 0x4000), right.get(right_handle).?.active.icmp.icmp_id);
+}
