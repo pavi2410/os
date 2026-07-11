@@ -52,7 +52,13 @@ pub const HandleTable = struct {
     }
 };
 
-var handles: HandleTable = .{};
+var default_handles: HandleTable = .{};
+var handles: *HandleTable = &default_handles;
+
+pub fn installHandleTable(next: *HandleTable) void {
+    handles = next;
+    handles.init();
+}
 
 pub fn init() VfsError!void {
     handles.init();
