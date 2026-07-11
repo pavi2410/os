@@ -1,6 +1,7 @@
 const std_root = @import("std_root");
 pub const std_options_debug_io = std_root.std_options_debug_io;
 pub const std_options = std_root.std_options;
+pub const panic = @import("ulib").panic.handler;
 
 const tests = @import("tests.zig");
 
