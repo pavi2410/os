@@ -25,6 +25,7 @@ const syscall = @import("syscall/entry.zig");
 const user_access = @import("syscall/user_access.zig");
 const thread = @import("proc/thread.zig");
 const virtual = @import("mm/virtual.zig");
+const memory = @import("mm/memory.zig");
 const runtime_mod = @import("runtime.zig");
 
 var runtime: runtime_mod.Runtime = .{};
@@ -186,14 +187,8 @@ fn reserveMemoryMapBuffer(response: *const limine.MemmapResponse) void {
 
 fn initMemoryAllocators() void {
     hal.console.println("\n--- Memory Allocators ---", .{});
-    physical.init();
-    virtual.init();
-    heap.init() catch {
-        hal.console.println("heap init failed", .{});
-        hal.processor.haltForever();
-    };
-    page_ref.init(physical.maxPfn()) catch {
-        hal.console.println("page ref init failed", .{});
+    runtime.memory.init() catch {
+        hal.console.println("memory service init failed", .{});
         hal.processor.haltForever();
     };
     hal.console.println("physical, virtual, and heap allocators initialized", .{});

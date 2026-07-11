@@ -4,6 +4,7 @@ const pipe = @import("ipc/pipe.zig");
 const socket_table = @import("net/socket/table.zig");
 const vfs = @import("fs/vfs.zig");
 const thread = @import("proc/thread.zig");
+const memory = @import("mm/memory.zig");
 
 /// Composition root for services that have completed their explicit-state
 /// extraction. Additional resource tables migrate here incrementally.
@@ -14,6 +15,7 @@ pub const Runtime = struct {
     network: socket_table.Network = .{},
     vfs: vfs.Vfs = .{},
     threads: thread.Runtime = .{},
+    memory: memory.Memory = .{},
 
     pub fn install(self: *Runtime) void {
         process.install(&self.processes);
