@@ -1,11 +1,11 @@
 const process = @import("process.zig");
 const scheduler = @import("scheduler.zig");
 const thread = @import("thread.zig");
-const user_fork = @import("user_fork.zig");
+const user_mode = @import("../arch/x86_64/user.zig");
 const gdt = @import("../arch/x86_64/gdt.zig");
 const tty = @import("../drivers/tty.zig");
 
-pub fn forkFromSyscall(ctx: user_fork.ForkUserContext) i64 {
+pub fn forkFromSyscall(ctx: user_mode.ForkContext) i64 {
     const parent = process.currentProcess() orelse return -1;
 
     const child = process.forkChild(parent) catch |err| switch (err) {
@@ -37,5 +37,5 @@ fn forkChildEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
     const kstack = (@intFromPtr(self.stack) + self.stack_size) & ~@as(u64, 15);
     gdt.setKernelStack(kstack);
 
-    user_fork.returnToUser(ctx, 0);
+    user_mode.returnAfterFork(ctx, 0);
 }

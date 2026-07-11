@@ -2,7 +2,7 @@ const numbers = @import("numbers.zig");
 const process = @import("../proc/process.zig");
 const thread = @import("../proc/thread.zig");
 const user_fork = @import("../proc/fork.zig");
-const user_fork_ctx = @import("../proc/user_fork.zig");
+const user_mode = @import("../arch/x86_64/user.zig");
 const user_exec = @import("../proc/exec.zig");
 const user_wait = @import("../proc/wait.zig");
 const vfs = @import("../fs/vfs.zig");
@@ -194,7 +194,7 @@ fn sysGetpid() i64 {
 }
 
 fn sysFork(frame: *Frame) i64 {
-    const ctx = user_fork_ctx.ForkUserContext.captureFromFrame(frame.*);
+    const ctx = user_mode.ForkContext.captureFromSyscallFrame(frame.*);
     return user_fork.forkFromSyscall(ctx);
 }
 

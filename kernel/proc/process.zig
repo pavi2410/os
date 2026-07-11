@@ -6,7 +6,7 @@ const gdt = @import("../arch/x86_64/gdt.zig");
 const thread = @import("thread.zig");
 const user_loader = @import("../mm/user_loader.zig");
 const page_ref = @import("../mm/page_ref.zig");
-const user_entry = @import("user_entry.zig");
+const user_mode = @import("../arch/x86_64/user.zig");
 const fd_table = @import("fd_table.zig");
 const fd_cleanup = @import("fd_cleanup.zig");
 const fd_retain = @import("fd_retain.zig");
@@ -304,7 +304,7 @@ pub fn enterUser(proc: *Process, image: user_loader.LoadedImage, kernel_stack_to
     gdt.setKernelStack(kernel_stack_top);
     setCurrent(proc);
     proc.state = .running;
-    user_entry.jumpToUser(image.entry, image.stack_top, proc.address_space.cr3);
+    user_mode.enter(image.entry, image.stack_top, proc.address_space.cr3);
 }
 
 /// Linux `brk`: grow the heap mapping or return the current break.
