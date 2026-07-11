@@ -51,10 +51,16 @@ pub fn execve(path: []const u8, argv: []const []const u8, envp: []const []const 
     };
     defer programs.free(image_buf);
 
-    process.resetAddressSpace(proc) catch return ExecError.OutOfMemory;
-    signal_mod.resetOnExec(proc);
+    // Build the replacement image before touching the current address space.
+    // A failed execve must return to the old program intact.
+    var replacement = process.AddressSpace.create() catch return ExecError.OutOfMemory;
+    errdefer replacement.destroy();
+    const loaded = user_loader.load(replacement.cr3, image_buf, argv_slice, envp_slice) catch return ExecError.InvalidElf;
 
-    const loaded = process.loadElf(proc, image_buf, argv_slice, envp_slice) catch return ExecError.InvalidElf;
+    var previous = proc.address_space;
+    proc.address_space = replacement;
+    previous.destroy();
+    signal_mod.resetOnExec(proc);
     proc.brk = process.user_brk_base;
 
     const self = thread.currentThread() orelse thread.exit();
