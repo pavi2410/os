@@ -13,6 +13,7 @@ const fd_retain = @import("fd_retain.zig");
 const path_mod = @import("common/path");
 const signal_mod = @import("signal.zig");
 const proc_types = @import("types.zig");
+const memory = @import("../mm/memory.zig");
 
 pub const cwd_max_len = path_mod.default_cap;
 pub const Cwd = path_mod.Path(cwd_max_len);
@@ -49,25 +50,25 @@ pub const AddressSpace = struct {
     cr3: u64,
 
     pub fn create() ProcessError!AddressSpace {
-        const cr3 = paging.createUserAddressSpace() catch return ProcessError.OutOfMemory;
+        const cr3 = memory.AddressSpaceManager.createUser() catch return ProcessError.OutOfMemory;
         return .{ .cr3 = cr3 };
     }
 
     pub fn destroy(self: *AddressSpace) void {
         if (self.cr3 == 0) return;
         if (paging.readCr3() == self.cr3) {
-            paging.writeCr3(boot_cr3);
+            memory.AddressSpaceManager.activate(boot_cr3);
         }
-        paging.destroyUserAddressSpace(self.cr3) catch {};
+        memory.AddressSpaceManager.destroyUser(self.cr3);
         self.cr3 = 0;
     }
 
     pub fn activate(self: *const AddressSpace) void {
-        paging.writeCr3(self.cr3);
+        memory.AddressSpaceManager.activate(self.cr3);
     }
 
     pub fn mapUserPage(self: *const AddressSpace, virt: u64, phys: u64, perm: paging.Pte) ProcessError!void {
-        paging.mapUserPageIn(self.cr3, virt, phys, perm) catch return ProcessError.OutOfMemory;
+        memory.AddressSpaceManager.mapUser(self.cr3, virt, phys, perm) catch return ProcessError.OutOfMemory;
     }
 };
 
