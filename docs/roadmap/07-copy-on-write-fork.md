@@ -6,7 +6,7 @@
 
 **Unlocks:** [Phase 8 — Process environment](08-process-environment.md), [Phase 13 — SMP](13-smp.md) (SMP-safe COW is required before multicore)
 
-**Status:** Done (uniprocessor). SMP TLB shootdown and atomic refcounts remain for [phase 13](13-smp.md).
+**Status:** Paused on a safe eager-copy fallback. The COW primitives and tests exist, but production `fork` uses `cloneUserAddressSpace` until the address-space ownership refactor restores `shareUserAddressSpace` with full guest regression coverage.
 
 ---
 
@@ -18,7 +18,7 @@
 - Future daemons, pipes, and job control need cheap fork
 - SMP will require COW with correct TLB shootdown anyway — better to learn COW on one CPU first
 
-COW now shares physical pages on `fork` via [`paging.shareUserAddressSpace`](../../kernel/arch/x86_64/paging.zig) and promotes on write faults in [`kernel/mm/cow.zig`](../../kernel/mm/cow.zig).
+COW is implemented in [`paging.shareUserAddressSpace`](../../kernel/arch/x86_64/paging.zig) and [`kernel/mm/cow.zig`](../../kernel/mm/cow.zig), but is not currently selected by production `fork`.
 
 ---
 
@@ -27,7 +27,7 @@ COW now shares physical pages on `fork` via [`paging.shareUserAddressSpace`](../
 ### Physical page sharing
 
 - [x] Reference count (or equivalent) on physical pages used by user mappings ([`page_ref.zig`](../../kernel/mm/page_ref.zig) / [`page_ref_table.zig`](../../kernel/mm/page_ref_table.zig))
-- [x] `fork` maps child PTEs to parent's physical pages read-only (user + present) via `shareUserAddressSpace`
+- [ ] Restore production `fork` to map child PTEs to parent's physical pages read-only (user + present) via `shareUserAddressSpace`
 - [x] Mark shared user pages in page tables (software `Pte.cow` bit)
 
 ### Page fault promotion
@@ -80,4 +80,4 @@ Uniprocessor COW first. When bringing up APs in [phase 13](13-smp.md):
 
 - See also [phase 4](04-userspace.md) — eager copy was temporary and has been replaced.
 - Do not implement COW without phase 6 tests; faults and refcounts are easy to get wrong.
-- Eager `cloneUserAddressSpace` remains in paging as unused leftover; safe to delete in a follow-up cleanup.
+- Eager `cloneUserAddressSpace` is the current safety fallback. Remove it only after COW passes the shell, in-guest, and repeated-fork regression suites.
