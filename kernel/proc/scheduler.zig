@@ -55,17 +55,18 @@ const ReadyQueue = struct {
     }
 };
 
-pub const SchedulerState = struct {
+/// Runtime-owned cooperative scheduler service.
+pub const Scheduler = struct {
     bootstrap: thread.Thread = undefined,
     idle_thread: *thread.Thread = undefined,
     ready_queue: ReadyQueue = .{},
     preempt_requested: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     ticks: u64 = 0,
 };
-var default_state: SchedulerState = .{};
-var state: *SchedulerState = &default_state;
+var default_state: Scheduler = .{};
+var state: *Scheduler = &default_state;
 
-pub fn installState(next: *SchedulerState) void {
+pub fn install(next: *Scheduler) void {
     state = next;
     state.* = .{};
 }

@@ -9,7 +9,7 @@ const thread = @import("proc/thread.zig");
 /// extraction. Additional resource tables migrate here incrementally.
 pub const Runtime = struct {
     processes: process.ProcessTable = .{},
-    scheduler: scheduler.SchedulerState = .{},
+    scheduler: scheduler.Scheduler = .{},
     pipes: pipe.PipeTable = .{},
     sockets: socket_table.SocketTable = .{},
     vfs_handles: vfs.HandleTable = .{},
@@ -17,7 +17,7 @@ pub const Runtime = struct {
 
     pub fn install(self: *Runtime) void {
         process.installTable(&self.processes);
-        scheduler.installState(&self.scheduler);
+        scheduler.install(&self.scheduler);
         pipe.installTable(&self.pipes);
         socket_table.installTable(&self.sockets);
         vfs.installHandleTable(&self.vfs_handles);
