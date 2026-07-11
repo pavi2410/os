@@ -114,83 +114,42 @@ pub const SocketTable = struct {
     }
 };
 
-var sockets: [max_sockets]Socket = [_]Socket{.{}} ** max_sockets;
-var next_ephemeral: u16 = ephemeral_port_min;
-var next_icmp_id: u16 = 0x4000;
-var next_isn: u32 = 0x12340000;
+var default_storage: SocketTable = .{};
+var default_table: *SocketTable = &default_storage;
+
+pub fn installTable(next: *SocketTable) void { default_table = next; default_table.init(); }
 
 pub fn get(handle: u32) ?*Socket {
-    if (handle >= max_sockets) return null;
-    const sock = &sockets[handle];
-    if (!sock.in_use) return null;
-    return sock;
+    return default_table.get(handle);
 }
 
 pub fn create(kind: Kind) ?u32 {
-    var i: usize = 0;
-    while (i < max_sockets) : (i += 1) {
-        if (!sockets[i].in_use) {
-            sockets[i] = switch (kind) {
-                .udp => .{ .in_use = true, .refs = 1, .active = .{ .udp = .{} } },
-                .icmp => .{
-                    .in_use = true,
-                    .refs = 1,
-                    .active = .{ .icmp = .{ .icmp_id = allocIcmpId() } },
-                },
-                .tcp => .{ .in_use = true, .refs = 1, .active = .{ .tcp = .{} } },
-            };
-            return @intCast(i);
-        }
-    }
-    return null;
+    return default_table.create(kind);
 }
 
 pub fn retain(handle: u32) bool {
-    const sock = get(handle) orelse return false;
-    if (sock.refs == std.math.maxInt(u16)) return false;
-    sock.refs += 1;
-    return true;
+    return default_table.retain(handle);
 }
 
 /// Returns true when the caller released the final reference.
 pub fn release(handle: u32) bool {
-    if (handle >= max_sockets) return false;
-    const sock = get(handle) orelse return false;
-    if (sock.refs == 0) return false;
-    sock.refs -= 1;
-    if (sock.refs != 0) return false;
-    sockets[handle] = .{};
-    return true;
+    return default_table.release(handle);
 }
 
 pub fn allocEphemeralPort() u16 {
-    const port = next_ephemeral;
-    next_ephemeral +%= 1;
-    if (next_ephemeral < 1024) next_ephemeral = ephemeral_port_min;
-    return port;
+    return default_table.allocEphemeralPort();
 }
 
 pub fn allocIcmpId() u16 {
-    const id = next_icmp_id;
-    next_icmp_id +%= 1;
-    return id;
+    return default_table.allocIcmpId();
 }
 
 pub fn allocIsn() u32 {
-    const isn = next_isn;
-    next_isn +%= 65536;
-    return isn;
+    return default_table.allocIsn();
 }
 
 pub fn ensureLocalPort(sock: *Socket) void {
-    switch (sock.active) {
-        .udp => |*udp_sock| {
-            if (udp_sock.local_port == 0) {
-                udp_sock.local_port = allocEphemeralPort();
-            }
-        },
-        else => {},
-    }
+    default_table.ensureLocalPort(sock);
 }
 
 pub fn asUdp(sock: *Socket) ?*UdpSocket {
