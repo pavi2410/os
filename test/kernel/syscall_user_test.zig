@@ -14,6 +14,11 @@ test "cString rejects null and unterminated text" {
     try std.testing.expect(user.cString(@intFromPtr(&text), text.len) == null);
 }
 
+test "user range rejects null and overflow" {
+    try std.testing.expect(!user.range(0, 1));
+    try std.testing.expect(!user.range(std.math.maxInt(u64), 1));
+}
+
 test "readArgv reads bounded cstring vector" {
     var arg0 = [_]u8{ 'e', 'c', 'h', 'o', 0 };
     var arg1 = [_]u8{ 'h', 'i', 0 };

@@ -11,12 +11,15 @@ pub fn copyOut(dest_ptr: u64, data: []const u8) Fault!void {
 }
 
 fn copyOutIn(cr3: u64, dest_ptr: u64, data: []const u8) Fault!void {
+    if (!user.range(dest_ptr, data.len)) return error.Fault;
     var written: usize = 0;
     while (written < data.len) {
         const addr = dest_ptr + written;
         const page = addr & ~(paging.page_size - 1);
         const off = addr & (paging.page_size - 1);
-        const phys = paging.getPhysIn(cr3, page) orelse return error.Fault;
+        const entry = paging.getLeafEntryIn(cr3, page) orelse return error.Fault;
+        if (entry.user == 0 or entry.writable == 0) return error.Fault;
+        const phys = entry.framePhys();
         const page_virt = address.physToVirt(phys);
         const chunk = @min(data.len - written, paging.page_size - off);
         @memcpy(

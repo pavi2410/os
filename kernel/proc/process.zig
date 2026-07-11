@@ -35,6 +35,8 @@ pub const no_parent: usize = 0;
 pub const user_stack_top = user_loader.user_stack_top;
 pub const user_stack_pages = user_loader.user_stack_pages;
 pub const user_brk_base: u64 = 0x0000000000400000;
+pub const user_brk_limit: u64 = user_loader.user_stack_top -
+    @as(u64, @intCast(user_stack_pages + 1)) * paging.page_size;
 
 pub const Fd = fd_table.Fd;
 pub const FdTable = fd_table.FdTable;
@@ -302,7 +304,7 @@ pub fn enterUser(proc: *Process, image: user_loader.LoadedImage, kernel_stack_to
 pub fn sysBrk(proc: *Process, addr: u64) i64 {
     if (addr == 0) return @bitCast(@as(i64, @intCast(proc.brk)));
 
-    if (addr < user_brk_base) return @bitCast(@as(i64, @intCast(proc.brk)));
+    if (addr < user_brk_base or addr >= user_brk_limit) return @bitCast(@as(i64, @intCast(proc.brk)));
 
     const page_size = paging.page_size;
     const new_end = (addr + page_size - 1) & ~(page_size - 1);

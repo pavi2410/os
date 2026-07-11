@@ -19,6 +19,7 @@ pub const LoadedImage = struct {
 /// Linux-style user stack layout (must match `process.user_stack_top`).
 pub const user_stack_top: u64 = 0x00007FFFFFFFE000;
 pub const user_stack_pages: usize = 16;
+pub const user_top: u64 = 0x0000_8000_0000_0000;
 
 pub const max_argv = 16;
 pub const max_envp = 16;
@@ -29,6 +30,7 @@ pub fn load(cr3: u64, image: []const u8, argv: []const []const u8, envp: []const
 
     const hdr: *const elf.Elf64_Ehdr = @ptrCast(@alignCast(image.ptr));
     try validateHeader(hdr, image.len);
+    if (hdr.e_entry >= user_top) return LoadError.InvalidElf;
 
     const ph_size = @as(usize, hdr.e_phentsize) * hdr.e_phnum;
     if (hdr.e_phoff > image.len or ph_size > image.len - hdr.e_phoff) {
@@ -56,8 +58,8 @@ fn validateHeader(hdr: *const elf.Elf64_Ehdr, image_len: usize) LoadError!void {
     if (hdr.e_ident[elf.EI.CLASS] != @intFromEnum(elf.CLASS.@"64")) return LoadError.UnsupportedElf;
     if (hdr.e_ident[elf.EI.DATA] != @intFromEnum(elf.DATA.@"2LSB")) return LoadError.UnsupportedElf;
     if (hdr.e_machine != .X86_64) return LoadError.UnsupportedElf;
-    if (hdr.e_type != .EXEC and hdr.e_type != .DYN) return LoadError.UnsupportedElf;
-    if (hdr.e_phentsize < @sizeOf(elf.Elf64_Phdr)) return LoadError.InvalidElf;
+    if (hdr.e_type != .EXEC) return LoadError.UnsupportedElf;
+    if (hdr.e_phentsize != @sizeOf(elf.Elf64_Phdr)) return LoadError.InvalidElf;
     if (hdr.e_phoff >= image_len) return LoadError.InvalidElf;
     _ = hdr.e_shoff;
     _ = hdr.e_shnum;
@@ -79,6 +81,9 @@ fn loadSegment(cr3: u64, image: []const u8, ph: elf.Elf64_Phdr) LoadError!void {
         return LoadError.InvalidElf;
     }
     if (ph.p_memsz < ph.p_filesz) return LoadError.InvalidElf;
+    if (ph.p_vaddr >= user_top or ph.p_memsz > user_top - ph.p_vaddr) {
+        return LoadError.InvalidElf;
+    }
 
     const flags = segmentFlags(ph.p_flags);
     const first_page = ph.p_vaddr & ~(paging.page_size - 1);
