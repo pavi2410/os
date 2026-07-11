@@ -52,21 +52,37 @@ pub const HandleTable = struct {
     }
 };
 
-var default_handles: HandleTable = .{};
-var handles: *HandleTable = &default_handles;
+/// Runtime-owned filesystem service. Filesystem policy remains FAT32 + devfs
+/// for now; callers retain the facade below during migration.
+pub const Vfs = struct {
+    handles: HandleTable = .{},
 
-pub fn installHandleTable(next: *HandleTable) void {
-    handles = next;
+    pub fn init(self: *Vfs) VfsError!void {
+        self.handles.init();
+        try active_fs.mount();
+    }
+
+    pub fn isReady(_: *const Vfs) bool {
+        return active_fs.is_ready();
+    }
+};
+
+var default_vfs: Vfs = .{};
+var active: *Vfs = &default_vfs;
+var handles: *HandleTable = &default_vfs.handles;
+
+pub fn install(next: *Vfs) void {
+    active = next;
+    handles = &active.handles;
     handles.init();
 }
 
 pub fn init() VfsError!void {
-    handles.init();
-    try active_fs.mount();
+    try active.init();
 }
 
 pub fn isReady() bool {
-    return active_fs.is_ready();
+    return active.isReady();
 }
 
 pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {

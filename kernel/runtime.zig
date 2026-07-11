@@ -12,7 +12,7 @@ pub const Runtime = struct {
     scheduler: scheduler.Scheduler = .{},
     pipes: pipe.PipeTable = .{},
     sockets: socket_table.SocketTable = .{},
-    vfs_handles: vfs.HandleTable = .{},
+    vfs: vfs.Vfs = .{},
     threads: thread.Runtime = .{},
 
     pub fn install(self: *Runtime) void {
@@ -20,7 +20,7 @@ pub const Runtime = struct {
         scheduler.install(&self.scheduler);
         pipe.installTable(&self.pipes);
         socket_table.installTable(&self.sockets);
-        vfs.installHandleTable(&self.vfs_handles);
+        vfs.install(&self.vfs);
         thread.installRuntime(&self.threads);
     }
 };
