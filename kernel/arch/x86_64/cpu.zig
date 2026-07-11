@@ -70,3 +70,13 @@ pub inline fn inb(port: u16) u8 {
         : [port] "{dx}" (port),
     );
 }
+
+/// Output a 32-bit value to an I/O port.
+pub inline fn outl(port: u16, value: u32) void {
+    asm volatile ("outl %[value], %[port]" : : [value] "{eax}" (value), [port] "{dx}" (port));
+}
+
+/// Input a 32-bit value from an I/O port.
+pub inline fn inl(port: u16) u32 {
+    return asm volatile ("inl %[port], %[result]" : [result] "={eax}" (-> u32), : [port] "{dx}" (port));
+}

@@ -1,6 +1,7 @@
 const acpi_access = @import("../acpi/access.zig");
 const address = @import("../mm/address.zig");
 const hal = @import("../hal.zig");
+const cpu = @import("../arch/x86_64/cpu.zig");
 
 pub const DeviceId = struct {
     pub const blk_modern: u16 = 0x1042;
@@ -131,8 +132,8 @@ pub fn readConfig32(addr: Addr, offset: u8) u32 {
         (@as(u32, addr.device) << 11) |
         (@as(u32, addr.function) << 8) |
         (@as(u32, offset) & 0xFC);
-    outl(config_address_port, config_addr);
-    return inl(config_data_port);
+    cpu.outl(config_address_port, config_addr);
+    return cpu.inl(config_data_port);
 }
 
 pub fn writeConfig16(addr: Addr, offset: u8, value: u16) void {
@@ -194,8 +195,8 @@ pub fn writeConfig32(addr: Addr, offset: u8, value: u32) void {
         (@as(u32, addr.device) << 11) |
         (@as(u32, addr.function) << 8) |
         (@as(u32, offset) & 0xFC);
-    outl(config_address_port, config_addr);
-    outl(config_data_port, value);
+    cpu.outl(config_address_port, config_addr);
+    cpu.outl(config_data_port, value);
 }
 
 pub fn logDevices() void {
@@ -303,19 +304,4 @@ fn mcfgConfigPtr(addr: Addr, offset: u8) ?[*]u8 {
         return @ptrFromInt(address.physToVirt(cfg_phys));
     }
     return null;
-}
-
-fn outl(port: u16, value: u32) void {
-    asm volatile ("outl %[value], %[port]"
-        :
-        : [value] "{eax}" (value),
-          [port] "{dx}" (port),
-    );
-}
-
-fn inl(port: u16) u32 {
-    return asm volatile ("inl %[port], %[result]"
-        : [result] "={eax}" (-> u32),
-        : [port] "{dx}" (port),
-    );
 }
