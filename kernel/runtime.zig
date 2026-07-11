@@ -11,7 +11,7 @@ pub const Runtime = struct {
     processes: process.ProcessManager = .{},
     scheduler: scheduler.Scheduler = .{},
     pipes: pipe.PipeTable = .{},
-    sockets: socket_table.SocketTable = .{},
+    network: socket_table.Network = .{},
     vfs: vfs.Vfs = .{},
     threads: thread.Runtime = .{},
 
@@ -19,7 +19,7 @@ pub const Runtime = struct {
         process.install(&self.processes);
         scheduler.install(&self.scheduler);
         pipe.installTable(&self.pipes);
-        socket_table.installTable(&self.sockets);
+        socket_table.install(&self.network);
         vfs.install(&self.vfs);
         thread.installRuntime(&self.threads);
     }

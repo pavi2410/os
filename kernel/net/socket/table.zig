@@ -114,10 +114,23 @@ pub const SocketTable = struct {
     }
 };
 
-var default_storage: SocketTable = .{};
-var default_table: *SocketTable = &default_storage;
+/// Runtime-owned network socket service. Protocol caches will migrate into
+/// this service alongside the table in the next network slice.
+pub const Network = struct {
+    sockets: SocketTable = .{},
 
-pub fn installTable(next: *SocketTable) void { default_table = next; default_table.init(); }
+    pub fn init(self: *Network) void { self.sockets.init(); }
+};
+
+var default_network: Network = .{};
+var active: *Network = &default_network;
+var default_table: *SocketTable = &default_network.sockets;
+
+pub fn install(next: *Network) void {
+    active = next;
+    default_table = &active.sockets;
+    active.init();
+}
 
 pub fn get(handle: u32) ?*Socket {
     return default_table.get(handle);
