@@ -8,6 +8,7 @@ const user_loader = @import("../mm/user_loader.zig");
 const page_ref = @import("../mm/page_ref.zig");
 const user_entry = @import("user_entry.zig");
 const fd_table = @import("fd_table.zig");
+const fd_cleanup = @import("fd_cleanup.zig");
 const path_mod = @import("common/path");
 const signal_mod = @import("signal.zig");
 
@@ -346,6 +347,7 @@ pub fn terminateCurrent(wait_status: u32) noreturn {
         signal_mod.notifyChildExit(parent_id);
     }
 
+    fd_cleanup.closeAll(&proc.fds);
     proc.address_space.destroy();
     proc.state = .dead;
     unregister(proc);
