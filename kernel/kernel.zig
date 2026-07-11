@@ -22,6 +22,7 @@ const driver_manager = @import("drivers/manager.zig");
 const tap_suite = @import("boot/tap_suite.zig");
 const vfs = @import("fs/vfs.zig");
 const syscall = @import("syscall/entry.zig");
+const user_access = @import("syscall/user_access.zig");
 const thread = @import("proc/thread.zig");
 const virtual = @import("mm/virtual.zig");
 
@@ -84,6 +85,7 @@ pub fn init(ctx: BootContext) void {
     hal.console.println("\n=== Phase 3 runtime ===", .{});
     syscall.init();
     process.init();
+    user_access.init();
     tty.init();
     pipe.init();
     initApic(ctx.rsdp_virt);

@@ -11,7 +11,7 @@ pub fn copyOut(dest_ptr: u64, data: []const u8) Fault!void {
 }
 
 fn copyOutIn(cr3: u64, dest_ptr: u64, data: []const u8) Fault!void {
-    if (!user.range(dest_ptr, data.len)) return error.Fault;
+    if (!user.validate(dest_ptr, data.len, true)) return error.Fault;
     var written: usize = 0;
     while (written < data.len) {
         const addr = dest_ptr + written;

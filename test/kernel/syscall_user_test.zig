@@ -19,6 +19,11 @@ test "user range rejects null and overflow" {
     try std.testing.expect(!user.range(std.math.maxInt(u64), 1));
 }
 
+test "unconfigured host validator preserves direct helper tests" {
+    var out: [2]u8 = undefined;
+    try std.testing.expect(user.bytes(@intFromPtr(&out), out.len) != null);
+}
+
 test "readArgv reads bounded cstring vector" {
     var arg0 = [_]u8{ 'e', 'c', 'h', 'o', 0 };
     var arg1 = [_]u8{ 'h', 'i', 0 };
