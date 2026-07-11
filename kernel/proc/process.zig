@@ -133,6 +133,26 @@ pub const ProcessManager = struct {
             }
         }
     }
+
+    pub fn enqueueZombie(self: *ProcessManager, pid: usize, parent_id: usize, status: u32) ProcessError!void {
+        for (&self.zombies) |*slot| {
+            if (slot.in_use) continue;
+            slot.* = .{ .pid = pid, .parent_id = parent_id, .status = status, .in_use = true };
+            return;
+        }
+        return ProcessError.TooManyZombies;
+    }
+
+    pub fn reapZombieAny(self: *ProcessManager, parent_id: usize, pid: isize) ?Zombie {
+        for (&self.zombies) |*slot| {
+            if (!slot.in_use or slot.parent_id != parent_id) continue;
+            if (pid >= 0 and @as(usize, @intCast(pid)) != slot.pid) continue;
+            const zombie = slot.*;
+            slot.in_use = false;
+            return zombie;
+        }
+        return null;
+    }
 };
 var default_table: ProcessManager = .{};
 var table: *ProcessManager = &default_table;
@@ -244,17 +264,7 @@ pub fn lookup(pid: usize) ?*Process {
 }
 
 pub fn enqueueZombie(pid: usize, parent_id: usize, status: u32) ProcessError!void {
-    for (&table.zombies) |*slot| {
-        if (slot.in_use) continue;
-        slot.* = .{
-            .pid = pid,
-            .parent_id = parent_id,
-            .status = status,
-            .in_use = true,
-        };
-        return;
-    }
-    return ProcessError.TooManyZombies;
+    return table.enqueueZombie(pid, parent_id, status);
 }
 
 pub fn reapZombie(parent_id: usize, pid: usize) ?Zombie {
@@ -272,16 +282,7 @@ pub fn reapZombie(parent_id: usize, pid: usize) ?Zombie {
 
 /// `pid == -1` waits for any child of `parent_id`; otherwise match a specific pid.
 pub fn reapZombieAny(parent_id: usize, pid: isize) ?Zombie {
-    for (&table.zombies) |*slot| {
-        if (!slot.in_use) continue;
-        if (slot.parent_id != parent_id) continue;
-        if (pid >= 0 and @as(usize, @intCast(pid)) != slot.pid) continue;
-
-        const copy = slot.*;
-        slot.in_use = false;
-        return copy;
-    }
-    return null;
+    return table.reapZombieAny(parent_id, pid);
 }
 
 /// True if `parent_id` still has a live or unreaped child matching `pid`.
