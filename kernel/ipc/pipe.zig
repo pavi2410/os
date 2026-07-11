@@ -92,12 +92,21 @@ pub const PipeTable = struct {
     }
 };
 
-var default_storage: PipeTable = .{};
-var default_table: *PipeTable = &default_storage;
+/// Runtime-owned IPC service. Additional IPC primitives join this owner here.
+pub const Ipc = struct {
+    pipes: PipeTable = .{},
 
-pub fn installTable(next: *PipeTable) void {
-    default_table = next;
-    default_table.init();
+    pub fn init(self: *Ipc) void { self.pipes.init(); }
+};
+
+var default_ipc: Ipc = .{};
+var active: *Ipc = &default_ipc;
+var default_table: *PipeTable = &default_ipc.pipes;
+
+pub fn install(next: *Ipc) void {
+    active = next;
+    default_table = &active.pipes;
+    active.init();
 }
 
 pub fn init() void {

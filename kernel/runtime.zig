@@ -10,7 +10,7 @@ const thread = @import("proc/thread.zig");
 pub const Runtime = struct {
     processes: process.ProcessManager = .{},
     scheduler: scheduler.Scheduler = .{},
-    pipes: pipe.PipeTable = .{},
+    ipc: pipe.Ipc = .{},
     network: socket_table.Network = .{},
     vfs: vfs.Vfs = .{},
     threads: thread.Runtime = .{},
@@ -18,7 +18,7 @@ pub const Runtime = struct {
     pub fn install(self: *Runtime) void {
         process.install(&self.processes);
         scheduler.install(&self.scheduler);
-        pipe.installTable(&self.pipes);
+        pipe.install(&self.ipc);
         socket_table.install(&self.network);
         vfs.install(&self.vfs);
         thread.installRuntime(&self.threads);
