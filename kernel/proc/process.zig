@@ -97,15 +97,21 @@ pub const Zombie = struct {
 };
 
 const max_zombies = 16;
-var zombies: [max_zombies]Zombie = @splat(.{});
-
 const max_processes = 16;
-var live: [max_processes]?*Process = .{null} ** max_processes;
+
+/// Owns process identity and lifecycle registries. Scheduler integration will
+/// migrate to this table directly in the next slice.
+pub const ProcessTable = struct {
+    zombies: [max_zombies]Zombie = @splat(.{}),
+    live: [max_processes]?*Process = .{null} ** max_processes,
+    next_id: usize = 1,
+};
+var table: ProcessTable = .{};
 
 var boot_cr3: u64 = 0;
-var next_id: usize = 1;
 
 pub fn init() void {
+    table = .{};
     boot_cr3 = paging.readCr3();
     paging.initKernelAddressSpace(boot_cr3);
     thread.setActivateCr3Hook(activateForThread);
@@ -142,7 +148,7 @@ pub fn createWithParent(parent_id: usize) ProcessError!*Process {
     const proc: *Process = @ptrCast(@alignCast(mem));
     const cwd = Cwd.root();
     proc.* = .{
-        .id = next_id,
+        .id = table.next_id,
         .parent_id = parent_id,
         .address_space = try AddressSpace.create(),
         .fds = FdTable.init(),
@@ -152,13 +158,13 @@ pub fn createWithParent(parent_id: usize) ProcessError!*Process {
         .cwd = cwd,
         .signals = signal_mod.SignalState.init(),
     };
-    next_id += 1;
+    table.next_id += 1;
     try register(proc);
     return proc;
 }
 
 fn register(proc: *Process) ProcessError!void {
-    for (&live) |*slot| {
+    for (&table.live) |*slot| {
         if (slot.* == null) {
             slot.* = proc;
             return;
@@ -168,7 +174,7 @@ fn register(proc: *Process) ProcessError!void {
 }
 
 fn unregister(proc: *Process) void {
-    for (&live) |*slot| {
+    for (&table.live) |*slot| {
         if (slot.* == proc) {
             slot.* = null;
             return;
@@ -212,7 +218,7 @@ pub fn resolvePath(proc: *const Process, path: []const u8, buf: []u8) ProcessErr
 }
 
 pub fn lookup(pid: usize) ?*Process {
-    for (live) |slot| {
+    for (table.live) |slot| {
         if (slot) |proc| {
             if (proc.id == pid) return proc;
         }
@@ -221,7 +227,7 @@ pub fn lookup(pid: usize) ?*Process {
 }
 
 pub fn enqueueZombie(pid: usize, parent_id: usize, status: u32) ProcessError!void {
-    for (&zombies) |*slot| {
+    for (&table.zombies) |*slot| {
         if (slot.in_use) continue;
         slot.* = .{
             .pid = pid,
@@ -235,7 +241,7 @@ pub fn enqueueZombie(pid: usize, parent_id: usize, status: u32) ProcessError!voi
 }
 
 pub fn reapZombie(parent_id: usize, pid: usize) ?Zombie {
-    for (&zombies) |*slot| {
+    for (&table.zombies) |*slot| {
         if (!slot.in_use) continue;
         if (slot.parent_id != parent_id) continue;
         if (slot.pid != pid) continue;
@@ -249,7 +255,7 @@ pub fn reapZombie(parent_id: usize, pid: usize) ?Zombie {
 
 /// `pid == -1` waits for any child of `parent_id`; otherwise match a specific pid.
 pub fn reapZombieAny(parent_id: usize, pid: isize) ?Zombie {
-    for (&zombies) |*slot| {
+    for (&table.zombies) |*slot| {
         if (!slot.in_use) continue;
         if (slot.parent_id != parent_id) continue;
         if (pid >= 0 and @as(usize, @intCast(pid)) != slot.pid) continue;
@@ -263,14 +269,14 @@ pub fn reapZombieAny(parent_id: usize, pid: isize) ?Zombie {
 
 /// True if `parent_id` still has a live or unreaped child matching `pid`.
 pub fn hasChild(parent_id: usize, pid: i64) bool {
-    for (live) |slot| {
+    for (table.live) |slot| {
         if (slot) |proc| {
             if (proc.parent_id != parent_id) continue;
             if (pid < 0) return true;
             if (@as(usize, @intCast(pid)) == proc.id) return true;
         }
     }
-    for (zombies) |slot| {
+    for (table.zombies) |slot| {
         if (!slot.in_use) continue;
         if (slot.parent_id != parent_id) continue;
         if (pid < 0) return true;
