@@ -16,7 +16,7 @@ export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) 
     }
 
     const payload = "ignored";
-    if (ulib.fs.write(@intCast(null_fd), payload.ptr, payload.len) != payload.len) {
+    if (ulib.fs.write(@intCast(null_fd), payload.ptr, payload.len) != @as(i64, @intCast(payload.len))) {
         ulib.io.writeStr("devtest: write /dev/null failed\n");
         return 1;
     }
@@ -36,7 +36,7 @@ export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) 
     }
 
     var zero_buf: [4]u8 = .{0xFF} ** 4;
-    if (ulib.fs.read(@intCast(zero_fd), &zero_buf, zero_buf.len) != zero_buf.len) {
+    if (ulib.fs.read(@intCast(zero_fd), &zero_buf, zero_buf.len) != @as(i64, @intCast(zero_buf.len))) {
         ulib.io.writeStr("devtest: read /dev/zero failed\n");
         return 1;
     }

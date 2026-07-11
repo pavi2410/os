@@ -1,6 +1,10 @@
 const abi_fs = @import("abi_fs");
 const syscall = @import("syscall.zig");
 
+/// Kernel descriptor number; syscall results remain signed errno values.
+pub const Descriptor = u32;
+pub const Result = i64;
+
 pub const O_RDONLY = abi_fs.O_RDONLY;
 pub const O_WRONLY = abi_fs.O_WRONLY;
 pub const O_RDWR = abi_fs.O_RDWR;
@@ -28,48 +32,61 @@ pub const Dirent64Entry = abi_fs.Dirent64Entry;
 pub const Dirent64Iterator = abi_fs.Dirent64Iterator;
 pub const writeDirent64 = abi_fs.writeDirent64;
 
-pub fn open(path: [*:0]const u8, flags: u32, mode: u32) isize {
-    return syscall.open(path, flags, mode);
+pub fn open(path: [*:0]const u8, flags: u32, mode: u32) Result {
+    return @intCast(syscall.open(path, flags, mode));
 }
 
-pub fn close(fd: u32) isize {
-    return syscall.close(fd);
+pub fn close(fd: Descriptor) Result {
+    return @intCast(syscall.close(fd));
 }
 
-pub fn read(fd: u32, buf: [*]u8, count: usize) isize {
-    return syscall.read(fd, buf, count);
+pub fn read(fd: Descriptor, buf: [*]u8, count: usize) Result {
+    return @intCast(syscall.read(fd, buf, count));
 }
 
-pub fn write(fd: u32, buf: [*]const u8, count: usize) isize {
-    return syscall.write(fd, buf, count);
+pub fn write(fd: Descriptor, buf: [*]const u8, count: usize) Result {
+    return @intCast(syscall.write(fd, buf, count));
 }
 
-pub fn stat(path: [*:0]const u8, out: *Stat) isize {
-    return syscall.stat(path, out);
+/// Create a pair of connected descriptor endpoints.
+pub fn pipe(endpoints: *[2]i32) Result {
+    return @intCast(syscall.pipe(endpoints));
 }
 
-pub fn getdents64(fd: u32, buf: [*]u8, count: usize) isize {
-    return syscall.getdents64(fd, buf, count);
+pub fn duplicate(fd: Descriptor) Result {
+    return @intCast(syscall.dup(fd));
 }
 
-pub fn unlink(path: [*:0]const u8) isize {
-    return syscall.unlink(path);
+pub fn duplicateTo(source: Descriptor, target: Descriptor) Result {
+    return @intCast(syscall.dup2(source, target));
 }
 
-pub fn mkdir(path: [*:0]const u8, mode: u32) isize {
-    return syscall.mkdir(path, mode);
+pub fn stat(path: [*:0]const u8, out: *Stat) Result {
+    return @intCast(syscall.stat(path, out));
 }
 
-pub fn rmdir(path: [*:0]const u8) isize {
-    return syscall.rmdir(path);
+pub fn getdents64(fd: Descriptor, buf: [*]u8, count: usize) Result {
+    return @intCast(syscall.getdents64(fd, buf, count));
 }
 
-pub fn getcwd(buf: [*]u8, size: usize) isize {
-    return syscall.getcwd(buf, size);
+pub fn unlink(path: [*:0]const u8) Result {
+    return @intCast(syscall.unlink(path));
 }
 
-pub fn chdir(path: [*:0]const u8) isize {
-    return syscall.chdir(path);
+pub fn mkdir(path: [*:0]const u8, mode: u32) Result {
+    return @intCast(syscall.mkdir(path, mode));
+}
+
+pub fn rmdir(path: [*:0]const u8) Result {
+    return @intCast(syscall.rmdir(path));
+}
+
+pub fn getcwd(buf: [*]u8, size: usize) Result {
+    return @intCast(syscall.getcwd(buf, size));
+}
+
+pub fn chdir(path: [*:0]const u8) Result {
+    return @intCast(syscall.chdir(path));
 }
 
 pub fn isDir(mode: u32) bool {

@@ -32,7 +32,7 @@ fn testChildWriteParentUnchanged() void {
     }
 
     var status: u32 = 0;
-    _ = ulib.process.waitpid(pid, &status, 0);
+    _ = ulib.process.wait(pid, &status, 0);
     tap.Harness.check("child write parent unchanged", shared_value == 42);
 }
 
@@ -50,6 +50,6 @@ fn testBothSidesWrite() void {
 
     shared_value = 3;
     var status: u32 = 0;
-    _ = ulib.process.waitpid(pid, &status, 0);
+    _ = ulib.process.wait(pid, &status, 0);
     tap.Harness.check("both sides write", shared_value == 3);
 }

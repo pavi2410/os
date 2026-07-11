@@ -35,12 +35,12 @@ pub fn run(parsed: *const argv_mod.Parsed) u8 {
         if (!fillExecEnvp(&exec_envp)) {
             ulib.process.exit(1);
         }
-        _ = ulib.process.execve(@ptrCast(&exec_path), @ptrCast(&exec_argv), @ptrCast(&exec_envp));
+        _ = ulib.process.exec(@ptrCast(&exec_path), @ptrCast(&exec_argv), @ptrCast(&exec_envp));
         ulib.process.exit(1);
     }
 
     var wstatus: u32 = 0;
-    if (ulib.process.waitpid(child, &wstatus, 0) < 0) {
+    if (ulib.process.wait(child, &wstatus, 0) < 0) {
         io.writeStr("run failed\n");
         return 1;
     }

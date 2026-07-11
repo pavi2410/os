@@ -166,8 +166,8 @@ pub fn apply(redirects: []const Redirect) void {
                     0o644,
                 );
                 if (fd >= 0) {
-                    _ = ulib.syscall.dup2(@intCast(fd), 1);
-                    _ = ulib.syscall.close(@intCast(fd));
+                    _ = ulib.fs.duplicateTo(@intCast(fd), 1);
+                    _ = ulib.fs.close(@intCast(fd));
                 }
             },
             .stdout_append => {
@@ -177,8 +177,8 @@ pub fn apply(redirects: []const Redirect) void {
                     0o644,
                 );
                 if (fd >= 0) {
-                    _ = ulib.syscall.dup2(@intCast(fd), 1);
-                    _ = ulib.syscall.close(@intCast(fd));
+                    _ = ulib.fs.duplicateTo(@intCast(fd), 1);
+                    _ = ulib.fs.close(@intCast(fd));
                 }
             },
             .stderr_trunc => {
@@ -188,8 +188,8 @@ pub fn apply(redirects: []const Redirect) void {
                     0o644,
                 );
                 if (fd >= 0) {
-                    _ = ulib.syscall.dup2(@intCast(fd), 2);
-                    _ = ulib.syscall.close(@intCast(fd));
+                    _ = ulib.fs.duplicateTo(@intCast(fd), 2);
+                    _ = ulib.fs.close(@intCast(fd));
                 }
             },
             .stderr_append => {
@@ -199,12 +199,12 @@ pub fn apply(redirects: []const Redirect) void {
                     0o644,
                 );
                 if (fd >= 0) {
-                    _ = ulib.syscall.dup2(@intCast(fd), 2);
-                    _ = ulib.syscall.close(@intCast(fd));
+                    _ = ulib.fs.duplicateTo(@intCast(fd), 2);
+                    _ = ulib.fs.close(@intCast(fd));
                 }
             },
             .stderr_to_stdout => {
-                _ = ulib.syscall.dup2(1, 2);
+                _ = ulib.fs.duplicateTo(1, 2);
             },
             .stdin => {
                 const fd = ulib.fs.open(
@@ -213,8 +213,8 @@ pub fn apply(redirects: []const Redirect) void {
                     0,
                 );
                 if (fd >= 0) {
-                    _ = ulib.syscall.dup2(@intCast(fd), 0);
-                    _ = ulib.syscall.close(@intCast(fd));
+                    _ = ulib.fs.duplicateTo(@intCast(fd), 0);
+                    _ = ulib.fs.close(@intCast(fd));
                 }
             },
         }

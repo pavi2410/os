@@ -25,13 +25,13 @@ pub fn run(
     var pipe_fds: [max_pipes][2]i32 = undefined;
     var i: usize = 0;
     while (i < pipe_count) : (i += 1) {
-        if (ulib.syscall.pipe(&pipe_fds[i]) < 0) {
+        if (ulib.fs.pipe(&pipe_fds[i]) < 0) {
             io.writeStr("pipe failed\n");
             return 1;
         }
     }
 
-    var pids: [max_pipes + 1]isize = undefined;
+    var pids: [max_pipes + 1]ulib.process.ProcessId = undefined;
 
     i = 0;
     while (i < cmd_count) : (i += 1) {
@@ -43,16 +43,16 @@ pub fn run(
 
         if (pid == 0) {
             if (i > 0) {
-                _ = ulib.syscall.dup2(@intCast(pipe_fds[i - 1][0]), 0);
+                _ = ulib.fs.duplicateTo(@intCast(pipe_fds[i - 1][0]), 0);
             }
             if (i < pipe_count) {
-                _ = ulib.syscall.dup2(@intCast(pipe_fds[i][1]), 1);
+                _ = ulib.fs.duplicateTo(@intCast(pipe_fds[i][1]), 1);
             }
 
             var j: usize = 0;
             while (j < pipe_count) : (j += 1) {
-                _ = ulib.syscall.close(@intCast(pipe_fds[j][0]));
-                _ = ulib.syscall.close(@intCast(pipe_fds[j][1]));
+                _ = ulib.fs.close(@intCast(pipe_fds[j][0]));
+                _ = ulib.fs.close(@intCast(pipe_fds[j][1]));
             }
 
             const range = parts[i];
@@ -93,7 +93,7 @@ pub fn run(
             }
             exec_argv[argc] = null;
 
-            _ = ulib.process.execve(@ptrCast(&exec_path), @ptrCast(&exec_argv), @ptrCast(&[_]?[*:0]const u8{null}));
+            _ = ulib.process.exec(@ptrCast(&exec_path), @ptrCast(&exec_argv), @ptrCast(&[_]?[*:0]const u8{null}));
             ulib.process.exit(1);
         }
 
@@ -102,15 +102,15 @@ pub fn run(
 
     var j: usize = 0;
     while (j < pipe_count) : (j += 1) {
-        _ = ulib.syscall.close(@intCast(pipe_fds[j][0]));
-        _ = ulib.syscall.close(@intCast(pipe_fds[j][1]));
+        _ = ulib.fs.close(@intCast(pipe_fds[j][0]));
+        _ = ulib.fs.close(@intCast(pipe_fds[j][1]));
     }
 
     var exit_code: u8 = 0;
     var k: usize = 0;
     while (k < cmd_count) : (k += 1) {
         var wstatus: u32 = 0;
-        _ = ulib.process.waitpid(pids[k], &wstatus, 0);
+        _ = ulib.process.wait(pids[k], &wstatus, 0);
         if (k == cmd_count - 1) {
             exit_code = status.codeFromWait(wstatus);
         }
