@@ -21,10 +21,10 @@ pub fn build(b: *std.Build) void {
 
     const user_target = b.resolveTargetQuery(freestanding_x64_query);
 
-    // Zig 0.16's Debug runtime currently cannot lower this freestanding
-    // x86-64 userspace configuration. Keep userspace checked and optimized
-    // instead of silently using ReleaseSmall.
-    const user_optimize: std.builtin.OptimizeMode = .ReleaseSafe;
+    // The boot-time ELF loader intentionally keeps a small image ceiling, so
+    // release images use ReleaseSmall by default. CI and diagnostics can opt
+    // into the larger checked userspace binaries explicitly.
+    const user_optimize = b.option(std.builtin.OptimizeMode, "user-optimize", "Optimization mode for userspace ELF programs") orelse .ReleaseSmall;
 
     const abi_user = helpers.AbiBundle.create(b, user_target, user_optimize);
     const common_bytes_user = helpers.exeModule(b, "common/bytes.zig", user_target, user_optimize);
