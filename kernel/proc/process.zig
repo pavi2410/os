@@ -106,12 +106,18 @@ pub const ProcessTable = struct {
     live: [max_processes]?*Process = .{null} ** max_processes,
     next_id: usize = 1,
 };
-var table: ProcessTable = .{};
+var default_table: ProcessTable = .{};
+var table: *ProcessTable = &default_table;
+
+pub fn installTable(next: *ProcessTable) void {
+    table = next;
+    table.* = .{};
+}
 
 var boot_cr3: u64 = 0;
 
 pub fn init() void {
-    table = .{};
+    table.* = .{};
     boot_cr3 = paging.readCr3();
     paging.initKernelAddressSpace(boot_cr3);
     thread.setActivateCr3Hook(activateForThread);

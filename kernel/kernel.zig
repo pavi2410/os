@@ -25,6 +25,9 @@ const syscall = @import("syscall/entry.zig");
 const user_access = @import("syscall/user_access.zig");
 const thread = @import("proc/thread.zig");
 const virtual = @import("mm/virtual.zig");
+const runtime_mod = @import("runtime.zig");
+
+var runtime: runtime_mod.Runtime = .{};
 
 /// Deliberately unmapped higher-half address used to verify the page fault handler.
 const page_fault_test_addr: u64 = 0xFFFFFFFF90000000;
@@ -44,6 +47,7 @@ pub const BootContext = struct {
 };
 
 pub fn init(ctx: BootContext) void {
+    runtime.install();
     address.setHhdmOffset(ctx.hhdm_offset);
 
     gdt.init();

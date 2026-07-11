@@ -61,10 +61,16 @@ pub const SchedulerState = struct {
     preempt_requested: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     ticks: u64 = 0,
 };
-var state: SchedulerState = .{};
+var default_state: SchedulerState = .{};
+var state: *SchedulerState = &default_state;
+
+pub fn installState(next: *SchedulerState) void {
+    state = next;
+    state.* = .{};
+}
 
 pub fn init() void {
-    state = .{};
+    state.* = .{};
     state.bootstrap = .{
         .id = 0,
         .name = "bootstrap",
