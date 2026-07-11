@@ -68,30 +68,11 @@ pub const Vfs = struct {
     pub fn isReady(_: *const Vfs) bool {
         return active_fs.is_ready();
     }
-};
 
-var default_vfs: Vfs = .{};
-var active: *Vfs = &default_vfs;
-var handles: *HandleTable = &default_vfs.handles;
-
-pub fn install(next: *Vfs) void {
-    active = next;
-    handles = &active.handles;
-    handles.init();
-}
-
-pub fn init() VfsError!void {
-    try active.init();
-}
-
-pub fn isReady() bool {
-    return active.isReady();
-}
-
-pub fn open(path: []const u8, flags: OpenFlags) VfsError!HandleId {
+    pub fn open(self: *Vfs, path: []const u8, flags: OpenFlags) VfsError!HandleId {
     if (devfs.lookup(path)) |node| {
         return switch (node) {
-            .root => openDevRoot(flags),
+            .root => self.openDevRoot(flags),
             .device => VfsError.NotFile,
         };
     }
@@ -102,8 +83,8 @@ pub fn open(path: []const u8, flags: OpenFlags) VfsError!HandleId {
     if (flags.truncate and !flags.write) return VfsError.ReadOnly;
 
     const is_directory = opened.isDirectory();
-    const slot = handles.alloc() orelse return VfsError.TooManyOpenFiles;
-    handles.slots[slot] = .{
+    const slot = self.handles.alloc() orelse return VfsError.TooManyOpenFiles;
+    self.handles.slots[slot] = .{
         .in_use = true,
         .refs = 1,
         .kind = .fat,
@@ -115,39 +96,37 @@ pub fn open(path: []const u8, flags: OpenFlags) VfsError!HandleId {
         .dir_skip = 0,
     };
     return slot;
-}
+    }
 
-pub fn close(handle: HandleId) void {
-    handles.close(handle);
-}
+    pub fn close(self: *Vfs, handle: HandleId) void { self.handles.close(handle); }
 
-pub fn retain(handle: HandleId) VfsError!void {
-    const h = try getHandle(handle);
+    pub fn retain(self: *Vfs, handle: HandleId) VfsError!void {
+    const h = try self.getHandle(handle);
     if (h.refs == std.math.maxInt(u16)) return VfsError.TooManyOpenFiles;
     h.refs += 1;
-}
+    }
 
-pub fn read(handle: HandleId, buf: []u8) VfsError!usize {
-    const h = try getHandle(handle);
+    pub fn read(self: *Vfs, handle: HandleId, buf: []u8) VfsError!usize {
+    const h = try self.getHandle(handle);
     if (h.is_directory) return VfsError.NotFile;
     if (h.kind == .dev_root) return VfsError.NotFile;
     const n = try active_fs.read(h.open, h.offset, buf);
     h.offset += n;
     return n;
-}
+    }
 
-pub fn write(handle: HandleId, buf: []const u8) VfsError!usize {
-    const h = try getHandle(handle);
+    pub fn write(self: *Vfs, handle: HandleId, buf: []const u8) VfsError!usize {
+    const h = try self.getHandle(handle);
     if (h.is_directory) return VfsError.IsDirectory;
     if (h.kind == .dev_root) return VfsError.IsDirectory;
     if (!h.writable) return VfsError.ReadOnly;
     const n = try active_fs.write_at(&h.open, h.offset, buf);
     h.offset += n;
     return n;
-}
+    }
 
-pub fn lseek(handle: HandleId, offset: i64, whence: Whence) VfsError!u64 {
-    const h = try getHandle(handle);
+    pub fn lseek(self: *Vfs, handle: HandleId, offset: i64, whence: Whence) VfsError!u64 {
+    const h = try self.getHandle(handle);
     const size: u64 = if (h.kind == .dev_root) 0 else h.open.size;
     const new_off: u64 = switch (whence) {
         .set => {
@@ -173,18 +152,18 @@ pub fn lseek(handle: HandleId, offset: i64, whence: Whence) VfsError!u64 {
     };
     h.offset = new_off;
     return new_off;
-}
+    }
 
-pub fn stat(path: []const u8, out: *Stat) VfsError!void {
+    pub fn stat(_: *Vfs, path: []const u8, out: *Stat) VfsError!void {
     if (devfs.lookup(path)) |node| {
         devfs.stat(node, out);
         return;
     }
     try active_fs.stat(path, out);
-}
+    }
 
-pub fn getdents64(handle: HandleId, buf: []u8) VfsError!usize {
-    const h = try getHandle(handle);
+    pub fn getdents64(self: *Vfs, handle: HandleId, buf: []u8) VfsError!usize {
+    const h = try self.getHandle(handle);
     if (!h.is_directory) return VfsError.NotFile;
     if (h.kind == .dev_root) return devfs.getdents64(&h.dir_skip, buf);
 
@@ -195,58 +174,57 @@ pub fn getdents64(handle: HandleId, buf: []u8) VfsError!usize {
     const extra = devfs.appendRootMountDirent(buf) orelse return 0;
     h.root_mount_emitted = true;
     return extra;
-}
+    }
 
-pub fn unlink(path: []const u8) VfsError!void {
+    pub fn unlink(self: *Vfs, path: []const u8) VfsError!void {
     if (devfs.isDevPath(path)) return VfsError.ReadOnly;
-    if (try active_fs.unlink(path)) |id| invalidateHandlesAt(id);
-}
+    if (try active_fs.unlink(path)) |id| self.invalidateHandlesAt(id);
+    }
 
-pub fn mkdir(path: []const u8) VfsError!void {
+    pub fn mkdir(_: *Vfs, path: []const u8) VfsError!void {
     if (devfs.isDevPath(path)) return VfsError.ReadOnly;
     try active_fs.mkdir(path);
-}
+    }
 
-pub fn rmdir(path: []const u8) VfsError!void {
+    pub fn rmdir(self: *Vfs, path: []const u8) VfsError!void {
     if (devfs.isDevPath(path)) return VfsError.ReadOnly;
-    if (try active_fs.rmdir(path)) |id| invalidateHandlesAt(id);
-}
+    if (try active_fs.rmdir(path)) |id| self.invalidateHandlesAt(id);
+    }
 
-fn invalidateHandlesAt(id: filesystem.FileId) void {
+    fn invalidateHandlesAt(self: *Vfs, id: filesystem.FileId) void {
     var i: u32 = 0;
     while (i < max_handles) : (i += 1) {
-        if (!handles.slots[i].in_use) continue;
-        const h = &handles.slots[i];
+        if (!self.handles.slots[i].in_use) continue;
+        const h = &self.handles.slots[i];
         if (h.open.id.eql(id)) {
-            handles.slots[i] = .{};
+            self.handles.slots[i] = .{};
         }
     }
-}
+    }
 
-pub fn logStatus() void {
+    pub fn logStatus(self: *const Vfs) void {
     hal.console.println("\n--- VFS ---", .{});
-    if (!isReady()) {
+    if (!self.isReady()) {
         hal.console.println("FAT32 not mounted", .{});
         return;
     }
     hal.console.println("FAT32 mounted (read/write)", .{});
     hal.console.println("devfs: /dev/null, /dev/zero, /dev/ttyS0", .{});
-}
+    }
 
-fn openDevRoot(flags: OpenFlags) VfsError!HandleId {
+    fn openDevRoot(self: *Vfs, flags: OpenFlags) VfsError!HandleId {
     if (!flags.read) return VfsError.InvalidWhence;
     if (flags.write or flags.create or flags.truncate) return VfsError.ReadOnly;
 
-    const slot = handles.alloc() orelse return VfsError.TooManyOpenFiles;
-    handles.slots[slot] = .{
+    const slot = self.handles.alloc() orelse return VfsError.TooManyOpenFiles;
+    self.handles.slots[slot] = .{
         .in_use = true,
         .refs = 1,
         .kind = .dev_root,
         .is_directory = true,
     };
     return slot;
-}
+    }
 
-fn getHandle(handle: HandleId) VfsError!*Handle {
-    return handles.get(handle);
-}
+    fn getHandle(self: *Vfs, handle: HandleId) VfsError!*Handle { return self.handles.get(handle); }
+};

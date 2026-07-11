@@ -3,6 +3,7 @@ const physical = @import("../mm/physical.zig");
 const tap_mod = @import("common/tap");
 const udp_test = @import("../net/udp_test.zig");
 const vfs = @import("../fs/vfs.zig");
+const runtime = @import("../runtime.zig");
 
 const Tap = tap_mod.Harness(hal.console.writeAll);
 
@@ -18,12 +19,12 @@ pub fn run() void {
 }
 
 fn testVfsReadme() bool {
-    if (!vfs.isReady()) return false;
+    if (!runtime.boot().vfs.isReady()) return false;
 
     var buf: [64]u8 = undefined;
-    const handle = vfs.open("/README.TXT", .{}) catch return false;
-    defer vfs.close(handle);
+    const handle = runtime.boot().vfs.open("/README.TXT", .{}) catch return false;
+    defer runtime.boot().vfs.close(handle);
 
-    const n = vfs.read(handle, &buf) catch return false;
+    const n = runtime.boot().vfs.read(handle, &buf) catch return false;
     return n > 0;
 }

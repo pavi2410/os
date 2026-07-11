@@ -1,6 +1,7 @@
 const fat32 = @import("../fs/fat32.zig");
 const heap = @import("../mm/heap.zig");
 const vfs = @import("../fs/vfs.zig");
+const runtime = @import("../runtime.zig");
 
 pub const LoadError = error{
     NotReady,
@@ -29,7 +30,7 @@ pub fn load(path: []const u8) LoadError![]u8 {
 }
 
 fn loadAt(path: []const u8) LoadError![]u8 {
-    if (!vfs.isReady()) return LoadError.NotReady;
+    if (!runtime.boot().vfs.isReady()) return LoadError.NotReady;
 
     const entry = fat32.lookup(path) catch |err| switch (err) {
         fat32.FatError.NotFound => return LoadError.NotFound,

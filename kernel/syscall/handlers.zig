@@ -156,9 +156,9 @@ fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
         }
     }
 
-    const handle = vfs.open(path, open_flags) catch |err| return errno.fromVfs(err);
+    const handle = runtime.boot().vfs.open(path, open_flags) catch |err| return errno.fromVfs(err);
     const fd = fdtab.alloc(proc) catch {
-        vfs.close(handle);
+        runtime.boot().vfs.close(handle);
         return errno.EMFILE;
     };
     proc.fds.fds[fd] = .{ .file = handle };
@@ -175,7 +175,7 @@ fn sysStat(path_ptr: u64, stat_ptr: u64) i64 {
     var path_buf: [process.cwd_max_len]u8 = undefined;
     const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
     const out = user.outPtr(vfs.Stat, stat_ptr) orelse return errno.EFAULT;
-    vfs.stat(path, out) catch |err| return errno.fromVfs(err);
+    runtime.boot().vfs.stat(path, out) catch |err| return errno.fromVfs(err);
     return 0;
 }
 
@@ -233,7 +233,7 @@ fn sysChdir(path_ptr: u64) i64 {
     const path = process.resolvePath(proc, path_raw, &path_buf) catch return errno.EINVAL;
 
     var st: vfs.Stat = .{};
-    vfs.stat(path, &st) catch |err| return errno.fromVfs(err);
+    runtime.boot().vfs.stat(path, &st) catch |err| return errno.fromVfs(err);
     if (st.st_mode & abi_fs.S_IFDIR == 0) return errno.ENOTDIR;
 
     process.setCwd(proc, path) catch return errno.EINVAL;
@@ -244,7 +244,7 @@ fn sysUnlink(path_ptr: u64) i64 {
     const path_raw = user.cString(path_ptr, 256) orelse return errno.EFAULT;
     var path_buf: [process.cwd_max_len]u8 = undefined;
     const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
-    vfs.unlink(path) catch |err| return errno.fromVfs(err);
+    runtime.boot().vfs.unlink(path) catch |err| return errno.fromVfs(err);
     return 0;
 }
 
@@ -253,7 +253,7 @@ fn sysMkdir(path_ptr: u64, mode: u64) i64 {
     const path_raw = user.cString(path_ptr, 256) orelse return errno.EFAULT;
     var path_buf: [process.cwd_max_len]u8 = undefined;
     const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
-    vfs.mkdir(path) catch |err| return errno.fromVfs(err);
+    runtime.boot().vfs.mkdir(path) catch |err| return errno.fromVfs(err);
     return 0;
 }
 
@@ -261,7 +261,7 @@ fn sysRmdir(path_ptr: u64) i64 {
     const path_raw = user.cString(path_ptr, 256) orelse return errno.EFAULT;
     var path_buf: [process.cwd_max_len]u8 = undefined;
     const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
-    vfs.rmdir(path) catch |err| return errno.fromVfs(err);
+    runtime.boot().vfs.rmdir(path) catch |err| return errno.fromVfs(err);
     return 0;
 }
 

@@ -120,11 +120,11 @@ fn initBlock() void {
 }
 
 fn initVfs() void {
-    vfs.init() catch {
+    runtime_mod.boot().vfs.init() catch {
         hal.console.println("VFS init failed", .{});
         return;
     };
-    vfs.logStatus();
+    runtime_mod.boot().vfs.logStatus();
 }
 
 fn initPci(rsdp_virt: u64) void {

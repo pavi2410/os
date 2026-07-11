@@ -8,7 +8,7 @@ const runtime = @import("../runtime.zig");
 pub fn closeAll(table: *fd_table.FdTable) void {
     for (&table.fds) |*entry| {
         switch (entry.*) {
-            .file => |handle| vfs.close(handle),
+            .file => |handle| runtime.boot().vfs.close(handle),
             .socket => |handle| socket.close(handle),
             .pipe_fd => |pfd| {
                 if (pfd.is_read) runtime.boot().ipc.closeRead(pfd.handle) else runtime.boot().ipc.closeWrite(pfd.handle);

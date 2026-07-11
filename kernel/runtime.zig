@@ -21,9 +21,9 @@ pub const Runtime = struct {
         process.install(&self.processes);
         scheduler.install(&self.scheduler);
         socket_table.install(&self.network);
-        vfs.install(&self.vfs);
         thread.installRuntime(&self.threads);
         self.ipc.init();
+        self.vfs.handles.init();
     }
 };
 

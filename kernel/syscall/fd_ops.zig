@@ -33,7 +33,7 @@ pub fn read(fd: u64, slot: *process.Fd, buf: []u8) i64 {
             return @intCast(devfs.readDevice(dev_fd.kind, buf));
         },
         .file => |handle| {
-            const n = vfs.read(handle, buf) catch |err| return errno.fromVfs(err);
+            const n = runtime.boot().vfs.read(handle, buf) catch |err| return errno.fromVfs(err);
             return @intCast(n);
         },
         .pipe_fd => |pfd| {
@@ -64,7 +64,7 @@ pub fn write(fd: u64, slot: *process.Fd, buf: []const u8) i64 {
             return @intCast(devfs.writeDevice(dev_fd.kind, buf));
         },
         .file => |handle| {
-            const n = vfs.write(handle, buf) catch |err| return errno.fromVfs(err);
+            const n = runtime.boot().vfs.write(handle, buf) catch |err| return errno.fromVfs(err);
             return @intCast(n);
         },
         .pipe_fd => |pfd| {
@@ -87,7 +87,7 @@ pub fn write(fd: u64, slot: *process.Fd, buf: []const u8) i64 {
 pub fn close(slot: *process.Fd) i64 {
     return switch (slot.*) {
         .file => |handle| {
-            vfs.close(handle);
+            runtime.boot().vfs.close(handle);
             slot.* = .none;
             return 0;
         },
@@ -116,7 +116,7 @@ pub fn close(slot: *process.Fd) i64 {
 pub fn lseek(slot: *process.Fd, offset: i64, whence: u32) i64 {
     return switch (slot.*) {
         .file => |handle| {
-            const pos = vfs.lseek(handle, offset, @enumFromInt(whence)) catch |err| return errno.fromVfs(err);
+            const pos = runtime.boot().vfs.lseek(handle, offset, @enumFromInt(whence)) catch |err| return errno.fromVfs(err);
             return @bitCast(@as(i64, @intCast(pos)));
         },
         else => errno.EBADF,
@@ -126,7 +126,7 @@ pub fn lseek(slot: *process.Fd, offset: i64, whence: u32) i64 {
 pub fn getdents64(slot: *process.Fd, buf: []u8) i64 {
     return switch (slot.*) {
         .file => |handle| {
-            const n = vfs.getdents64(handle, buf) catch |err| return errno.fromVfs(err);
+            const n = runtime.boot().vfs.getdents64(handle, buf) catch |err| return errno.fromVfs(err);
             return @intCast(n);
         },
         else => errno.EBADF,
