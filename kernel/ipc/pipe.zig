@@ -92,7 +92,13 @@ pub const PipeTable = struct {
     }
 };
 
-var default_table: PipeTable = .{};
+var default_storage: PipeTable = .{};
+var default_table: *PipeTable = &default_storage;
+
+pub fn installTable(next: *PipeTable) void {
+    default_table = next;
+    default_table.init();
+}
 
 pub fn init() void {
     default_table.init();
