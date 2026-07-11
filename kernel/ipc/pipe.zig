@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const ring_size = 4096;
 
 pub const PipeError = error{
@@ -6,8 +8,12 @@ pub const PipeError = error{
     TooManyPipes,
 };
 
+/// Index into a Runtime-owned pipe table. Descriptor translation belongs in
+/// the syscall layer; IPC never accepts a process descriptor directly.
+pub const Handle = u32;
+
 pub const PipeFd = struct {
-    handle: u32,
+    handle: Handle,
     is_read: bool,
 };
 
@@ -31,7 +37,7 @@ pub const PipeTable = struct {
         self.* = .{};
     }
 
-    pub fn create(self: *PipeTable) PipeError!u32 {
+    pub fn create(self: *PipeTable) PipeError!Handle {
         for (&self.pipes, 0..) |*slot, i| {
             if (slot.* == null) {
                 slot.* = Pipe{};
@@ -41,7 +47,7 @@ pub const PipeTable = struct {
         return PipeError.TooManyPipes;
     }
 
-    pub fn read(self: *PipeTable, handle: u32, buf: []u8) PipeError!usize {
+    pub fn read(self: *PipeTable, handle: Handle, buf: []u8) PipeError!usize {
         const pipe = self.get(handle) orelse return PipeError.BrokenPipe;
         if (pipe.available == 0) return if (pipe.writers == 0) 0 else error.WouldBlock;
         const to_read = @min(buf.len, pipe.available);
@@ -56,7 +62,7 @@ pub const PipeTable = struct {
         return total;
     }
 
-    pub fn write(self: *PipeTable, handle: u32, buf: []const u8) PipeError!usize {
+    pub fn write(self: *PipeTable, handle: Handle, buf: []const u8) PipeError!usize {
         const pipe = self.get(handle) orelse return PipeError.BrokenPipe;
         if (pipe.readers == 0) return PipeError.BrokenPipe;
         const to_write = @min(buf.len, ring_size - pipe.available);
@@ -71,22 +77,26 @@ pub const PipeTable = struct {
         return total;
     }
 
-    pub fn closeRead(self: *PipeTable, handle: u32) void { self.close(handle, true); }
-    pub fn closeWrite(self: *PipeTable, handle: u32) void { self.close(handle, false); }
+    pub fn closeRead(self: *PipeTable, handle: Handle) void { self.close(handle, true); }
+    pub fn closeWrite(self: *PipeTable, handle: Handle) void { self.close(handle, false); }
 
-    pub fn dupRef(self: *PipeTable, handle: u32, is_read: bool) void {
+    pub fn dupRef(self: *PipeTable, handle: Handle, is_read: bool) void {
         const pipe = self.get(handle) orelse return;
-        if (is_read) pipe.readers += 1 else pipe.writers += 1;
+        if (is_read) {
+            if (pipe.readers != std.math.maxInt(u8)) pipe.readers += 1;
+        } else if (pipe.writers != std.math.maxInt(u8)) {
+            pipe.writers += 1;
+        }
     }
 
-    fn close(self: *PipeTable, handle: u32, is_read: bool) void {
+    fn close(self: *PipeTable, handle: Handle, is_read: bool) void {
         const pipe = self.get(handle) orelse return;
         if (is_read and pipe.readers > 0) pipe.readers -= 1;
         if (!is_read and pipe.writers > 0) pipe.writers -= 1;
         if (pipe.readers == 0 and pipe.writers == 0) self.pipes[handle] = null;
     }
 
-    fn get(self: *PipeTable, handle: u32) ?*Pipe {
+    fn get(self: *PipeTable, handle: Handle) ?*Pipe {
         if (handle >= max_pipes) return null;
         return &(self.pipes[handle] orelse return null);
     }

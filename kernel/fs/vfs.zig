@@ -11,6 +11,8 @@ pub const OpenFlags = filesystem.OpenFlags;
 pub const Stat = filesystem.Stat;
 
 pub const max_handles = 16;
+/// Index into a Runtime-owned VFS open-file table.
+pub const HandleId = u32;
 const active_fs = fat32.ops;
 
 const HandleKind = enum {
@@ -37,16 +39,17 @@ pub const HandleTable = struct {
     slots: [max_handles]Handle = undefined,
 
     pub fn init(self: *HandleTable) void { self.slots = @splat(.{}); }
-    pub fn alloc(self: *HandleTable) ?u32 {
+    pub fn alloc(self: *HandleTable) ?HandleId {
         for (&self.slots, 0..) |*slot, i| if (!slot.in_use) return @intCast(i);
         return null;
     }
-    pub fn get(self: *HandleTable, handle: u32) VfsError!*Handle {
+    pub fn get(self: *HandleTable, handle: HandleId) VfsError!*Handle {
         if (handle >= max_handles or !self.slots[handle].in_use) return VfsError.BadHandle;
         return &self.slots[handle];
     }
-    pub fn close(self: *HandleTable, handle: u32) void {
+    pub fn close(self: *HandleTable, handle: HandleId) void {
         const slot = self.get(handle) catch return;
+        if (slot.refs == 0) return;
         slot.refs -= 1;
         if (slot.refs == 0) slot.* = .{};
     }
@@ -85,7 +88,7 @@ pub fn isReady() bool {
     return active.isReady();
 }
 
-pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
+pub fn open(path: []const u8, flags: OpenFlags) VfsError!HandleId {
     if (devfs.lookup(path)) |node| {
         return switch (node) {
             .root => openDevRoot(flags),
@@ -114,17 +117,17 @@ pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
     return slot;
 }
 
-pub fn close(handle: u32) void {
+pub fn close(handle: HandleId) void {
     handles.close(handle);
 }
 
-pub fn retain(handle: u32) VfsError!void {
+pub fn retain(handle: HandleId) VfsError!void {
     const h = try getHandle(handle);
     if (h.refs == std.math.maxInt(u16)) return VfsError.TooManyOpenFiles;
     h.refs += 1;
 }
 
-pub fn read(handle: u32, buf: []u8) VfsError!usize {
+pub fn read(handle: HandleId, buf: []u8) VfsError!usize {
     const h = try getHandle(handle);
     if (h.is_directory) return VfsError.NotFile;
     if (h.kind == .dev_root) return VfsError.NotFile;
@@ -133,7 +136,7 @@ pub fn read(handle: u32, buf: []u8) VfsError!usize {
     return n;
 }
 
-pub fn write(handle: u32, buf: []const u8) VfsError!usize {
+pub fn write(handle: HandleId, buf: []const u8) VfsError!usize {
     const h = try getHandle(handle);
     if (h.is_directory) return VfsError.IsDirectory;
     if (h.kind == .dev_root) return VfsError.IsDirectory;
@@ -143,7 +146,7 @@ pub fn write(handle: u32, buf: []const u8) VfsError!usize {
     return n;
 }
 
-pub fn lseek(handle: u32, offset: i64, whence: Whence) VfsError!u64 {
+pub fn lseek(handle: HandleId, offset: i64, whence: Whence) VfsError!u64 {
     const h = try getHandle(handle);
     const size: u64 = if (h.kind == .dev_root) 0 else h.open.size;
     const new_off: u64 = switch (whence) {
@@ -180,7 +183,7 @@ pub fn stat(path: []const u8, out: *Stat) VfsError!void {
     try active_fs.stat(path, out);
 }
 
-pub fn getdents64(handle: u32, buf: []u8) VfsError!usize {
+pub fn getdents64(handle: HandleId, buf: []u8) VfsError!usize {
     const h = try getHandle(handle);
     if (!h.is_directory) return VfsError.NotFile;
     if (h.kind == .dev_root) return devfs.getdents64(&h.dir_skip, buf);
@@ -230,7 +233,7 @@ pub fn logStatus() void {
     hal.console.println("devfs: /dev/null, /dev/zero, /dev/ttyS0", .{});
 }
 
-fn openDevRoot(flags: OpenFlags) VfsError!u32 {
+fn openDevRoot(flags: OpenFlags) VfsError!HandleId {
     if (!flags.read) return VfsError.InvalidWhence;
     if (flags.write or flags.create or flags.truncate) return VfsError.ReadOnly;
 
@@ -244,6 +247,6 @@ fn openDevRoot(flags: OpenFlags) VfsError!u32 {
     return slot;
 }
 
-fn getHandle(handle: u32) VfsError!*Handle {
+fn getHandle(handle: HandleId) VfsError!*Handle {
     return handles.get(handle);
 }

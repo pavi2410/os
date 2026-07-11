@@ -199,12 +199,13 @@ pub fn create() ProcessError!*Process {
 
 pub fn createWithParent(parent_id: usize) ProcessError!*Process {
     const mem = heap.kmalloc(@sizeOf(Process)) catch return ProcessError.OutOfMemory;
+    errdefer heap.kfree(mem) catch {};
     const proc: *Process = @ptrCast(@alignCast(mem));
     const cwd = Cwd.root();
     proc.* = .{
         .id = table.next_id,
         .parent_id = parent_id,
-        .address_space = try AddressSpace.create(),
+        .address_space = AddressSpace.create() catch return ProcessError.OutOfMemory,
         .fds = FdTable.init(),
         .exit_status = null,
         .state = .created,
@@ -212,8 +213,12 @@ pub fn createWithParent(parent_id: usize) ProcessError!*Process {
         .cwd = cwd,
         .signals = signal_mod.SignalState.init(),
     };
+    errdefer proc.address_space.destroy();
     table.next_id += 1;
-    try table.register(proc);
+    table.register(proc) catch |err| {
+        table.next_id -= 1;
+        return err;
+    };
     return proc;
 }
 

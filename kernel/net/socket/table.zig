@@ -16,6 +16,9 @@ pub const Kind = enum {
     tcp,
 };
 
+/// Index into a Runtime-owned socket table.
+pub const Handle = u32;
+
 pub const TcpState = enum {
     closed,
     syn_sent,
@@ -67,11 +70,11 @@ pub const SocketTable = struct {
     next_isn: u32 = 0x12340000,
 
     pub fn init(self: *SocketTable) void { self.* = .{}; }
-    pub fn get(self: *SocketTable, handle: u32) ?*Socket {
+    pub fn get(self: *SocketTable, handle: Handle) ?*Socket {
         if (handle >= max_sockets or !self.sockets[handle].in_use) return null;
         return &self.sockets[handle];
     }
-    pub fn create(self: *SocketTable, kind: Kind) ?u32 {
+    pub fn create(self: *SocketTable, kind: Kind) ?Handle {
         for (&self.sockets, 0..) |*slot, i| {
             if (slot.in_use) continue;
             slot.* = switch (kind) {
@@ -83,14 +86,15 @@ pub const SocketTable = struct {
         }
         return null;
     }
-    pub fn retain(self: *SocketTable, handle: u32) bool {
+    pub fn retain(self: *SocketTable, handle: Handle) bool {
         const sock = self.get(handle) orelse return false;
         if (sock.refs == std.math.maxInt(u16)) return false;
         sock.refs += 1;
         return true;
     }
-    pub fn release(self: *SocketTable, handle: u32) bool {
+    pub fn release(self: *SocketTable, handle: Handle) bool {
         const sock = self.get(handle) orelse return false;
+        if (sock.refs == 0) return false;
         sock.refs -= 1;
         if (sock.refs != 0) return false;
         self.sockets[handle] = .{};
