@@ -61,8 +61,12 @@ raw = true
 run = "uv run run-qemu --uefi"
 
 [tasks.test]
-description = "Run host-side unit tests"
-run = "zig build test"
+description = "Run fast host-side unit tests (compatibility alias)"
+run = "zig build test-host"
+
+[tasks."test-host"]
+description = "Run fast host-side unit tests"
+run = "zig build test-host"
 
 [tasks."test-shell"]
 description = "Boot the OS and smoke-test the serial shell (pytest + pexpect)"

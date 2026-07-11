@@ -21,7 +21,10 @@ pub fn build(b: *std.Build) void {
 
     const user_target = b.resolveTargetQuery(freestanding_x64_query);
 
-    const user_optimize: std.builtin.OptimizeMode = .ReleaseSmall;
+    // Zig 0.16's Debug runtime currently cannot lower this freestanding
+    // x86-64 userspace configuration. Keep userspace checked and optimized
+    // instead of silently using ReleaseSmall.
+    const user_optimize: std.builtin.OptimizeMode = .ReleaseSafe;
 
     const abi_user = helpers.AbiBundle.create(b, user_target, user_optimize);
     const common_bytes_user = helpers.exeModule(b, "common/bytes.zig", user_target, user_optimize);
@@ -432,6 +435,7 @@ pub fn build(b: *std.Build) void {
     const run_time_math_tests = helpers.runHostTest(b, time_math_test_mod);
 
     const test_step = b.step("test", "Run unit tests");
+    const test_host_step = b.step("test-host", "Run fast host-side unit tests");
     helpers.dependOnTests(test_step, &.{
         run_memory_map_tests,
         run_page_ref_tests,
@@ -467,4 +471,5 @@ pub fn build(b: *std.Build) void {
         run_pci_class_tests,
         run_time_math_tests,
     });
+    test_host_step.dependOn(test_step);
 }
