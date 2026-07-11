@@ -483,7 +483,7 @@ fn sysDup(old_fd: u64) i64 {
     proc.fds.fds[new_fd] = old_entry;
 
     switch (old_entry) {
-        .pipe_fd => |pfd| pipe.dupRef(pfd.handle),
+        .pipe_fd => |pfd| pipe.dupRef(pfd.handle, pfd.is_read),
         else => {},
     }
 
@@ -505,7 +505,7 @@ fn sysDup2(old_fd: u64, new_fd: u64) i64 {
     proc.fds.fds[@intCast(new_fd)] = old_entry.*;
 
     switch (old_entry.*) {
-        .pipe_fd => |pfd| pipe.dupRef(pfd.handle),
+        .pipe_fd => |pfd| pipe.dupRef(pfd.handle, pfd.is_read),
         else => {},
     }
 
@@ -563,4 +563,3 @@ fn sysKill(pid: u64, sig: u64) i64 {
     if (!signal.send(@intCast(pid), signum)) return errno.ESRCH;
     return 0;
 }
-

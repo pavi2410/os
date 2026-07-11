@@ -16,9 +16,8 @@ const Pipe = struct {
     read_pos: usize = 0,
     write_pos: usize = 0,
     available: usize = 0,
-    ref_count: u8 = 2,
-    write_closed: bool = false,
-    read_closed: bool = false,
+    readers: u8 = 1,
+    writers: u8 = 1,
 };
 
 const max_pipes = 16;
@@ -44,7 +43,7 @@ pub fn read(handle: u32, buf: []u8) PipeError!usize {
     const pipe = getPipe(handle) orelse return PipeError.BrokenPipe;
 
     if (pipe.available == 0) {
-        if (pipe.write_closed) return 0;
+        if (pipe.writers == 0) return 0;
         return error.WouldBlock;
     }
 
@@ -63,8 +62,7 @@ pub fn read(handle: u32, buf: []u8) PipeError!usize {
 pub fn write(handle: u32, buf: []const u8) PipeError!usize {
     const pipe = getPipe(handle) orelse return PipeError.BrokenPipe;
 
-    if (pipe.read_closed) return PipeError.BrokenPipe;
-    if (pipe.write_closed) return PipeError.BrokenPipe;
+    if (pipe.readers == 0) return PipeError.BrokenPipe;
 
     if (buf.len == 0) return 0;
 
@@ -85,21 +83,19 @@ pub fn write(handle: u32, buf: []const u8) PipeError!usize {
 
 pub fn closeRead(handle: u32) void {
     const pipe = getPipe(handle) orelse return;
-    pipe.read_closed = true;
-    decRef(handle);
+    if (pipe.readers > 0) pipe.readers -= 1;
+    releaseIfUnused(handle);
 }
 
 pub fn closeWrite(handle: u32) void {
     const pipe = getPipe(handle) orelse return;
-    pipe.write_closed = true;
-    decRef(handle);
+    if (pipe.writers > 0) pipe.writers -= 1;
+    releaseIfUnused(handle);
 }
 
-fn decRef(handle: u32) void {
+fn releaseIfUnused(handle: u32) void {
     const pipe = getPipe(handle) orelse return;
-    if (pipe.ref_count == 0) return;
-    pipe.ref_count -= 1;
-    if (pipe.ref_count == 0) {
+    if (pipe.readers == 0 and pipe.writers == 0) {
         pipes[handle] = null;
     }
 }
@@ -109,7 +105,11 @@ fn getPipe(handle: u32) ?*Pipe {
     return &(pipes[handle] orelse return null);
 }
 
-pub fn dupRef(handle: u32) void {
+pub fn dupRef(handle: u32, is_read: bool) void {
     const pipe = getPipe(handle) orelse return;
-    pipe.ref_count += 1;
+    if (is_read) {
+        pipe.readers += 1;
+    } else {
+        pipe.writers += 1;
+    }
 }

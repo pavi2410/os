@@ -184,6 +184,7 @@ pub fn forkChild(parent: *Process) ProcessError!*Process {
 
     child.brk = parent.brk;
     child.fds = parent.fds;
+    child.fds.retainAll();
     child.cwd = parent.cwd;
     child.state = .created;
     signal_mod.inheritFromParent(child, parent);
