@@ -238,6 +238,7 @@ class TestShellDevfs:
         run_case(shell_session, "devtest", "devtest: ok", case="devnull and devzero")
 
 
+@pytest.mark.network
 class TestShellPrograms:
     def test_lscpu(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "lscpu", "Architecture:", case="fork/exec lscpu")
@@ -304,6 +305,7 @@ class TestShellPersistence:
         rebooted_shell.assert_no_faults()
 
 
+@pytest.mark.network
 def test_tcp_curl_from_host(repo_root: Path, tmp_path: Path) -> None:
     (tmp_path / "index.html").write_text("hello from host tcp\n", encoding="utf-8")
     port = free_port()

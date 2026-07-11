@@ -30,3 +30,6 @@ packages = ["scripts"]
 [tool.pytest.ini_options]
 testpaths = ["test/integration"]
 addopts = "-ra"
+markers = [
+    "network: requires QEMU networking or an external network endpoint",
+]

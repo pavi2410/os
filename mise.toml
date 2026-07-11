@@ -69,7 +69,7 @@ description = "Run fast host-side unit tests"
 run = "zig build test-host"
 
 [tasks."test-shell"]
-description = "Boot the OS and smoke-test the serial shell (pytest + pexpect)"
+description = "Boot the OS and run deterministic serial-shell smoke tests"
 depends = ["iso", "disk"]
 sources = [
   "pyproject.toml",
@@ -80,7 +80,16 @@ sources = [
   "scripts/qemu.py",
   "scripts/create_disk.py",
 ]
-run = "uv run pytest test/integration/test_shell.py -v"
+run = "uv run pytest test/integration/test_shell.py -v -m 'not network'"
+
+[tasks."test-shell-smoke"]
+description = "Alias for deterministic serial-shell smoke tests"
+depends = ["test-shell"]
+
+[tasks."test-extended"]
+description = "Run network-dependent QEMU diagnostics (not required for the fast gate)"
+depends = ["iso", "disk"]
+run = "uv run pytest test/integration/test_shell.py -v -m network"
 
 [tasks."test-in-guest"]
 description = "Boot the OS and verify kernel/userspace TAP self-tests"
