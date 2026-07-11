@@ -6,6 +6,7 @@ const init_shell = @import("init_shell.zig");
 const process = @import("process.zig");
 const signal = @import("signal.zig");
 const thread = @import("thread.zig");
+const proc_types = @import("types.zig");
 const tty = @import("../drivers/tty.zig");
 const std = @import("std");
 
@@ -96,10 +97,10 @@ pub fn spawn(entry: thread.EntryFn, name: []const u8) SchedulerError!void {
 pub fn spawnWithProcess(
     entry: thread.EntryFn,
     name: []const u8,
-    proc: ?*anyopaque,
+    proc: ?proc_types.Id,
 ) SchedulerError!*thread.Thread {
     const t = thread.create(entry, name, thread.default_stack_size) catch return SchedulerError.OutOfMemory;
-    t.process = proc;
+    t.process_id = proc;
     try state.ready_queue.push(t);
     return t;
 }
@@ -119,10 +120,7 @@ pub fn yieldIfRequested() void {
 
 pub fn cooperativePoll() void {
     cpu.sti();
-    if (thread.currentProcessPtr()) |raw| {
-        const proc: *process.Process = @ptrCast(@alignCast(raw));
-        signal.tryApply(proc);
-    }
+    if (process.currentProcess()) |proc| signal.tryApply(proc);
     yieldIfRequested();
     yield();
     cpu.cli();
@@ -159,10 +157,7 @@ fn schedule() void {
     const next = state.ready_queue.pop() orelse state.idle_thread;
     if (next == self) return;
     self.switchTo(next);
-    if (next.process) |raw| {
-        const proc: *process.Process = @ptrCast(@alignCast(raw));
-        signal.tryApply(proc);
-    }
+    if (process.currentProcess()) |proc| signal.tryApply(proc);
 }
 
 fn exitCurrent() noreturn {

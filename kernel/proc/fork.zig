@@ -14,7 +14,7 @@ pub fn forkFromSyscall(ctx: user_mode.ForkContext) i64 {
         else => return -1,
     };
 
-    const child_thread = scheduler.spawnWithProcess(forkChildEntry, "fork-child", child) catch {
+    const child_thread = scheduler.spawnWithProcess(forkChildEntry, "fork-child", child.id) catch {
         process.destroy(child);
         return -12;
     };
@@ -26,7 +26,7 @@ pub fn forkFromSyscall(ctx: user_mode.ForkContext) i64 {
 
 fn forkChildEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
     const self = thread.currentThread() orelse thread.exit();
-    const child: *process.Process = @ptrCast(@alignCast(self.process orelse thread.exit()));
+    const child = process.lookup(self.process_id orelse thread.exit()) orelse thread.exit();
     const ctx = self.fork_context orelse thread.exit();
     self.fork_context = null;
 

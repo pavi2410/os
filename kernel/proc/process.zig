@@ -12,6 +12,7 @@ const fd_cleanup = @import("fd_cleanup.zig");
 const fd_retain = @import("fd_retain.zig");
 const path_mod = @import("common/path");
 const signal_mod = @import("signal.zig");
+const proc_types = @import("types.zig");
 
 pub const cwd_max_len = path_mod.default_cap;
 pub const Cwd = path_mod.Path(cwd_max_len);
@@ -123,10 +124,9 @@ pub fn init() void {
     thread.setActivateCr3Hook(activateForThread);
 }
 
-fn activateForThread(raw: ?*anyopaque) void {
-    if (raw) |p| {
-        const proc: *Process = @ptrCast(@alignCast(p));
-        proc.address_space.activate();
+fn activateForThread(id: ?proc_types.Id) void {
+    if (id) |pid| {
+        if (lookup(pid)) |proc| proc.address_space.activate() else paging.writeCr3(boot_cr3);
     } else {
         paging.writeCr3(boot_cr3);
     }
@@ -137,12 +137,12 @@ pub fn kernelAddressSpace() AddressSpace {
 }
 
 pub fn currentProcess() ?*Process {
-    const raw = thread.currentProcessPtr() orelse return null;
-    return @ptrCast(@alignCast(raw));
+    const id = thread.currentProcessId() orelse return null;
+    return lookup(id);
 }
 
 pub fn setCurrent(proc: ?*Process) void {
-    thread.setProcess(if (proc) |p| @ptrCast(p) else null);
+    thread.setProcess(if (proc) |p| p.id else null);
 }
 
 pub fn create() ProcessError!*Process {

@@ -4,10 +4,11 @@ const heap = @import("../mm/heap.zig");
 const hal = @import("../hal.zig");
 const user_mode = @import("../arch/x86_64/user.zig");
 const arch_context = @import("../arch/x86_64/context.zig");
+const proc_types = @import("types.zig");
 
-const ActivateCr3Fn = *const fn (?*anyopaque) void;
+const ActivateCr3Fn = *const fn (?proc_types.Id) void;
 
-fn noopActivateCr3(_: ?*anyopaque) void {}
+fn noopActivateCr3(_: ?proc_types.Id) void {}
 
 pub const ThreadError = error{
     OutOfMemory,
@@ -42,7 +43,7 @@ pub const Thread = struct {
     context: SavedContext,
     state: State,
     /// User process bound to this kernel thread (null for idle/bootstrap).
-    process: ?*anyopaque = null,
+    process_id: ?proc_types.Id = null,
     /// Captured syscall state used only by a newly forked child.
     fork_context: ?user_mode.ForkContext = null,
 
@@ -54,10 +55,10 @@ pub const Thread = struct {
         other.state = .running;
         runtime.current = other;
         other.activateKernelStack();
-        runtime.activate_cr3(other.process);
+        runtime.activate_cr3(other.process_id);
         arch_context.switchContext(@ptrCast(&self.context), @ptrCast(&other.context));
         if (self.state != .dead) {
-            runtime.activate_cr3(self.process);
+            runtime.activate_cr3(self.process_id);
         } else {
             runtime.activate_cr3(null);
         }
@@ -116,14 +117,14 @@ pub fn setCurrent(t: ?*Thread) void {
     runtime.current = t;
 }
 
-pub fn setProcess(proc: ?*anyopaque) void {
+pub fn setProcess(proc: ?proc_types.Id) void {
     const t = runtime.current orelse return;
-    t.process = proc;
+    t.process_id = proc;
 }
 
-pub fn currentProcessPtr() ?*anyopaque {
+pub fn currentProcessId() ?proc_types.Id {
     const t = runtime.current orelse return null;
-    return t.process;
+    return t.process_id;
 }
 
 pub fn setExitHandler(handler: *const fn () noreturn) void {
