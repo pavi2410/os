@@ -80,3 +80,8 @@ pub inline fn outl(port: u16, value: u32) void {
 pub inline fn inl(port: u16) u32 {
     return asm volatile ("inl %[port], %[result]" : [result] "={eax}" (-> u32), : [port] "{dx}" (port));
 }
+
+/// Prevent the compiler from reordering memory accesses across a device handoff.
+pub inline fn compilerMemoryBarrier() void {
+    asm volatile ("" ::: .{ .memory = true });
+}

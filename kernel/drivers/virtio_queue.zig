@@ -1,4 +1,5 @@
 const hal = @import("../hal.zig");
+const cpu = @import("../arch/x86_64/cpu.zig");
 const virtual = @import("../mm/virtual.zig");
 const descriptor = @import("virtio_descriptor.zig");
 const virtio_pci = @import("virtio_pci.zig");
@@ -126,5 +127,5 @@ pub const Queue = struct {
 };
 
 fn memoryBarrier() void {
-    asm volatile ("" ::: .{ .memory = true });
+    cpu.compilerMemoryBarrier();
 }
