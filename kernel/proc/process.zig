@@ -102,15 +102,16 @@ const max_processes = 16;
 
 /// Owns process identity and lifecycle registries. Scheduler integration will
 /// migrate to this table directly in the next slice.
-pub const ProcessTable = struct {
+/// Runtime-owned process lifecycle service.
+pub const ProcessManager = struct {
     zombies: [max_zombies]Zombie = @splat(.{}),
     live: [max_processes]?*Process = .{null} ** max_processes,
     next_id: usize = 1,
 };
-var default_table: ProcessTable = .{};
-var table: *ProcessTable = &default_table;
+var default_table: ProcessManager = .{};
+var table: *ProcessManager = &default_table;
 
-pub fn installTable(next: *ProcessTable) void {
+pub fn install(next: *ProcessManager) void {
     table = next;
     table.* = .{};
 }

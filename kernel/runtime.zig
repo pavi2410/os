@@ -8,7 +8,7 @@ const thread = @import("proc/thread.zig");
 /// Composition root for services that have completed their explicit-state
 /// extraction. Additional resource tables migrate here incrementally.
 pub const Runtime = struct {
-    processes: process.ProcessTable = .{},
+    processes: process.ProcessManager = .{},
     scheduler: scheduler.Scheduler = .{},
     pipes: pipe.PipeTable = .{},
     sockets: socket_table.SocketTable = .{},
@@ -16,7 +16,7 @@ pub const Runtime = struct {
     threads: thread.Runtime = .{},
 
     pub fn install(self: *Runtime) void {
-        process.installTable(&self.processes);
+        process.install(&self.processes);
         scheduler.install(&self.scheduler);
         pipe.installTable(&self.pipes);
         socket_table.installTable(&self.sockets);
