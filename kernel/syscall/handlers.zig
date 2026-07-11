@@ -308,7 +308,7 @@ fn sysClockGettime(clock_id: u64, timespec_ptr: u64) i64 {
 }
 
 fn sysSocket(domain: u64, sock_type: u64, protocol: u64) i64 {
-    const handle = socket.create(@truncate(domain), @truncate(sock_type), @intCast(protocol)) catch |err| {
+    const handle = socket.create(&runtime.boot().network, @truncate(domain), @truncate(sock_type), @intCast(protocol)) catch |err| {
         return errno.fromSocket(err);
     };
     const proc = fdtab.currentProcess() catch return errno.EBADF;
@@ -321,7 +321,7 @@ fn sysBind(sockfd: u64, addr_ptr: u64, addrlen: u64) i64 {
     _ = addrlen;
     const handle = fdtab.expectSocket(sockfd) catch return errno.EBADF;
     const addr = user.value(socket.SockaddrIn, addr_ptr) orelse return errno.EFAULT;
-    socket.bind(handle, &addr) catch |err| return errno.fromSocket(err);
+    socket.bind(&runtime.boot().network, handle, &addr) catch |err| return errno.fromSocket(err);
     return 0;
 }
 
@@ -329,7 +329,7 @@ fn sysConnect(sockfd: u64, addr_ptr: u64, addrlen: u64) i64 {
     _ = addrlen;
     const handle = fdtab.expectSocket(sockfd) catch return errno.EBADF;
     const addr = user.value(socket.SockaddrIn, addr_ptr) orelse return errno.EFAULT;
-    socket.connect(handle, &addr) catch |err| return errno.fromSocket(err);
+    socket.connect(&runtime.boot().network, handle, &addr) catch |err| return errno.fromSocket(err);
     return 0;
 }
 
@@ -340,7 +340,7 @@ fn sysSend(sockfd: u64, buf_ptr: u64, len: u64, flags: u64) i64 {
     const max_len: usize = 4096;
     const copy_len: usize = @intCast(@min(len, max_len));
     const buf = user.constBytes(buf_ptr, copy_len) orelse return errno.EFAULT;
-    const sent = socket.send(handle, buf) catch |err| {
+    const sent = socket.send(&runtime.boot().network, handle, buf) catch |err| {
         return errno.fromSocket(err);
     };
     return @intCast(sent);
@@ -353,7 +353,7 @@ fn sysRecv(sockfd: u64, buf_ptr: u64, len: u64, flags: u64) i64 {
     const max_len: usize = 4096;
     const copy_len: usize = @intCast(@min(len, max_len));
     const buf = user.bytes(buf_ptr, copy_len) orelse return errno.EFAULT;
-    const received = socket.recv(handle, buf, 2_000_000) catch |err| {
+    const received = socket.recv(&runtime.boot().network, handle, buf, 2_000_000) catch |err| {
         return errno.fromSocket(err);
     };
     return @intCast(received);
@@ -367,7 +367,7 @@ fn sysSendto(sockfd: u64, buf_ptr: u64, len: u64, flags: u64, dest_ptr: u64, add
     const max_len: usize = 4096;
     const copy_len: usize = @intCast(@min(len, max_len));
     const buf = user.constBytes(buf_ptr, copy_len) orelse return errno.EFAULT;
-    const sent = socket.sendto(handle, buf, &dest) catch |err| {
+    const sent = socket.sendto(&runtime.boot().network, handle, buf, &dest) catch |err| {
         return errno.fromSocket(err);
     };
     return @intCast(sent);
@@ -383,7 +383,7 @@ fn sysRecvfrom(sockfd: u64, buf_ptr: u64, len: u64, flags: u64, src_ptr: u64, ad
 
     var src: socket.SockaddrIn = undefined;
     const src_out: ?*socket.SockaddrIn = if (src_ptr != 0) &src else null;
-    const received = socket.recvfrom(handle, buf, src_out, 2_000_000) catch |err| {
+    const received = socket.recvfrom(&runtime.boot().network, handle, buf, src_out, 2_000_000) catch |err| {
         return errno.fromSocket(err);
     };
 

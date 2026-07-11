@@ -92,7 +92,7 @@ pub fn close(slot: *process.Fd) i64 {
             return 0;
         },
         .socket => |handle| {
-            socket.close(handle);
+            socket.close(&runtime.boot().network, handle);
             slot.* = .none;
             return 0;
         },

@@ -124,50 +124,15 @@ pub const Network = struct {
     sockets: SocketTable = .{},
 
     pub fn init(self: *Network) void { self.sockets.init(); }
+    pub fn get(self: *Network, handle: Handle) ?*Socket { return self.sockets.get(handle); }
+    pub fn create(self: *Network, kind: Kind) ?Handle { return self.sockets.create(kind); }
+    pub fn retain(self: *Network, handle: Handle) bool { return self.sockets.retain(handle); }
+    pub fn release(self: *Network, handle: Handle) bool { return self.sockets.release(handle); }
+    pub fn allocEphemeralPort(self: *Network) u16 { return self.sockets.allocEphemeralPort(); }
+    pub fn allocIcmpId(self: *Network) u16 { return self.sockets.allocIcmpId(); }
+    pub fn allocIsn(self: *Network) u32 { return self.sockets.allocIsn(); }
+    pub fn ensureLocalPort(self: *Network, sock: *Socket) void { self.sockets.ensureLocalPort(sock); }
 };
-
-var default_network: Network = .{};
-var active: *Network = &default_network;
-var default_table: *SocketTable = &default_network.sockets;
-
-pub fn install(next: *Network) void {
-    active = next;
-    default_table = &active.sockets;
-    active.init();
-}
-
-pub fn get(handle: u32) ?*Socket {
-    return default_table.get(handle);
-}
-
-pub fn create(kind: Kind) ?u32 {
-    return default_table.create(kind);
-}
-
-pub fn retain(handle: u32) bool {
-    return default_table.retain(handle);
-}
-
-/// Returns true when the caller released the final reference.
-pub fn release(handle: u32) bool {
-    return default_table.release(handle);
-}
-
-pub fn allocEphemeralPort() u16 {
-    return default_table.allocEphemeralPort();
-}
-
-pub fn allocIcmpId() u16 {
-    return default_table.allocIcmpId();
-}
-
-pub fn allocIsn() u32 {
-    return default_table.allocIsn();
-}
-
-pub fn ensureLocalPort(sock: *Socket) void {
-    default_table.ensureLocalPort(sock);
-}
 
 pub fn asUdp(sock: *Socket) ?*UdpSocket {
     return switch (sock.active) {

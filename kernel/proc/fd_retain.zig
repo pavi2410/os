@@ -7,7 +7,7 @@ const runtime = @import("../runtime.zig");
 pub fn retain(entry: fd_table.Fd) bool {
     switch (entry) {
         .file => |handle| runtime.boot().vfs.retain(handle) catch return false,
-        .socket => |handle| if (!socket.retain(handle)) return false,
+        .socket => |handle| if (!socket.retain(&runtime.boot().network, handle)) return false,
         .pipe_fd => |pfd| runtime.boot().ipc.dupRef(pfd.handle, pfd.is_read),
         .none, .console, .device => {},
     }
@@ -30,7 +30,7 @@ pub fn retainAll(table: *const fd_table.FdTable) bool {
 fn release(entry: fd_table.Fd) void {
     switch (entry) {
         .file => |handle| runtime.boot().vfs.close(handle),
-        .socket => |handle| socket.close(handle),
+        .socket => |handle| socket.close(&runtime.boot().network, handle),
         .pipe_fd => |pfd| {
             if (pfd.is_read) runtime.boot().ipc.closeRead(pfd.handle) else runtime.boot().ipc.closeWrite(pfd.handle);
         },

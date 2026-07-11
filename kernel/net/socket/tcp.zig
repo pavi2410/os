@@ -19,8 +19,8 @@ pub fn close(sock: *table.Socket) void {
     }
 }
 
-pub fn connect(handle: u32, addr: *const api.SockaddrIn) api.SocketError!void {
-    const sock = table.get(handle) orelse return api.SocketError.NotFound;
+pub fn connect(sockets: *table.SocketTable, handle: table.Handle, addr: *const api.SockaddrIn) api.SocketError!void {
+    const sock = sockets.get(handle) orelse return api.SocketError.NotFound;
     const tcp_sock = table.asTcp(sock) orelse return api.SocketError.Unsupported;
     if (api.sockaddrFamily(addr) != .inet) return api.SocketError.Unsupported;
     if (!link.isReady()) return api.SocketError.NotReady;
@@ -28,9 +28,9 @@ pub fn connect(handle: u32, addr: *const api.SockaddrIn) api.SocketError!void {
 
     tcp_sock.remote_ip = ipv4_addr.Addr.fromOctets(addr.addr);
     tcp_sock.remote_port = @byteSwap(addr.port_be);
-    tcp_sock.local_port = table.allocEphemeralPort();
+    tcp_sock.local_port = sockets.allocEphemeralPort();
 
-    tcp_sock.snd_isn = table.allocIsn();
+    tcp_sock.snd_isn = sockets.allocIsn();
 
     try sendSegment(tcp_sock, tcp_sock.snd_isn, 0, .{ .syn = 1 }, "");
     tcp_sock.tcp_state = .syn_sent;
@@ -46,8 +46,8 @@ pub fn connect(handle: u32, addr: *const api.SockaddrIn) api.SocketError!void {
     tcp_sock.tcp_state = .established;
 }
 
-pub fn send(handle: u32, data: []const u8) api.SocketError!usize {
-    const sock = table.get(handle) orelse return api.SocketError.NotFound;
+pub fn send(sockets: *table.SocketTable, handle: table.Handle, data: []const u8) api.SocketError!usize {
+    const sock = sockets.get(handle) orelse return api.SocketError.NotFound;
     const tcp_sock = table.asTcp(sock) orelse return api.SocketError.Unsupported;
     if (tcp_sock.tcp_state != .established) return api.SocketError.NotConnected;
     if (!link.isReady()) return api.SocketError.NotReady;
@@ -68,8 +68,8 @@ pub fn send(handle: u32, data: []const u8) api.SocketError!usize {
     return api.SocketError.Timeout;
 }
 
-pub fn recv(handle: u32, buf: []u8, max_spins: usize) api.SocketError!usize {
-    const sock = table.get(handle) orelse return api.SocketError.NotFound;
+pub fn recv(sockets: *table.SocketTable, handle: table.Handle, buf: []u8, max_spins: usize) api.SocketError!usize {
+    const sock = sockets.get(handle) orelse return api.SocketError.NotFound;
     const tcp_sock = table.asTcp(sock) orelse return api.SocketError.Unsupported;
     if (tcp_sock.tcp_state != .established and tcp_sock.tcp_state != .peer_closed) return api.SocketError.NotConnected;
     if (!link.isReady()) return api.SocketError.NotReady;

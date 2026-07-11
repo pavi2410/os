@@ -15,7 +15,7 @@ pub const SockaddrIn = api.SockaddrIn;
 pub const socketErrorFromPump = api.socketErrorFromPump;
 pub const putSockaddrIn = api.putSockaddrIn;
 
-pub fn create(domain: u32, sock_type: u32, protocol: i32) SocketError!u32 {
+pub fn create(network: *table.Network, domain: u32, sock_type: u32, protocol: i32) SocketError!table.Handle {
     const family = api.AddressFamily.fromInt(domain) orelse return SocketError.Unsupported;
     if (family != .inet) return SocketError.Unsupported;
     if (!link.isReady()) return SocketError.NotReady;
@@ -32,68 +32,70 @@ pub fn create(domain: u32, sock_type: u32, protocol: i32) SocketError!u32 {
         },
     };
 
-    const handle = table.create(kind) orelse return SocketError.TooManySockets;
+    const handle = network.create(kind) orelse return SocketError.TooManySockets;
     return handle;
 }
 
-pub fn close(handle: u32) void {
-    if (table.get(handle)) |sock| {
+pub fn close(network: *table.Network, handle: table.Handle) void {
+    if (network.get(handle)) |sock| {
         if (sock.refs == 1) sock_tcp.close(sock);
     }
-    _ = table.release(handle);
+    _ = network.release(handle);
 }
 
-pub fn retain(handle: u32) bool {
-    return table.retain(handle);
+pub fn retain(network: *table.Network, handle: table.Handle) bool {
+    return network.retain(handle);
 }
 
-pub fn bind(handle: u32, addr: *const SockaddrIn) SocketError!void {
-    const sock = table.get(handle) orelse return SocketError.NotFound;
+pub fn bind(network: *table.Network, handle: table.Handle, addr: *const SockaddrIn) SocketError!void {
+    const sock = network.get(handle) orelse return SocketError.NotFound;
     if (api.sockaddrFamily(addr) != .inet) return SocketError.Unsupported;
     const udp_sock = table.asUdp(sock) orelse return SocketError.Unsupported;
     udp_sock.local_port = @byteSwap(addr.port_be);
 }
 
-pub fn connect(handle: u32, addr: *const SockaddrIn) SocketError!void {
-    return sock_tcp.connect(handle, addr);
+pub fn connect(network: *table.Network, handle: table.Handle, addr: *const SockaddrIn) SocketError!void {
+    return sock_tcp.connect(&network.sockets, handle, addr);
 }
 
-pub fn send(handle: u32, data: []const u8) SocketError!usize {
-    return sock_tcp.send(handle, data);
+pub fn send(network: *table.Network, handle: table.Handle, data: []const u8) SocketError!usize {
+    return sock_tcp.send(&network.sockets, handle, data);
 }
 
-pub fn recv(handle: u32, buf: []u8, max_spins: usize) SocketError!usize {
-    return sock_tcp.recv(handle, buf, max_spins);
+pub fn recv(network: *table.Network, handle: table.Handle, buf: []u8, max_spins: usize) SocketError!usize {
+    return sock_tcp.recv(&network.sockets, handle, buf, max_spins);
 }
 
 pub fn sendto(
-    handle: u32,
+    network: *table.Network,
+    handle: table.Handle,
     data: []const u8,
     dest: *const SockaddrIn,
 ) SocketError!usize {
-    const sock = table.get(handle) orelse return SocketError.NotFound;
+    const sock = network.get(handle) orelse return SocketError.NotFound;
     if (api.sockaddrFamily(dest) != .inet) return SocketError.Unsupported;
     if (!link.isReady()) return SocketError.NotReady;
 
     return switch (sock.active) {
-        .udp => try sock_udp.send(handle, data, dest),
-        .icmp => try sock_icmp.send(handle, dest),
+        .udp => try sock_udp.send(&network.sockets, handle, data, dest),
+        .icmp => try sock_icmp.send(&network.sockets, handle, dest),
         .tcp => SocketError.Unsupported,
     };
 }
 
 pub fn recvfrom(
-    handle: u32,
+    network: *table.Network,
+    handle: table.Handle,
     buf: []u8,
     src_out: ?*SockaddrIn,
     max_spins: usize,
 ) SocketError!usize {
-    const sock = table.get(handle) orelse return SocketError.NotFound;
+    const sock = network.get(handle) orelse return SocketError.NotFound;
     if (!link.isReady()) return SocketError.NotReady;
 
     return switch (sock.active) {
-        .udp => try sock_udp.recv(handle, buf, src_out, max_spins),
-        .icmp => try sock_icmp.recv(handle, buf, src_out, max_spins),
+        .udp => try sock_udp.recv(&network.sockets, handle, buf, src_out, max_spins),
+        .icmp => try sock_icmp.recv(&network.sockets, handle, buf, src_out, max_spins),
         .tcp => SocketError.Unsupported,
     };
 }

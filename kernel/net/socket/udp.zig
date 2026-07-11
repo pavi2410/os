@@ -7,12 +7,12 @@ const udp = @import("../udp.zig");
 const api = @import("api.zig");
 const table = @import("table.zig");
 
-pub fn send(handle: u32, data: []const u8, dest: *const api.SockaddrIn) api.SocketError!usize {
-    const sock = table.get(handle) orelse return api.SocketError.NotFound;
+pub fn send(sockets: *table.SocketTable, handle: table.Handle, data: []const u8, dest: *const api.SockaddrIn) api.SocketError!usize {
+    const sock = sockets.get(handle) orelse return api.SocketError.NotFound;
     const udp_sock = table.asUdp(sock) orelse return api.SocketError.Unsupported;
     if (!link.isReady()) return api.SocketError.NotReady;
 
-    table.ensureLocalPort(sock);
+    sockets.ensureLocalPort(sock);
 
     const dst_ip = ipv4_addr.Addr.fromOctets(dest.addr);
     const dst_port = @byteSwap(dest.port_be);
@@ -35,12 +35,13 @@ pub fn send(handle: u32, data: []const u8, dest: *const api.SockaddrIn) api.Sock
 }
 
 pub fn recv(
-    handle: u32,
+    sockets: *table.SocketTable,
+    handle: table.Handle,
     buf: []u8,
     src_out: ?*api.SockaddrIn,
     max_spins: usize,
 ) api.SocketError!usize {
-    const sock = table.get(handle) orelse return api.SocketError.NotFound;
+    const sock = sockets.get(handle) orelse return api.SocketError.NotFound;
     const udp_sock = table.asUdp(sock) orelse return api.SocketError.Unsupported;
     if (udp_sock.local_port == 0) return api.SocketError.NotBound;
     if (!link.isReady()) return api.SocketError.NotReady;

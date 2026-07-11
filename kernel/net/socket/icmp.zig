@@ -7,8 +7,8 @@ const resolve = @import("../resolve.zig");
 const api = @import("api.zig");
 const table = @import("table.zig");
 
-pub fn send(handle: u32, dest: *const api.SockaddrIn) api.SocketError!usize {
-    const sock = table.get(handle) orelse return api.SocketError.NotFound;
+pub fn send(sockets: *table.SocketTable, handle: table.Handle, dest: *const api.SockaddrIn) api.SocketError!usize {
+    const sock = sockets.get(handle) orelse return api.SocketError.NotFound;
     const icmp_sock = table.asIcmp(sock) orelse return api.SocketError.Unsupported;
     if (!link.isReady()) return api.SocketError.NotReady;
 
@@ -35,12 +35,13 @@ pub fn send(handle: u32, dest: *const api.SockaddrIn) api.SocketError!usize {
 }
 
 pub fn recv(
-    handle: u32,
+    sockets: *table.SocketTable,
+    handle: table.Handle,
     buf: []u8,
     src_out: ?*api.SockaddrIn,
     max_spins: usize,
 ) api.SocketError!usize {
-    const sock = table.get(handle) orelse return api.SocketError.NotFound;
+    const sock = sockets.get(handle) orelse return api.SocketError.NotFound;
     const icmp_sock = table.asIcmp(sock) orelse return api.SocketError.Unsupported;
     if (!link.isReady()) return api.SocketError.NotReady;
 

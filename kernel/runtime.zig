@@ -20,10 +20,10 @@ pub const Runtime = struct {
     pub fn install(self: *Runtime) void {
         process.install(&self.processes);
         scheduler.install(&self.scheduler);
-        socket_table.install(&self.network);
         thread.installRuntime(&self.threads);
         self.ipc.init();
         self.vfs.handles.init();
+        self.network.init();
     }
 };
 

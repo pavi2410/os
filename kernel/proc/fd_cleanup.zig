@@ -9,7 +9,7 @@ pub fn closeAll(table: *fd_table.FdTable) void {
     for (&table.fds) |*entry| {
         switch (entry.*) {
             .file => |handle| runtime.boot().vfs.close(handle),
-            .socket => |handle| socket.close(handle),
+            .socket => |handle| socket.close(&runtime.boot().network, handle),
             .pipe_fd => |pfd| {
                 if (pfd.is_read) runtime.boot().ipc.closeRead(pfd.handle) else runtime.boot().ipc.closeWrite(pfd.handle);
             },
