@@ -12,6 +12,7 @@ const net_info = @import("../net/info.zig");
 const hw_info = @import("../hw/info.zig");
 const hal = @import("../hal.zig");
 const pipe = @import("../ipc/pipe.zig");
+const runtime = @import("../runtime.zig");
 const abi_fs = @import("abi_fs");
 const abi_signal = @import("abi_signal");
 const abi_syscall = @import("abi_syscall");
@@ -448,7 +449,7 @@ fn sysPipe(fd_ptr: u64) i64 {
     if (fd_ptr == 0) return errno.EFAULT;
     const out = user.outPtr([2]i32, fd_ptr) orelse return errno.EFAULT;
 
-    const handle = pipe.create() catch |err| switch (err) {
+    const handle = runtime.boot().ipc.create() catch |err| switch (err) {
         pipe.PipeError.TooManyPipes => return errno.EMFILE,
         else => return errno.EIO,
     };
@@ -456,16 +457,16 @@ fn sysPipe(fd_ptr: u64) i64 {
     const proc = fdtab.currentProcess() catch return errno.EPERM;
 
     const read_fd = fdtab.alloc(proc) catch {
-        pipe.closeRead(handle);
-        pipe.closeWrite(handle);
+        runtime.boot().ipc.closeRead(handle);
+        runtime.boot().ipc.closeWrite(handle);
         return errno.EMFILE;
     };
     proc.fds.fds[read_fd] = .{ .pipe_fd = .{ .handle = handle, .is_read = true } };
 
     const write_fd = fdtab.alloc(proc) catch {
         proc.fds.fds[read_fd] = .none;
-        pipe.closeRead(handle);
-        pipe.closeWrite(handle);
+        runtime.boot().ipc.closeRead(handle);
+        runtime.boot().ipc.closeWrite(handle);
         return errno.EMFILE;
     };
     proc.fds.fds[write_fd] = .{ .pipe_fd = .{ .handle = handle, .is_read = false } };

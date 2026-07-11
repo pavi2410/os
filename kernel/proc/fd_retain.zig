@@ -2,12 +2,13 @@ const fd_table = @import("fd_table.zig");
 const pipe = @import("../ipc/pipe.zig");
 const socket = @import("../net/socket.zig");
 const vfs = @import("../fs/vfs.zig");
+const runtime = @import("../runtime.zig");
 
 pub fn retain(entry: fd_table.Fd) bool {
     switch (entry) {
         .file => |handle| vfs.retain(handle) catch return false,
         .socket => |handle| if (!socket.retain(handle)) return false,
-        .pipe_fd => |pfd| pipe.dupRef(pfd.handle, pfd.is_read),
+        .pipe_fd => |pfd| runtime.boot().ipc.dupRef(pfd.handle, pfd.is_read),
         .none, .console, .device => {},
     }
     return true;
@@ -31,7 +32,7 @@ fn release(entry: fd_table.Fd) void {
         .file => |handle| vfs.close(handle),
         .socket => |handle| socket.close(handle),
         .pipe_fd => |pfd| {
-            if (pfd.is_read) pipe.closeRead(pfd.handle) else pipe.closeWrite(pfd.handle);
+            if (pfd.is_read) runtime.boot().ipc.closeRead(pfd.handle) else runtime.boot().ipc.closeWrite(pfd.handle);
         },
         .none, .console, .device => {},
     }

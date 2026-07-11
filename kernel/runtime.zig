@@ -20,9 +20,18 @@ pub const Runtime = struct {
     pub fn install(self: *Runtime) void {
         process.install(&self.processes);
         scheduler.install(&self.scheduler);
-        pipe.install(&self.ipc);
         socket_table.install(&self.network);
         vfs.install(&self.vfs);
         thread.installRuntime(&self.threads);
+        self.ipc.init();
     }
 };
+
+/// The one composition root used by hardware entry points. Service modules do
+/// not retain defaults or active instances; ordinary kernel code receives a
+/// service from this Runtime instead.
+var boot_runtime: Runtime = .{};
+
+pub fn boot() *Runtime {
+    return &boot_runtime;
+}

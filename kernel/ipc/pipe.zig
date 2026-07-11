@@ -107,42 +107,11 @@ pub const Ipc = struct {
     pipes: PipeTable = .{},
 
     pub fn init(self: *Ipc) void { self.pipes.init(); }
+
+    pub fn create(self: *Ipc) PipeError!Handle { return self.pipes.create(); }
+    pub fn read(self: *Ipc, handle: Handle, buf: []u8) PipeError!usize { return self.pipes.read(handle, buf); }
+    pub fn write(self: *Ipc, handle: Handle, buf: []const u8) PipeError!usize { return self.pipes.write(handle, buf); }
+    pub fn closeRead(self: *Ipc, handle: Handle) void { self.pipes.closeRead(handle); }
+    pub fn closeWrite(self: *Ipc, handle: Handle) void { self.pipes.closeWrite(handle); }
+    pub fn dupRef(self: *Ipc, handle: Handle, is_read: bool) void { self.pipes.dupRef(handle, is_read); }
 };
-
-var default_ipc: Ipc = .{};
-var active: *Ipc = &default_ipc;
-var default_table: *PipeTable = &default_ipc.pipes;
-
-pub fn install(next: *Ipc) void {
-    active = next;
-    default_table = &active.pipes;
-    active.init();
-}
-
-pub fn init() void {
-    default_table.init();
-}
-
-pub fn create() PipeError!u32 {
-    return default_table.create();
-}
-
-pub fn read(handle: u32, buf: []u8) PipeError!usize {
-    return default_table.read(handle, buf);
-}
-
-pub fn write(handle: u32, buf: []const u8) PipeError!usize {
-    return default_table.write(handle, buf);
-}
-
-pub fn closeRead(handle: u32) void {
-    default_table.closeRead(handle);
-}
-
-pub fn closeWrite(handle: u32) void {
-    default_table.closeWrite(handle);
-}
-
-pub fn dupRef(handle: u32, is_read: bool) void {
-    default_table.dupRef(handle, is_read);
-}

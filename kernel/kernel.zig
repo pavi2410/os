@@ -28,8 +28,6 @@ const virtual = @import("mm/virtual.zig");
 const memory = @import("mm/memory.zig");
 const runtime_mod = @import("runtime.zig");
 
-var runtime: runtime_mod.Runtime = .{};
-
 /// Deliberately unmapped higher-half address used to verify the page fault handler.
 const page_fault_test_addr: u64 = 0xFFFFFFFF90000000;
 
@@ -48,6 +46,7 @@ pub const BootContext = struct {
 };
 
 pub fn init(ctx: BootContext) void {
+    const runtime = runtime_mod.boot();
     runtime.install();
     address.setHhdmOffset(ctx.hhdm_offset);
 
@@ -93,7 +92,7 @@ pub fn init(ctx: BootContext) void {
     process.init();
     user_access.init();
     tty.init();
-    pipe.init();
+    runtime.ipc.init();
     initApic(ctx.rsdp_virt);
     initPci(ctx.rsdp_virt);
     initBlock();
@@ -187,7 +186,7 @@ fn reserveMemoryMapBuffer(response: *const limine.MemmapResponse) void {
 
 fn initMemoryAllocators() void {
     hal.console.println("\n--- Memory Allocators ---", .{});
-    runtime.memory.init() catch {
+    runtime_mod.boot().memory.init() catch {
         hal.console.println("memory service init failed", .{});
         hal.processor.haltForever();
     };
