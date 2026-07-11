@@ -26,3 +26,18 @@ test "last endpoint release invalidates only its table entry" {
     table.closeWrite(handle);
     try std.testing.expectError(error.BrokenPipe, table.read(handle, &.{}));
 }
+
+test "duplicate references saturate without wrapping endpoint ownership" {
+    var table: pipe.PipeTable = .{};
+    const handle = try table.create();
+
+    var i: usize = 0;
+    while (i < std.math.maxInt(u8)) : (i += 1) table.dupRef(handle, true);
+    table.dupRef(handle, true);
+
+    // It takes 255 closes to exhaust the initial read endpoint plus every
+    // retained reference. A wrapped count would invalidate it much earlier.
+    i = 0;
+    while (i < std.math.maxInt(u8)) : (i += 1) table.closeRead(handle);
+    try std.testing.expectError(error.WouldBlock, table.read(handle, &.{}));
+}

@@ -55,6 +55,15 @@ test "retained socket remains live until final release" {
     try std.testing.expect(socket_table.get(handle) == null);
 }
 
+test "release rejects a corrupted zero-reference live slot" {
+    var table: socket_table.SocketTable = .{};
+    const handle = table.create(.udp).?;
+    table.get(handle).?.refs = 0;
+
+    try std.testing.expect(!table.release(handle));
+    try std.testing.expect(table.get(handle) != null);
+}
+
 test "tag coercion mirrors active socket kind" {
     const handle = socket_table.create(.tcp).?;
     const sock = socket_table.get(handle).?;
