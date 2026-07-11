@@ -10,7 +10,7 @@ pub const Whence = filesystem.Whence;
 pub const OpenFlags = filesystem.OpenFlags;
 pub const Stat = filesystem.Stat;
 
-const max_handles = 16;
+pub const max_handles = 16;
 const active_fs = fat32.ops;
 
 const HandleKind = enum {
@@ -18,7 +18,7 @@ const HandleKind = enum {
     dev_root,
 };
 
-const Handle = struct {
+pub const Handle = struct {
     in_use: bool = false,
     refs: u16 = 0,
     kind: HandleKind = .fat,
@@ -31,9 +31,31 @@ const Handle = struct {
     root_mount_emitted: bool = false,
 };
 
-var handles: [max_handles]Handle = undefined;
+/// Owns VFS open-file slots independently of mount policy. A later `Vfs`
+/// context will compose this with filesystem and device backends.
+pub const HandleTable = struct {
+    slots: [max_handles]Handle = undefined,
+
+    pub fn init(self: *HandleTable) void { self.slots = @splat(.{}); }
+    pub fn alloc(self: *HandleTable) ?u32 {
+        for (&self.slots, 0..) |*slot, i| if (!slot.in_use) return @intCast(i);
+        return null;
+    }
+    pub fn get(self: *HandleTable, handle: u32) VfsError!*Handle {
+        if (handle >= max_handles or !self.slots[handle].in_use) return VfsError.BadHandle;
+        return &self.slots[handle];
+    }
+    pub fn close(self: *HandleTable, handle: u32) void {
+        const slot = self.get(handle) catch return;
+        slot.refs -= 1;
+        if (slot.refs == 0) slot.* = .{};
+    }
+};
+
+var handles: HandleTable = .{};
 
 pub fn init() VfsError!void {
+    handles.init();
     try active_fs.mount();
 }
 
@@ -55,8 +77,8 @@ pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
     if (flags.truncate and !flags.write) return VfsError.ReadOnly;
 
     const is_directory = opened.isDirectory();
-    const slot = allocHandle() orelse return VfsError.TooManyOpenFiles;
-    handles[slot] = .{
+    const slot = handles.alloc() orelse return VfsError.TooManyOpenFiles;
+    handles.slots[slot] = .{
         .in_use = true,
         .refs = 1,
         .kind = .fat,
@@ -71,11 +93,7 @@ pub fn open(path: []const u8, flags: OpenFlags) VfsError!u32 {
 }
 
 pub fn close(handle: u32) void {
-    if (handle >= max_handles) return;
-    const h = &handles[handle];
-    if (!h.in_use or h.refs == 0) return;
-    h.refs -= 1;
-    if (h.refs == 0) h.* = .{};
+    handles.close(handle);
 }
 
 pub fn retain(handle: u32) VfsError!void {
@@ -172,10 +190,10 @@ pub fn rmdir(path: []const u8) VfsError!void {
 fn invalidateHandlesAt(id: filesystem.FileId) void {
     var i: u32 = 0;
     while (i < max_handles) : (i += 1) {
-        if (!handles[i].in_use) continue;
-        const h = &handles[i];
+        if (!handles.slots[i].in_use) continue;
+        const h = &handles.slots[i];
         if (h.open.id.eql(id)) {
-            handles[i] = .{};
+            handles.slots[i] = .{};
         }
     }
 }
@@ -194,8 +212,8 @@ fn openDevRoot(flags: OpenFlags) VfsError!u32 {
     if (!flags.read) return VfsError.InvalidWhence;
     if (flags.write or flags.create or flags.truncate) return VfsError.ReadOnly;
 
-    const slot = allocHandle() orelse return VfsError.TooManyOpenFiles;
-    handles[slot] = .{
+    const slot = handles.alloc() orelse return VfsError.TooManyOpenFiles;
+    handles.slots[slot] = .{
         .in_use = true,
         .refs = 1,
         .kind = .dev_root,
@@ -205,14 +223,5 @@ fn openDevRoot(flags: OpenFlags) VfsError!u32 {
 }
 
 fn getHandle(handle: u32) VfsError!*Handle {
-    if (handle >= max_handles or !handles[handle].in_use) return VfsError.BadHandle;
-    return &handles[handle];
-}
-
-fn allocHandle() ?u32 {
-    var i: u32 = 0;
-    while (i < max_handles) : (i += 1) {
-        if (!handles[i].in_use) return i;
-    }
-    return null;
+    return handles.get(handle);
 }
