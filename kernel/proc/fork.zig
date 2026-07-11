@@ -5,9 +5,6 @@ const user_fork = @import("user_fork.zig");
 const gdt = @import("../arch/x86_64/gdt.zig");
 const tty = @import("../drivers/tty.zig");
 
-var pending_child: ?*process.Process = null;
-var pending_ctx: user_fork.ForkUserContext = undefined;
-
 pub fn forkFromSyscall(ctx: user_fork.ForkUserContext) i64 {
     const parent = process.currentProcess() orelse return -1;
 
@@ -17,28 +14,26 @@ pub fn forkFromSyscall(ctx: user_fork.ForkUserContext) i64 {
         else => return -1,
     };
 
-    pending_child = child;
-    pending_ctx = ctx;
-
-    _ = scheduler.spawnWithProcess(forkChildEntry, "fork-child", child) catch {
+    const child_thread = scheduler.spawnWithProcess(forkChildEntry, "fork-child", child) catch {
         process.destroy(child);
         return -12;
     };
+    child_thread.fork_context = ctx;
 
     tty.get().noteFork(parent.id, child.id);
     return @intCast(child.id);
 }
 
 fn forkChildEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
-    const child = pending_child orelse thread.exit();
-    const ctx = pending_ctx;
-    pending_child = null;
+    const self = thread.currentThread() orelse thread.exit();
+    const child: *process.Process = @ptrCast(@alignCast(self.process orelse thread.exit()));
+    const ctx = self.fork_context orelse thread.exit();
+    self.fork_context = null;
 
     process.setCurrent(child);
     child.address_space.activate();
     child.state = .running;
 
-    const self = thread.currentThread() orelse thread.exit();
     const kstack = (@intFromPtr(self.stack) + self.stack_size) & ~@as(u64, 15);
     gdt.setKernelStack(kstack);
 

@@ -2,6 +2,7 @@ const cpu = @import("../arch/x86_64/cpu.zig");
 const gdt = @import("../arch/x86_64/gdt.zig");
 const heap = @import("../mm/heap.zig");
 const hal = @import("../hal.zig");
+const user_fork = @import("user_fork.zig");
 
 const ActivateCr3Fn = *const fn (?*anyopaque) void;
 
@@ -47,6 +48,8 @@ pub const Thread = struct {
     state: State,
     /// User process bound to this kernel thread (null for idle/bootstrap).
     process: ?*anyopaque = null,
+    /// Captured syscall state used only by a newly forked child.
+    fork_context: ?user_fork.ForkUserContext = null,
 
     pub fn switchTo(self: *Thread, other: *Thread) void {
         const prev_state = self.state;
