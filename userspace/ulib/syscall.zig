@@ -166,7 +166,8 @@ pub fn getmemregions(buf: [*]MemRegionInfo, max: usize) isize {
 
 pub fn waitpid(pid: isize, status: ?*u32, options: u32) isize {
     const status_ptr: u64 = if (status) |s| @intFromPtr(s) else 0;
-    return syscall6(abi_syscall.wait4, @bitCast(@as(u64, @intCast(pid))), status_ptr, options, 0, 0, 0);
+    const pid_arg: u64 = @bitCast(@as(i64, pid));
+    return syscall6(abi_syscall.wait4, pid_arg, status_ptr, options, 0, 0, 0);
 }
 
 pub fn unlink(path: [*:0]const u8) isize {

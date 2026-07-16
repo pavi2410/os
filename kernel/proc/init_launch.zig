@@ -9,9 +9,9 @@ var init_proc: ?*process.Process = null;
 var init_image: ?user_loader.LoadedImage = null;
 
 pub fn launch() void {
-    const image_buf = programs.load(programs.initShellPath()) catch |err| {
-        hal.console.println("shell not found on disk ({s}): {s} (run: mise run disk)", .{
-            programs.initShellPath(),
+    const image_buf = programs.load(programs.initPath()) catch |err| {
+        hal.console.println("init not found on disk ({s}): {s} (run: mise run disk)", .{
+            programs.initPath(),
             @errorName(err),
         });
         return;
@@ -22,20 +22,20 @@ pub fn launch() void {
         hal.console.println("init process create failed", .{});
         return;
     };
-    init_image = process.loadElf(init_proc.?, image_buf, &.{programs.initShellPath()}, &.{}) catch {
-        hal.console.println("shell load failed", .{});
+    init_image = process.loadElf(init_proc.?, image_buf, &.{programs.initPath()}, &.{}) catch {
+        hal.console.println("init load failed", .{});
         return;
     };
 
-    scheduler.spawn(initShellEntry, "init-shell") catch {
-        hal.console.println("init-shell spawn failed", .{});
+    scheduler.spawn(initEntry, "init") catch {
+        hal.console.println("init spawn failed", .{});
         return;
     };
 
-    hal.console.println("Starting shell", .{});
+    hal.console.println("Starting init", .{});
 }
 
-fn initShellEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
+fn initEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
     const proc = init_proc orelse thread.exit();
     const image = init_image orelse thread.exit();
     const self = thread.currentThread() orelse thread.exit();

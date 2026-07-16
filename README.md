@@ -4,7 +4,7 @@
 
 ## Current status
 
-The kernel boots under QEMU, runs a serial shell in userspace, reads and writes files on a VirtIO FAT32 disk, runs ELF programs from `/BIN` via `fork`/`execve`, and has a small VirtIO-net TCP/IP stack.
+The kernel boots under QEMU, starts userspace `/BIN/INIT` as PID 1 (which spawns the serial shell), reads and writes files on a VirtIO FAT32 disk, runs ELF programs from `/BIN` via `fork`/`execve`, and has a small VirtIO-net TCP/IP stack.
 
 **Working today**
 
@@ -14,7 +14,8 @@ The kernel boots under QEMU, runs a serial shell in userspace, reads and writes 
 * Syscalls: `read`, `write`, `open` (`O_CREAT`, `O_TRUNC`, `O_APPEND`), `close`, `lseek`, `stat`, `brk`, `getpid`, `fork` (copy-on-write), `execve`, `wait4`, `unlink`, `mkdir`, `rmdir`, `getdents64`, `clock_gettime`, `exit`/`exit_group`
 * PCI enumeration (legacy I/O ports on QEMU q35), VirtIO-blk read/write, FAT32 VFS (read/write/create/truncate/append)
 * VirtIO-net with ARP, IPv4, UDP, ICMP echo, minimal TCP client sockets, and DNS A-record resolution
-* Userspace programs on the VirtIO FAT disk (`/README.TXT`, `/BIN/shell`, `/BIN/dig`, …)
+* Userspace programs on the VirtIO FAT disk (`/README.TXT`, `/BIN/INIT`, `/BIN/SHELL`, `/BIN/dig`, …)
+* Boot chain: kernel → `/BIN/INIT` (PID 1) → `/BIN/SHELL` (interactive serial shell)
 * Serial shell with modular builtins: `help`, `exit`, `pid`, `echo`, `cat`, `ls`, `write`, `rm`, `mkdir`, `rmdir`, `cd`, `pwd`, `date`
 * Disk image sync preserves user-created files across `mise run boot` (see [disk notes](#virtio-disk))
 * [mise](https://mise.jdx.dev) tasks for build, ISO, disk, QEMU boot, and integration tests

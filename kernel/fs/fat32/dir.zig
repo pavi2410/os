@@ -178,7 +178,9 @@ pub fn getDents64(dir_cluster: u32, skip: *usize, out: []u8) FatError!usize {
             index += 1;
             off += 32;
         }
-        cluster = try core.nextCluster(cluster);
+        // End-of-chain is a normal directory terminator when the last cluster is full
+        // (no 0x00 dent). Do not surface that as IoError or the listing is discarded.
+        cluster = core.nextCluster(cluster) catch break;
     }
     skip.* = index;
     return written;

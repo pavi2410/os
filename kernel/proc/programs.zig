@@ -1,6 +1,5 @@
 const fat32 = @import("../fs/fat32.zig");
 const heap = @import("../mm/heap.zig");
-const vfs = @import("../fs/vfs.zig");
 const runtime = @import("../runtime.zig");
 
 pub const LoadError = error{
@@ -16,12 +15,17 @@ pub const LoadError = error{
 /// Maximum ELF image size read from the VirtIO FAT volume.
 const max_image_size = 256 * 1024;
 
-const bin_dir = "/BIN/";
-const init_shell_path = "/BIN/SHELL";
+const init_path = "/BIN/INIT";
+const shell_path = "/BIN/SHELL";
 
-/// Path to the init shell on the VirtIO FAT volume.
-pub fn initShellPath() []const u8 {
-    return init_shell_path;
+/// Path to userspace init (PID 1) on the VirtIO FAT volume.
+pub fn initPath() []const u8 {
+    return init_path;
+}
+
+/// Path to the interactive shell on the VirtIO FAT volume.
+pub fn shellPath() []const u8 {
+    return shell_path;
 }
 
 /// Read a program ELF from the mounted FAT32 volume (exact path only).

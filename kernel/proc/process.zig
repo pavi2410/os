@@ -14,6 +14,7 @@ const path_mod = @import("common/path");
 const signal_mod = @import("signal.zig");
 const proc_types = @import("types.zig");
 const memory = @import("../mm/memory.zig");
+const orphan = @import("orphan.zig");
 
 pub const cwd_max_len = path_mod.default_cap;
 pub const Cwd = path_mod.Path(cwd_max_len);
@@ -32,8 +33,11 @@ pub const State = enum {
     dead,
 };
 
-/// `parent_id` uses 0 when a process has no parent (init shell).
+/// `parent_id` uses 0 when a process has no parent (true init / PID 1).
 pub const no_parent: usize = 0;
+
+/// Userspace init process id (first `process.create()`).
+pub const init_pid = orphan.init_pid;
 
 /// Linux-style user virtual layout constants for later ELF loading.
 pub const user_stack_top = user_loader.user_stack_top;
@@ -153,6 +157,26 @@ pub const ProcessManager = struct {
             return zombie;
         }
         return null;
+    }
+
+    /// Move live children and unreaped zombies of `dying_pid` to init.
+    /// Returns true if any zombie was reparented (init should be woken).
+    pub fn reparentOrphans(self: *ProcessManager, dying_pid: usize) bool {
+        for (self.live) |slot| {
+            if (slot) |proc| {
+                proc.parent_id = orphan.adoptParent(proc.parent_id, dying_pid);
+            }
+        }
+        var any_zombie = false;
+        for (&self.zombies) |*slot| {
+            if (!slot.in_use) continue;
+            const next = orphan.adoptParent(slot.parent_id, dying_pid);
+            if (next != slot.parent_id) {
+                slot.parent_id = next;
+                any_zombie = true;
+            }
+        }
+        return any_zombie;
     }
 };
 var default_table: ProcessManager = .{};
@@ -375,7 +399,15 @@ pub fn terminateCurrent(wait_status: u32) noreturn {
     const parent_id = proc.parent_id;
     proc.exit_status = wait_status;
 
+    if (pid == init_pid) {
+        @panic("init (PID 1) exited");
+    }
+
     signal_mod.onProcessExit(pid);
+
+    if (table.reparentOrphans(pid)) {
+        signal_mod.notifyChildExit(init_pid);
+    }
 
     if (parent_id != no_parent) {
         enqueueZombie(pid, parent_id, wait_status) catch {};

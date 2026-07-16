@@ -16,7 +16,7 @@ Interaction today is entirely over **serial**: shell, `curl` output, kernel pani
 - ~~No **environment variables**~~ — `execve` delivers `envp`; shell `export` and `PATH` lookup (done)
 - ~~No **`PATH`**~~ — shell searches colon-separated `PATH` (done)
 - ~~No **pipes** or FD duplication~~ — `pipe` syscall, shell `|` pipelines, `>` / `2>&1` redirects (done)
-- **Init is the shell** ([`kernel/proc/init_shell.zig`](../../kernel/proc/init_shell.zig)) — no PID 1 reap loop or service spawning
+- ~~**Init is the shell**~~ — `/BIN/INIT` is PID 1; shell runs as its child (done)
 - ~~No **`/dev`** nodes~~ — kernel devfs exposes `/dev/null`, `/dev/zero`, `/dev/ttyS0` (done)
 
 Polish this layer before `mmap`, ext2, and SMP.
@@ -99,10 +99,10 @@ Polish this layer before `mmap`, ext2, and SMP.
 
 ### Init / PID 1
 
-- [ ] Separate **init process** from interactive shell (e.g. `/BIN/init` or kernel-launched stub)
-- [ ] PID 1 `wait` loop — reap orphaned children
-- [ ] Init spawns shell (or getty) as a child, not as init itself
-- [ ] Document boot chain: kernel → init → shell
+- [x] Separate **init process** from interactive shell (e.g. `/BIN/init` or kernel-launched stub)
+- [x] PID 1 `wait` loop — reap orphaned children
+- [x] Init spawns shell (or getty) as a child, not as init itself
+- [x] Document boot chain: kernel → init → shell
 
 ### Shell integration
 
@@ -134,13 +134,14 @@ Polish this layer before `mmap`, ext2, and SMP.
 5. **`PATH` lookup** — bare command name resolves via `PATH` (default includes `/BIN`); explicit absolute paths still work.
 6. **Pipes and redirects** work for at least one pipeline and one output redirect. ✅
 7. **`/dev/null`** — writes discarded; reads return EOF.
-8. **PID 1** reaps orphans; shell runs as a child of init.
+8. **PID 1** reaps orphans; shell runs as a child of init. ✅
 9. **Serial remains the recommended interface** in README; GUI is not required for daily development.
 
 ---
 
 ## Notes
 
+- **Boot chain:** kernel → [`init_launch.zig`](../../kernel/proc/init_launch.zig) loads `/BIN/INIT` as PID 1 → init forks/execs `/BIN/SHELL` and reaps with `wait(-1)`. Orphans of dead parents are reparented to PID 1 in the kernel.
 - GUI input ([phase 14](14-gui.md)) should reuse the same TTY/input dispatch where possible.
 - Do not block on procfs; `/proc/self/fd` can come later in [phase 11](11-procfs-and-sysfs.md).
 - Framebuffer text mode is optional here or early in phase 14 — mouse/windows are not required.

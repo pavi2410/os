@@ -2,7 +2,7 @@ const cpu = @import("../arch/x86_64/cpu.zig");
 const hal = @import("../hal.zig");
 const heap = @import("../mm/heap.zig");
 const abi_signal = @import("abi_signal");
-const init_shell = @import("init_shell.zig");
+const init_launch = @import("init_launch.zig");
 const process = @import("process.zig");
 const signal = @import("signal.zig");
 const thread = @import("thread.zig");
@@ -145,7 +145,7 @@ pub fn yield() void {
 pub fn start() noreturn {
     hal.console.println("\n--- Scheduler ---", .{});
 
-    init_shell.launch();
+    init_launch.launch();
 
     hal.console.println("Enabling interrupts", .{});
     cpu.sti();

@@ -108,6 +108,15 @@ class TestShellBuiltins:
         pid_out = run_case(shell_session, "pid", case="pid")
         assert any(ch.isdigit() for ch in pid_out), f"pid: no digits in:\n{pid_out}"
 
+    def test_shell_not_pid1(self, shell_session: QemuShell) -> None:
+        """Shell runs as a child of /BIN/INIT (PID 1), not as init itself."""
+        pid_out = run_case(shell_session, "pid", case="shell not pid 1")
+        lines = [ln.strip() for ln in pid_out.splitlines() if ln.strip().isdigit()]
+        if not lines:
+            raise AssertionError(f"pid: no numeric line in:\n{pid_out}")
+        if lines[-1] == "1":
+            raise AssertionError(f"shell should not be PID 1 (init):\n{pid_out}")
+
 
 class TestShellFilesystem:
     def test_mkdir_cd_write_cat(self, shell_session: QemuShell) -> None:

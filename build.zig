@@ -111,6 +111,7 @@ pub fn build(b: *std.Build) void {
 
     const install_envtest = helpers.addUserProgram(b, user_deps, "envtest", "userspace/envtest/main.zig", user_install);
     const install_devtest = helpers.addUserProgram(b, user_deps, "devtest", "userspace/devtest/main.zig", user_install);
+    const install_init = helpers.addUserProgram(b, user_deps, "init", "userspace/init/main.zig", user_install);
 
     const shell_status_user = helpers.exeModule(b, "userspace/shell/status.zig", user_target, user_optimize);
     const shell = b.addExecutable(.{
@@ -162,6 +163,7 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_cowtest.step);
     b.getInstallStep().dependOn(&install_envtest.step);
     b.getInstallStep().dependOn(&install_devtest.step);
+    b.getInstallStep().dependOn(&install_init.step);
 
     const limine_kernel_mod = helpers.exeModule(b, "kernel/boot/limine.zig", kernel_target, optimize);
 
@@ -384,6 +386,11 @@ pub fn build(b: *std.Build) void {
     pipe_test_mod.addImport("pipe", pipe_host_mod);
     const run_pipe_tests = helpers.runHostTest(b, pipe_test_mod);
 
+    const orphan_host_mod = helpers.hostModule(b, "kernel/proc/orphan.zig");
+    const orphan_test_mod = helpers.hostTestModule(b, "test/kernel/orphan_reparent_test.zig");
+    orphan_test_mod.addImport("orphan", orphan_host_mod);
+    const run_orphan_tests = helpers.runHostTest(b, orphan_test_mod);
+
     const acpi_access_test_mod = helpers.hostTestModule(b, "test/kernel/acpi_access_test.zig");
     acpi_access_test_mod.addImport("common/acpi_sig", host_common.acpi_sig);
     const run_acpi_access_tests = helpers.runHostTest(b, acpi_access_test_mod);
@@ -454,6 +461,7 @@ pub fn build(b: *std.Build) void {
         run_fd_table_tests,
         run_socket_table_tests,
         run_pipe_tests,
+        run_orphan_tests,
         run_acpi_access_tests,
         run_icmp_tests,
         run_tcp_tests,
