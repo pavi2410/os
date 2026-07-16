@@ -116,7 +116,7 @@ Polish this layer before `mmap`, ext2, and SMP.
 
 ### Tests
 
-- [ ] Integration: `^C` during `curl` or `ping`; shell returns to prompt
+- [x] Integration: `^C` during `curl` or `ping`; shell returns to prompt
 - [x] Integration: child exit wakes blocked parent (`wait4`)
 - [ ] Integration: `echo foo | cat` or equivalent pipeline
 - [ ] Integration: `cd subdir && /BIN/cat relative-path`
@@ -127,7 +127,7 @@ Polish this layer before `mmap`, ext2, and SMP.
 
 ## Acceptance criteria
 
-1. **`^C` during `curl` or `ping`** aborts the child; shell remains usable.
+1. **`^C` during `curl` or `ping`** aborts the child; shell remains usable. ✅
 2. **Child exit** reaps correctly; no zombie leaks in normal shell use.
 3. **Kernel cwd** — `cd` in shell affects child `open("relative")` after `execve`.
 4. **Environment** — `execve` delivers non-empty `envp`; child can read `getenv("PATH")` (and at least one custom variable).

@@ -58,7 +58,9 @@ def build_qemu_argv(
         argv.extend(["-readconfig", str(QEMU_UEFI_CONFIG)])
     if display_none:
         argv.extend(["-display", "none"])
-    argv.extend(["-serial", "stdio", "-no-reboot"])
+    # mon:stdio traps host SIGINT (e.g. pty ^C) and forwards it to the guest
+    # serial instead of killing QEMU — required for Ctrl-C integration tests.
+    argv.extend(["-serial", "mon:stdio", "-no-reboot"])
     argv.extend(extra)
     return argv
 

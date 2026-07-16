@@ -42,6 +42,7 @@ pub fn run(
         }
 
         if (pid == 0) {
+            _ = ulib.signal.default(ulib.signal.SIGINT);
             if (i > 0) {
                 _ = ulib.fs.duplicateTo(@intCast(pipe_fds[i - 1][0]), 0);
             }

@@ -32,3 +32,8 @@ pub fn ignore(signum: u32) isize {
     const act = Sigaction{ .sa_handler = SIG_IGN, .sa_flags = 0, .sa_restorer = 0, .sa_mask = 0 };
     return sigaction(signum, &act, null);
 }
+
+pub fn default(signum: u32) isize {
+    const act = Sigaction{ .sa_handler = SIG_DFL, .sa_flags = 0, .sa_restorer = 0, .sa_mask = 0 };
+    return sigaction(signum, &act, null);
+}

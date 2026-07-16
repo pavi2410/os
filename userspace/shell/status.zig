@@ -13,6 +13,8 @@ pub fn setFromWait(wstatus: u32) void {
 }
 
 pub fn codeFromWait(wstatus: u32) u8 {
+    const sig = wstatus & 0x7f;
+    if (sig != 0) return @truncate(128 + sig);
     return @truncate((wstatus >> 8) & 0xff);
 }
 

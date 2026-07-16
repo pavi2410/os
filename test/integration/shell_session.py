@@ -70,6 +70,20 @@ class QemuShell:
         self.proc.expect(self.PROMPT, timeout=wait)
         return self.proc.before or ""
 
+    def send(self, data: str) -> None:
+        self.proc.send(data)
+
+    def expect(self, pattern: str | re.Pattern[str], *, timeout: float | None = None) -> str:
+        wait = self.command_timeout if timeout is None else timeout
+        self.proc.expect(pattern, timeout=wait)
+        return self.proc.before or ""
+
+    def expect_prompt(self, *, timeout: float | None = None) -> str:
+        return self.expect(self.PROMPT, timeout=timeout)
+
+    def send_ctrl_c(self) -> None:
+        self.proc.send("\x03")
+
     def close(self) -> None:
         if self._proc is None:
             return

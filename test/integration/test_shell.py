@@ -274,6 +274,16 @@ class TestShellPrograms:
             case="ping off-subnet",
         )
 
+    def test_ctrl_c_aborts_ping(self, shell_session: QemuShell) -> None:
+        # TEST-NET-3 blackhole: ping blocks in ICMP recv; Ctrl-C should kill it.
+        shell_session.send("ping -c 16 203.0.113.1\r")
+        shell_session.expect("PING 203.0.113.1")
+        shell_session.send_ctrl_c()
+        shell_session.expect_prompt()
+        run_case(shell_session, "echo $?", "130", case="SIGINT wait status")
+        run_case(shell_session, "echo ok", "ok", case="shell usable after ctrl-c")
+        shell_session.assert_no_faults()
+
     def test_ip(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "ip addr", "10.0.2.15/24", case="ip addr")
         run_case(shell_session, "ip route", "default via 10.0.2.2", case="ip route")
