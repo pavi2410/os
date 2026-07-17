@@ -166,7 +166,7 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 | 7 — COW fork | Done | Shared mappings, write fault promotion |
 | 8 — Process env | Planned | Signals, pipes, cwd, env, PATH, init, devfs, TTY |
 | 9 — Virtual memory | Done | `mmap`, page cache, demand paging, W^X |
-| 10 — Mount / tmpfs | Planned | mount table, tmpfs, rename/symlink |
+| 10 — Mount / tmpfs | Done | mount table, tmpfs, rename/symlink |
 | 11 — procfs/sysfs | Planned | `/proc`, `/sys`; retire hw snapshot syscalls |
 | 12 — Preemption | Planned | Involuntary timer preemption (SMP gate) |
 | 13 — SMP | Planned | Multicore bring-up, ACPI, SMP-safe kernel |

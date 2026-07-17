@@ -6,6 +6,8 @@
 
 **Unlocks:** [Phase 11 — procfs and sysfs](11-procfs-and-sysfs.md) (reuse mount + pseudo-fs plumbing)
 
+**Status:** Done
+
 ---
 
 ## Scope decisions
@@ -25,62 +27,69 @@
 
 ### Mount API
 
-- [ ] VFS mount points (attach fs instance to path prefix)
-- [ ] Syscall: `mount` / `umount`
-- [ ] Document mount order: FAT root → tmpfs on `/tmp`
-- [ ] Root `getdents` synthesizes `tmp` (same pattern as `dev`)
+- [x] VFS mount points (attach fs instance to path prefix)
+- [x] Syscall: `mount` / `umount2`
+- [x] Document mount order: FAT root → tmpfs on `/tmp`
+- [x] Root `getdents` synthesizes `tmp` (same pattern as `dev`)
 
 ### tmpfs
 
-- [ ] RAM-backed `Ops` (grow/shrink with heap or page allocator)
-- [ ] Mount at `/tmp` at boot
-- [ ] Files disappear on reboot — document behavior
-- [ ] Integration test: write `/tmp/foo`, read in same session; gone after reboot
+- [x] RAM-backed `Ops` (fixed node/data pools)
+- [x] Mount at `/tmp` at boot
+- [x] Files disappear on reboot — documented below
+- [x] Integration test: write `/tmp/foo`, read in same session; gone after reboot
 
 ### Permissions (light)
 
-- [ ] Mode bits stored on tmpfs nodes at create (default permissive)
-- [ ] FAT: document “no Unix permissions on disk”
-- [ ] No full `chmod` / credential model in this phase
+- [x] Mode bits stored on tmpfs nodes at create (default permissive)
+- [x] FAT: no Unix permissions on disk (documented in matrix)
+- [x] No full `chmod` / credential model in this phase
 
 ### VFS completeness
 
-- [ ] `rename` on FAT and tmpfs
-- [ ] `symlink` + `readlink` on tmpfs only (FAT → `ENOTSUP`)
-- [ ] `fsync` continues to flush dirty pages through page cache (FAT)
-- [ ] Document which ops FAT vs tmpfs vs `/dev` support
+- [x] `rename` on FAT and tmpfs
+- [x] `symlink` + `readlink` on tmpfs only (FAT → `ENOTSUP`)
+- [x] `fsync` continues to flush dirty pages through page cache (FAT)
+- [x] Document which ops FAT vs tmpfs vs `/dev` support
 
 ### Page cache
 
-- [ ] Per-handle / per-mount `Ops` for multi-mount writeback (not a single global binder)
+- [x] Per-handle / per-mount `Ops` for multi-mount writeback (ops pointer on cache key)
 
 ---
 
 ## Acceptance criteria
 
-1. **tmpfs mounts** at `/tmp`; shell and programs can create ephemeral files.
-2. **FAT boot disk unchanged** — `/BIN/*` still loads from existing workflow.
-3. **`mount` / `umount`** work for tmpfs (root FAT remains mounted).
-4. **`rename`** works on FAT and tmpfs; **`symlink` / `readlink`** work on tmpfs.
-5. Host + integration tests cover mount resolve and tmpfs round-trip (ephemeral across reboot).
+| # | Criterion | Status |
+|---|-----------|--------|
+| 1 | tmpfs mounts at `/tmp`; shell and programs can create ephemeral files | **Done** |
+| 2 | FAT boot disk unchanged — `/BIN/*` still loads | **Done** |
+| 3 | `mount` / `umount2` work for tmpfs (root FAT remains mounted) | **Done** (`mounttest`) |
+| 4 | `rename` on FAT and tmpfs; `symlink` / `readlink` on tmpfs | **Done** (`linktest`) |
+| 5 | Host + integration tests cover mount resolve and tmpfs round-trip | **Done** |
 
 ---
 
-## Capability matrix (fill in as implemented)
+## Capability matrix
 
 | Op | FAT | tmpfs | `/dev` |
 |----|-----|-------|--------|
-| open / read / write | yes | yes | devices via special FDs |
+| open / read / write | yes | yes (not on symlinks) | devices via special FDs |
 | mkdir / rmdir / unlink | yes | yes | no |
 | rename | yes | yes | no |
-| symlink / readlink | no | yes | no |
-| fsync | yes (page cache) | n/a or no-op | n/a |
+| symlink / readlink | no (`ENOTSUP`) | yes | no |
+| fsync | yes (page cache) | no-op via empty cache | n/a |
 | Unix mode bits | no | create-time only | n/a |
+| mount / umount | root (permanent) | yes (singleton) | n/a |
+
+**Ephemeral tmpfs:** contents live only in RAM. A reboot (or `umount` + remount / remount reset) discards all files under `/tmp`.
+
+**Mount order at boot:** FAT at `/`, then tmpfs at `/tmp`. `/dev` remains a path special-case.
 
 ---
 
 ## Notes
 
 - tmpfs is the proving ground for pseudo filesystems before `/proc` ([phase 11](11-procfs-and-sysfs.md)).
-- Page cache from [phase 9](09-virtual-memory-and-page-cache.md) must support more than one `Ops` backend once tmpfs is mounted.
+- Page cache keys include the filesystem `Ops` pointer so writeback targets the correct backend.
 - No second on-disk format: FAT remains the interoperability and boot volume.
