@@ -18,6 +18,20 @@ Since [phase 3](03-kernel-runtime.md), the LAPIC timer sets `preempt_requested`;
 
 ---
 
+## Quantum
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| LAPIC timer rate | 100 Hz | [`kernel/arch/x86_64/timer.zig`](../../kernel/arch/x86_64/timer.zig) `target_hz` |
+| `time_slice_ticks` | 10 | Compile-time in [`scheduler.zig`](../../kernel/proc/scheduler.zig) |
+| Effective slice | ~100 ms | Fixed round-robin; not Linux CFS |
+
+Linux desktop defaults are often on the order of a few ms under CFS; this kernel uses a coarser fixed slice for simplicity. Tune `time_slice_ticks` at compile time (no `/proc` knob yet).
+
+Syscalls remain non-preemptible mid-handler (SFMASK clears IF). Sticky `preempt_requested` is honored on syscall return via a brief `sti` → `yieldIfRequested` → `cli` window.
+
+---
+
 ## Checklist
 
 ### Interrupt-context context switch
@@ -61,3 +75,4 @@ Since [phase 3](03-kernel-runtime.md), the LAPIC timer sets `preempt_requested`;
 - Phase 3 deliberately deferred this; it is now a hard gate before [phase 13 (SMP)](13-smp.md).
 - SMP adds IPI reschedule on top of this — get uniprocessor preemption correct first.
 - GUI redraw loops ([phase 14](14-gui.md)) assume a fair scheduler.
+- Soak: after landing, boot under load for 60s+ of timer-driven scheduling without panic (CI uses a shorter gate; manual soak is fine).

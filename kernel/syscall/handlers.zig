@@ -1,5 +1,6 @@
 const numbers = @import("numbers.zig");
 const process = @import("../proc/process.zig");
+const scheduler = @import("../proc/scheduler.zig");
 const thread = @import("../proc/thread.zig");
 const user_fork = @import("../proc/fork.zig");
 const user_mode = @import("../arch/x86_64/user.zig");
@@ -23,6 +24,7 @@ const fd_retain = @import("../proc/fd_retain.zig");
 const signal = @import("../proc/signal.zig");
 const user = @import("user.zig");
 const copy_out = @import("copy_out.zig");
+const cpu = @import("../arch/x86_64/cpu.zig");
 const std = @import("std");
 
 /// Matches the stack layout built by `syscall_entry` (callee-saved pushed first).
@@ -50,6 +52,12 @@ pub export fn syscall_dispatch(frame: *Frame) callconv(.{ .x86_64_sysv = .{} }) 
     if (process.currentProcess()) |proc| {
         signal.tryApply(proc);
     }
+    // Syscalls run with IF cleared (SFMASK). Briefly open IF so a sticky
+    // quantum that expired during a blocking sti window can be honored before
+    // returning to user. Pure user CPU is preempted by the timer IRQ path.
+    cpu.sti();
+    scheduler.yieldIfRequested();
+    cpu.cli();
     return ret;
 }
 
