@@ -4,6 +4,9 @@ const page_ref = @import("page_ref.zig");
 const physical = @import("physical.zig");
 const process = @import("../proc/process.zig");
 const vma = @import("vma.zig");
+const file_cache = @import("../fs/file_cache.zig");
+const filesystem = @import("../fs/filesystem.zig");
+const fat32 = @import("../fs/fat32.zig");
 
 const PfErr = packed struct(u64) {
     present: u1,
@@ -30,17 +33,21 @@ pub fn tryHandleUserPageFault(fault_addr: u64, error_code: u64) bool {
     const proc = process.currentProcess() orelse return false;
     const region = proc.vmas.find(fault_addr) orelse return false;
 
-    switch (region.kind) {
-        .anon, .heap, .stack => {},
-        .elf, .file, .none => return false,
-    }
-
     if (err.write != 0 and !region.isWritable()) return false;
     if (err.fetch != 0 and !region.isExecutable()) return false;
     if (err.write == 0 and err.fetch == 0 and !region.isReadable()) return false;
 
     const virt = fault_addr & ~(paging.page_size - 1);
     if (paging.getPhysIn(proc.address_space.cr3, virt) != null) return false;
+
+    if (region.kind == .file) {
+        return mapFilePage(proc, region, virt);
+    }
+
+    switch (region.kind) {
+        .anon, .heap, .stack => {},
+        .elf, .file, .none => return false,
+    }
 
     const phys = physical.allocPage() catch return false;
     const buf = @as([*]u8, @ptrFromInt(address.physToVirt(phys)))[0..paging.page_size];
@@ -56,6 +63,35 @@ pub fn tryHandleUserPageFault(fault_addr: u64, error_code: u64) bool {
         return false;
     };
 
+    if (paging.readCr3() == proc.address_space.cr3) paging.invlpg(virt);
+    return true;
+}
+
+fn openFileFromVma(region: vma.Vma) filesystem.OpenFile {
+    return .{
+        .id = .{ .a = region.file.file_a, .b = region.file.file_b },
+        .start_cluster = region.file.start_cluster,
+        .size = region.file.file_size,
+        .attr = region.file.attr,
+        .loc_cluster = region.file.loc_cluster,
+        .loc_offset = region.file.loc_offset,
+    };
+}
+
+fn mapFilePage(proc: *process.Process, region: vma.Vma, virt: u64) bool {
+    const page_index = (region.file.file_offset + (virt - region.base)) / paging.page_size;
+    const open = openFileFromVma(region);
+    const phys = file_cache.pinPage(&fat32.ops, open, page_index) catch return false;
+    page_ref.retain(phys) catch {
+        file_cache.unpinPage(open, page_index);
+        return false;
+    };
+    const perm = pteFromProt(region.prot);
+    paging.mapUserPageIn(proc.address_space.cr3, virt, phys, perm) catch {
+        page_ref.release(phys) catch {};
+        file_cache.unpinPage(open, page_index);
+        return false;
+    };
     if (paging.readCr3() == proc.address_space.cr3) paging.invlpg(virt);
     return true;
 }

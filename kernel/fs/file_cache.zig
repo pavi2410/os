@@ -157,6 +157,21 @@ pub fn fsync(ops: *const filesystem.Ops, file: *filesystem.OpenFile) filesystem.
     // Refresh size after writeback may have updated on-disk metadata via ops.
 }
 
+/// Populate (if needed) and pin a file page; caller must `unpinPage` when unmapped.
+pub fn pinPage(ops: *const filesystem.Ops, file: filesystem.OpenFile, page_index: u64) filesystem.Error!u64 {
+    if (!page_cache.ready()) return filesystem.Error.NotReady;
+    const cache = page_cache.global();
+    const key = keyFor(file, page_index);
+    const slot = cache.getOrAlloc(key) catch return filesystem.Error.NoSpace;
+    try ensureValid(ops, file, page_index, slot);
+    return slot.phys;
+}
+
+pub fn unpinPage(file: filesystem.OpenFile, page_index: u64) void {
+    if (!page_cache.ready()) return;
+    page_cache.global().unpin(keyFor(file, page_index));
+}
+
 pub fn hits() u64 {
     if (!page_cache.ready()) return 0;
     return page_cache.global().hits;

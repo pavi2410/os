@@ -234,5 +234,5 @@ pub const Vfs = struct {
     return slot;
     }
 
-    fn getHandle(self: *Vfs, handle: HandleId) VfsError!*Handle { return self.handles.get(handle); }
+    pub fn getHandle(self: *Vfs, handle: HandleId) VfsError!*Handle { return self.handles.get(handle); }
 };

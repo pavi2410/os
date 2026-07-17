@@ -33,6 +33,11 @@ pub const FileBacking = struct {
     file_a: u64 = 0,
     file_b: u64 = 0,
     file_offset: u64 = 0,
+    start_cluster: u32 = 0,
+    file_size: u32 = 0,
+    attr: u8 = 0,
+    loc_cluster: u32 = 0,
+    loc_offset: u32 = 0,
 };
 
 pub const Vma = struct {
