@@ -13,6 +13,7 @@ const hw_info = @import("../hw/info.zig");
 const hal = @import("../hal.zig");
 const pipe = @import("../ipc/pipe.zig");
 const runtime = @import("../runtime.zig");
+const mmap_sys = @import("../mm/mmap.zig");
 const abi_fs = @import("abi_fs");
 const abi_signal = @import("abi_signal");
 const abi_syscall = @import("abi_syscall");
@@ -188,13 +189,8 @@ fn sysLseek(fd: u64, offset: i64, whence: u32) i64 {
 }
 
 fn sysMmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64) i64 {
-    _ = addr;
-    _ = len;
-    _ = prot;
-    _ = flags;
-    _ = fd;
-    _ = offset;
-    return errno.ENOSYS;
+    const proc = process.currentProcess() orelse return errno.ENOMEM;
+    return mmap_sys.sysMmap(proc, addr, len, prot, flags, fd, offset);
 }
 
 fn sysMprotect(addr: u64, len: u64, prot: u64) i64 {
@@ -205,9 +201,8 @@ fn sysMprotect(addr: u64, len: u64, prot: u64) i64 {
 }
 
 fn sysMunmap(addr: u64, len: u64) i64 {
-    _ = addr;
-    _ = len;
-    return errno.ENOSYS;
+    const proc = process.currentProcess() orelse return errno.ENOMEM;
+    return mmap_sys.sysMunmap(proc, addr, len);
 }
 
 fn sysBrk(addr: u64) i64 {
