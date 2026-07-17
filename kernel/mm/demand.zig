@@ -83,13 +83,13 @@ fn mapFilePage(proc: *process.Process, region: vma.Vma, virt: u64) bool {
     const open = openFileFromVma(region);
     const phys = file_cache.pinPage(&fat32.ops, open, page_index) catch return false;
     page_ref.retain(phys) catch {
-        file_cache.unpinPage(open, page_index);
+        file_cache.unpinPage(&fat32.ops, open, page_index);
         return false;
     };
     const perm = pteFromProt(region.prot);
     paging.mapUserPageIn(proc.address_space.cr3, virt, phys, perm) catch {
         page_ref.release(phys) catch {};
-        file_cache.unpinPage(open, page_index);
+        file_cache.unpinPage(&fat32.ops, open, page_index);
         return false;
     };
     if (paging.readCr3() == proc.address_space.cr3) paging.invlpg(virt);

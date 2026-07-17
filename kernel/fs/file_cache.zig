@@ -5,13 +5,12 @@ const paging = @import("../arch/x86_64/paging.zig");
 
 const page_size = paging.page_size;
 
-var bound_ops: ?*const filesystem.Ops = null;
-
-fn keyFor(file: filesystem.OpenFile, page_index: u64) page_cache.Key {
+fn keyFor(ops: *const filesystem.Ops, file: filesystem.OpenFile, page_index: u64) page_cache.Key {
     return .{
         .file_a = file.id.a,
         .file_b = file.id.b,
         .index = page_index,
+        .ops_ptr = @intFromPtr(ops),
         .start_cluster = file.start_cluster,
         .file_size = file.size,
         .attr = file.attr,
@@ -29,6 +28,11 @@ fn openFromKey(key: page_cache.Key) filesystem.OpenFile {
         .loc_cluster = key.loc_cluster,
         .loc_offset = key.loc_offset,
     };
+}
+
+fn opsFromKey(key: page_cache.Key) ?*const filesystem.Ops {
+    if (key.ops_ptr == 0) return null;
+    return @ptrFromInt(key.ops_ptr);
 }
 
 fn pageBuf(phys: u64) []u8 {
@@ -54,7 +58,7 @@ fn ensureValid(
 }
 
 fn writeback(key: page_cache.Key, phys: u64) page_cache.CacheError!void {
-    const ops = bound_ops orelse return page_cache.CacheError.NotFound;
+    const ops = opsFromKey(key) orelse return page_cache.CacheError.NotFound;
     var open = openFromKey(key);
     const offset = key.index * page_size;
     const buf = pageBuf(phys);
@@ -64,9 +68,8 @@ fn writeback(key: page_cache.Key, phys: u64) page_cache.CacheError!void {
     _ = ops.write_at(&open, offset, buf[0..write_len]) catch return page_cache.CacheError.OutOfMemory;
 }
 
-/// Bind filesystem ops used for miss populate and dirty writeback.
-pub fn bindOps(ops: *const filesystem.Ops) void {
-    bound_ops = ops;
+/// Install the page-cache writeback callback (ops come from each Key).
+pub fn bindOps(_: *const filesystem.Ops) void {
     if (page_cache.ready()) {
         page_cache.global().setWriteback(writeback);
     }
@@ -92,7 +95,7 @@ pub fn read(
         const page_off: usize = @intCast(file_off % page_size);
         const chunk = @min(total - done, page_size - page_off);
 
-        const key = keyFor(file, page_index);
+        const key = keyFor(ops, file, page_index);
         const slot = cache.getOrAlloc(key) catch return filesystem.Error.NoSpace;
         defer cache.unpin(key);
 
@@ -123,7 +126,7 @@ pub fn write(
         const page_off: usize = @intCast(file_off % page_size);
         const chunk = @min(buf.len - done, page_size - page_off);
 
-        var key = keyFor(file.*, page_index);
+        var key = keyFor(ops, file.*, page_index);
         const end_off = file_off + chunk;
         if (end_off > file.size) {
             file.size = @intCast(end_off);
@@ -151,25 +154,23 @@ pub fn write(
 }
 
 pub fn fsync(ops: *const filesystem.Ops, file: *filesystem.OpenFile) filesystem.Error!void {
-    _ = ops;
     if (!page_cache.ready()) return;
-    page_cache.global().flushFile(file.id.a, file.id.b) catch return filesystem.Error.IoError;
-    // Refresh size after writeback may have updated on-disk metadata via ops.
+    page_cache.global().flushFile(file.id.a, file.id.b, @intFromPtr(ops)) catch return filesystem.Error.IoError;
 }
 
 /// Populate (if needed) and pin a file page; caller must `unpinPage` when unmapped.
 pub fn pinPage(ops: *const filesystem.Ops, file: filesystem.OpenFile, page_index: u64) filesystem.Error!u64 {
     if (!page_cache.ready()) return filesystem.Error.NotReady;
     const cache = page_cache.global();
-    const key = keyFor(file, page_index);
+    const key = keyFor(ops, file, page_index);
     const slot = cache.getOrAlloc(key) catch return filesystem.Error.NoSpace;
     try ensureValid(ops, file, page_index, slot);
     return slot.phys;
 }
 
-pub fn unpinPage(file: filesystem.OpenFile, page_index: u64) void {
+pub fn unpinPage(ops: *const filesystem.Ops, file: filesystem.OpenFile, page_index: u64) void {
     if (!page_cache.ready()) return;
-    page_cache.global().unpin(keyFor(file, page_index));
+    page_cache.global().unpin(keyFor(ops, file, page_index));
 }
 
 pub fn hits() u64 {

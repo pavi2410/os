@@ -135,7 +135,7 @@ fn unpinFileRange(proc: *process.Process, base: u64, len: u64) void {
         if (region.kind != .file) continue;
         if (paging.getPhysIn(proc.address_space.cr3, page) == null) continue;
         const page_index = (region.file.file_offset + (page - region.base)) / paging.page_size;
-        file_cache.unpinPage(openFileFromVma(region), page_index);
+        file_cache.unpinPage(&@import("../fs/fat32.zig").ops, openFileFromVma(region), page_index);
     }
 }
 
