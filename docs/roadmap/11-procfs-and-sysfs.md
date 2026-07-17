@@ -6,19 +6,21 @@
 
 **Unlocks:** [Phase 13 — SMP](13-smp.md) (cleaner introspection before scaling to multicore)
 
+**Status:** MVP done (stretch/net deferred)
+
 ---
 
 ## Motivation
 
 Phase 5 added interim syscalls and tools:
 
-| Syscall | Tool | Future path |
-|---------|------|-------------|
+| Syscall | Tool | Path |
+|---------|------|------|
 | `getcpuinfo` (1026) | `lscpu` | `/proc/cpuinfo` |
-| `getpcidevices` (1027) | `lspci` | `/sys/bus/pci/devices/...` or `/proc/bus/pci/...` |
+| `getpcidevices` (1027) | `lspci` | `/sys/bus/pci/devices/...` |
 | `getblockdevices` (1028) | `lsblk` | `/sys/block/...` |
-| `getmemregions` (1029) | `lsmem` | `/proc/iomem` or `/sys/devices/system/memory/...` |
-| `getnetconfig` / `getneighbors` | `ip` | `/proc/net/...` (partial) |
+| `getmemregions` (1029) | `lsmem` | `/proc/iomem` |
+| `getnetconfig` / `getneighbors` | `ip` | `/proc/net/...` (deferred) |
 
 Problems with the syscall approach (already observed in development):
 
@@ -33,27 +35,27 @@ Problems with the syscall approach (already observed in development):
 
 ### Infrastructure
 
-- [ ] Pseudo filesystem type in VFS (seq_file-style read, no persistent storage)
-- [ ] Mount `/proc` at boot (init from [phase 8](08-process-environment.md))
-- [ ] Optional: mount `/sys` as separate tree or under `/proc/sys`
+- [x] Pseudo filesystem type in VFS (seq_file-style read, no persistent storage)
+- [x] Mount `/proc` at boot
+- [x] Mount `/sys` as a separate tree
 
 ### `/proc` files (first wave)
 
-- [ ] `/proc/cpuinfo` — replaces `getcpuinfo`
-- [ ] `/proc/meminfo` or `/proc/iomem` — replaces `getmemregions` / `lsmem`
+- [x] `/proc/cpuinfo` — replaces `getcpuinfo`
+- [x] `/proc/iomem` — replaces `getmemregions` / `lsmem`
 - [ ] `/proc/loadavg`, `/proc/uptime` — stretch (timer stats already exist in kernel)
 - [ ] `/proc/[pid]/` basics — stretch (`status`, `cmdline`)
 
-### `/sys` or `/proc` device trees
+### `/sys` device trees
 
-- [ ] PCI device listing — replaces `getpcidevices` / `lspci` text backend
-- [ ] Block device listing — replaces `getblockdevices` / `lsblk` text backend
+- [x] PCI device listing — `/sys/bus/pci/devices/<BB:DD.F>/{vendor,device,class}`
+- [x] Block device listing — `/sys/block/<name>/{size,sector_size}`
 
 ### Userspace migration
 
-- [ ] Rewrite `lscpu`, `lspci`, `lsblk`, `lsmem` as thin `open`/`read` parsers (or `cat` for bootstrap)
-- [ ] Deprecate hw snapshot syscalls; document removal in [`syscall-abi.md`](../syscall-abi.md)
-- [ ] Keep ABI numbers reserved or return `ENOSYS` after migration
+- [x] Rewrite `lscpu`, `lspci`, `lsblk`, `lsmem` as thin `open`/`read` parsers
+- [x] Deprecate hw snapshot syscalls; document removal in [`syscall-abi.md`](../syscall-abi.md)
+- [x] Keep ABI numbers reserved; return `ENOSYS`
 
 ### Network (optional in this phase)
 
@@ -79,6 +81,6 @@ Problems with the syscall approach (already observed in development):
 
 ## Notes
 
-- Text format can follow Linux loosely — document intentional differences.
+- Text format follows Linux loosely. Intentional extras on `/proc/cpuinfo`: `apic_id`, `ioapic_count`.
 - Prefer directory + file layout over monolithic ioctls.
-- Network config may stay on `getnetconfig` longer if `/proc/net` is deferred — that's acceptable.
+- Network config stays on `getnetconfig` / `getneighbors` until `/proc/net` lands.

@@ -16,18 +16,22 @@ pub const MEM_ACPI = abi_hw.MEM_ACPI;
 pub const MEM_UNUSABLE = abi_hw.MEM_UNUSABLE;
 pub const MEM_UNKNOWN = abi_hw.MEM_UNKNOWN;
 
+/// Deprecated: kernel returns `ENOSYS`. Prefer `/proc` and `/sys`.
 pub fn getcpuinfo(out: *CpuInfo) isize {
     return syscall.getcpuinfo(out);
 }
 
+/// Deprecated: kernel returns `ENOSYS`. Prefer `/sys/bus/pci/devices/...`.
 pub fn getpcidevices(buf: [*]PciDeviceInfo, max: usize) isize {
     return syscall.getpcidevices(buf, max);
 }
 
+/// Deprecated: kernel returns `ENOSYS`. Prefer `/sys/block/...`.
 pub fn getblockdevices(buf: [*]BlockDeviceInfo, max: usize) isize {
     return syscall.getblockdevices(buf, max);
 }
 
+/// Deprecated: kernel returns `ENOSYS`. Prefer `/proc/iomem`.
 pub fn getmemregions(buf: [*]MemRegionInfo, max: usize) isize {
     return syscall.getmemregions(buf, max);
 }

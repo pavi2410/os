@@ -9,7 +9,6 @@ const vfs = @import("../fs/vfs.zig");
 const devfs = @import("../fs/devfs.zig");
 const socket = @import("../net/socket.zig");
 const net_info = @import("../net/info.zig");
-const hw_info = @import("../hw/info.zig");
 const hal = @import("../hal.zig");
 const pipe = @import("../ipc/pipe.zig");
 const runtime = @import("../runtime.zig");
@@ -503,39 +502,24 @@ fn sysGetneighbors(buf_ptr: u64, max: u64) i64 {
     return @intCast(count);
 }
 
-fn sysGetcpuinfo(buf_ptr: u64) i64 {
-    if (buf_ptr == 0) return errno.EFAULT;
-    var info: hw_info.CpuInfo = undefined;
-    hw_info.fillCpuInfo(&info);
-    copy_out.copyOut(buf_ptr, std.mem.asBytes(&info)) catch return errno.EFAULT;
-    return 0;
+/// Retired: use `/proc/cpuinfo`. Number 1026 remains reserved.
+fn sysGetcpuinfo(_: u64) i64 {
+    return errno.ENOSYS;
 }
 
-fn sysGetpcidevices(buf_ptr: u64, max: u64) i64 {
-    if (buf_ptr == 0 or max == 0) return errno.EINVAL;
-    const cap: usize = @intCast(@min(max, 64));
-    var buf: [64]hw_info.PciDeviceInfo = undefined;
-    const count = hw_info.fillPciDevices(buf[0..cap]);
-    copy_out.copyOut(buf_ptr, std.mem.sliceAsBytes(buf[0..count])) catch return errno.EFAULT;
-    return @intCast(count);
+/// Retired: use `/sys/bus/pci/devices/...`. Number 1027 remains reserved.
+fn sysGetpcidevices(_: u64, _: u64) i64 {
+    return errno.ENOSYS;
 }
 
-fn sysGetblockdevices(buf_ptr: u64, max: u64) i64 {
-    if (buf_ptr == 0 or max == 0) return errno.EINVAL;
-    const cap: usize = @intCast(@min(max, 8));
-    var buf: [8]hw_info.BlockDeviceInfo = undefined;
-    const count = hw_info.fillBlockDevices(buf[0..cap]);
-    copy_out.copyOut(buf_ptr, std.mem.sliceAsBytes(buf[0..count])) catch return errno.EFAULT;
-    return @intCast(count);
+/// Retired: use `/sys/block/...`. Number 1028 remains reserved.
+fn sysGetblockdevices(_: u64, _: u64) i64 {
+    return errno.ENOSYS;
 }
 
-fn sysGetmemregions(buf_ptr: u64, max: u64) i64 {
-    if (buf_ptr == 0 or max == 0) return errno.EINVAL;
-    const cap: usize = @intCast(@min(max, 256));
-    var buf: [256]hw_info.MemRegionInfo = undefined;
-    const count = hw_info.fillMemRegions(buf[0..cap]);
-    copy_out.copyOut(buf_ptr, std.mem.sliceAsBytes(buf[0..count])) catch return errno.EFAULT;
-    return @intCast(count);
+/// Retired: use `/proc/iomem`. Number 1029 remains reserved.
+fn sysGetmemregions(_: u64, _: u64) i64 {
+    return errno.ENOSYS;
 }
 
 fn sysPipe(fd_ptr: u64) i64 {

@@ -69,10 +69,10 @@ Negative `RAX` values follow the Linux errno convention (e.g. `-38` = `ENOSYS`).
 | 231 | `exit_group` | Process exit |
 | 1024 | `getnetconfig` | Kernel network config snapshot for `ip addr`/`ip route` |
 | 1025 | `getneighbors` | ARP/neighbor table snapshot for `ip neigh` |
-| 1026 | `getcpuinfo` | CPU identification snapshot for `lscpu` |
-| 1027 | `getpcidevices` | PCI device table snapshot for `lspci` |
-| 1028 | `getblockdevices` | Block device table snapshot for `lsblk` |
-| 1029 | `getmemregions` | Physical memory map snapshot for `lsmem` |
+| 1026 | `getcpuinfo` | **Retired** (`ENOSYS`) — use `/proc/cpuinfo` |
+| 1027 | `getpcidevices` | **Retired** (`ENOSYS`) — use `/sys/bus/pci/devices/...` |
+| 1028 | `getblockdevices` | **Retired** (`ENOSYS`) — use `/sys/block/...` |
+| 1029 | `getmemregions` | **Retired** (`ENOSYS`) — use `/proc/iomem` |
 
 ## `mmap` / `mprotect` / `munmap` (supported subset)
 
