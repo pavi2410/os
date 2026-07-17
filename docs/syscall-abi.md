@@ -41,6 +41,7 @@ Negative `RAX` values follow the Linux errno convention (e.g. `-38` = `ENOSYS`).
 | 13 | `rt_sigaction` | Install `SIG_DFL` / `SIG_IGN` handler (no user handlers yet) |
 | 14 | `rt_sigprocmask` | Block/unblock signals (`sigsetsize` = 8) |
 | 39 | `getpid` | Current process ID |
+| 74 | `fsync` | Flush dirty page-cache pages for a file FD |
 | 41 | `socket` | `AF_INET` datagram/stream sockets |
 | 42 | `connect` | TCP client connect |
 | 44 | `sendto` | Datagram send |

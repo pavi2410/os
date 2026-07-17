@@ -16,6 +16,7 @@ pub const pipe = abi.pipe;
 pub const dup = abi.dup;
 pub const dup2 = abi.dup2;
 pub const getpid = abi.getpid;
+pub const fsync = abi.fsync;
 pub const socket = abi.socket;
 pub const connect = abi.connect;
 pub const sendto = abi.sendto;

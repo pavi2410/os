@@ -15,6 +15,7 @@ pub const pipe = 22;
 pub const dup = 32;
 pub const dup2 = 33;
 pub const getpid = 39;
+pub const fsync = 74;
 pub const socket = 41;
 pub const connect = 42;
 pub const sendto = 44;

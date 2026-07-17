@@ -64,6 +64,7 @@ pub const Vfs = struct {
     pub fn init(self: *Vfs) VfsError!void {
         self.handles.init();
         try active_fs.mount();
+        file_cache.bindOps(&active_fs);
     }
 
     pub fn isReady(_: *const Vfs) bool {
@@ -124,6 +125,12 @@ pub const Vfs = struct {
     const n = try file_cache.write(&active_fs, &h.open, h.offset, buf);
     h.offset += n;
     return n;
+    }
+
+    pub fn fsync(self: *Vfs, handle: HandleId) VfsError!void {
+        const h = try self.getHandle(handle);
+        if (h.is_directory or h.kind == .dev_root) return;
+        try file_cache.fsync(&active_fs, &h.open);
     }
 
     pub fn lseek(self: *Vfs, handle: HandleId, offset: i64, whence: Whence) VfsError!u64 {

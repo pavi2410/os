@@ -12,6 +12,12 @@ pub const Key = struct {
     file_a: u64 = 0,
     file_b: u64 = 0,
     index: u64 = 0,
+    /// Snapshot of OpenFile fields for dirty writeback (not part of equality).
+    start_cluster: u32 = 0,
+    file_size: u32 = 0,
+    attr: u8 = 0,
+    loc_cluster: u32 = 0,
+    loc_offset: u32 = 0,
 
     pub fn eql(self: Key, other: Key) bool {
         return self.file_a == other.file_a and self.file_b == other.file_b and self.index == other.index;

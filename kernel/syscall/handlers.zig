@@ -72,6 +72,7 @@ fn dispatchSyscall(frame: *Frame) i64 {
         numbers.dup => sysDup(frame.arg0),
         numbers.dup2 => sysDup2(frame.arg0, frame.arg1),
         numbers.getpid => sysGetpid(),
+        numbers.fsync => sysFsync(frame.arg0),
         numbers.fork => sysFork(frame),
         numbers.execve => sysExecve(frame.arg0, frame.arg1, frame.arg2),
         numbers.wait4 => sysWait4(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
@@ -211,6 +212,17 @@ fn sysBrk(addr: u64) i64 {
 fn sysGetpid() i64 {
     const proc = process.currentProcess() orelse return 1;
     return @intCast(proc.id);
+}
+
+fn sysFsync(fd: u64) i64 {
+    const slot = fdtab.currentSlot(fd) catch return errno.EBADF;
+    return switch (slot.*) {
+        .file => |handle| {
+            runtime.boot().vfs.fsync(handle) catch |err| return errno.fromVfs(err);
+            return 0;
+        },
+        else => errno.EINVAL,
+    };
 }
 
 fn sysFork(frame: *Frame) i64 {

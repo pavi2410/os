@@ -5,11 +5,29 @@ const paging = @import("../arch/x86_64/paging.zig");
 
 const page_size = paging.page_size;
 
+var bound_ops: ?*const filesystem.Ops = null;
+
 fn keyFor(file: filesystem.OpenFile, page_index: u64) page_cache.Key {
     return .{
         .file_a = file.id.a,
         .file_b = file.id.b,
         .index = page_index,
+        .start_cluster = file.start_cluster,
+        .file_size = file.size,
+        .attr = file.attr,
+        .loc_cluster = file.loc_cluster,
+        .loc_offset = file.loc_offset,
+    };
+}
+
+fn openFromKey(key: page_cache.Key) filesystem.OpenFile {
+    return .{
+        .id = .{ .a = key.file_a, .b = key.file_b },
+        .start_cluster = key.start_cluster,
+        .size = key.file_size,
+        .attr = key.attr,
+        .loc_cluster = key.loc_cluster,
+        .loc_offset = key.loc_offset,
     };
 }
 
@@ -33,6 +51,25 @@ fn ensureValid(
         if (n < want) @memset(buf[n..want], 0);
     }
     slot.valid = true;
+}
+
+fn writeback(key: page_cache.Key, phys: u64) page_cache.CacheError!void {
+    const ops = bound_ops orelse return page_cache.CacheError.NotFound;
+    var open = openFromKey(key);
+    const offset = key.index * page_size;
+    const buf = pageBuf(phys);
+    const len = if (offset >= open.size) page_size else @min(page_size, open.size -% offset);
+    // Always write a full page worth when dirty so partial updates persist.
+    const write_len = if (len == 0) page_size else len;
+    _ = ops.write_at(&open, offset, buf[0..write_len]) catch return page_cache.CacheError.OutOfMemory;
+}
+
+/// Bind filesystem ops used for miss populate and dirty writeback.
+pub fn bindOps(ops: *const filesystem.Ops) void {
+    bound_ops = ops;
+    if (page_cache.ready()) {
+        page_cache.global().setWriteback(writeback);
+    }
 }
 
 /// Read file bytes through the page cache.
@@ -67,7 +104,7 @@ pub fn read(
     return total;
 }
 
-/// Write file bytes through the page cache (marks dirty; caller may write-through).
+/// Write file bytes into the page cache (dirty); durable after fsync/eviction writeback.
 pub fn write(
     ops: *const filesystem.Ops,
     file: *filesystem.OpenFile,
@@ -86,11 +123,18 @@ pub fn write(
         const page_off: usize = @intCast(file_off % page_size);
         const chunk = @min(buf.len - done, page_size - page_off);
 
-        const key = keyFor(file.*, page_index);
+        var key = keyFor(file.*, page_index);
+        const end_off = file_off + chunk;
+        if (end_off > file.size) {
+            file.size = @intCast(end_off);
+            key.file_size = file.size;
+        }
+
         const slot = cache.getOrAlloc(key) catch return filesystem.Error.NoSpace;
         defer cache.unpin(key);
+        // Refresh metadata on the slot key for later writeback.
+        slot.key = key;
 
-        // Partial page write needs existing contents.
         if (page_off != 0 or chunk != page_size) {
             try ensureValid(ops, file.*, page_index, slot);
         } else {
@@ -103,8 +147,14 @@ pub fn write(
         done += chunk;
     }
 
-    // Write-through for durability until fsync-based writeback lands.
-    return ops.write_at(file, offset, buf);
+    return buf.len;
+}
+
+pub fn fsync(ops: *const filesystem.Ops, file: *filesystem.OpenFile) filesystem.Error!void {
+    _ = ops;
+    if (!page_cache.ready()) return;
+    page_cache.global().flushFile(file.id.a, file.id.b) catch return filesystem.Error.IoError;
+    // Refresh size after writeback may have updated on-disk metadata via ops.
 }
 
 pub fn hits() u64 {

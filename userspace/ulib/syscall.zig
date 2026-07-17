@@ -79,6 +79,10 @@ pub fn munmap(addr: usize, len: usize) isize {
     return syscall6(abi_syscall.munmap, addr, len, 0, 0, 0, 0);
 }
 
+pub fn fsync(fd: u32) isize {
+    return syscall6(abi_syscall.fsync, fd, 0, 0, 0, 0, 0);
+}
+
 pub fn mprotect(addr: usize, len: usize, prot: u32) isize {
     return syscall6(abi_syscall.mprotect, addr, len, prot, 0, 0, 0);
 }
