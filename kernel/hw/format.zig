@@ -70,3 +70,53 @@ pub fn formatIomem(regions: []const MemRegionInfo, dest: []u8) usize {
     }
     return p;
 }
+
+/// Format a hex value with newline (sysfs attribute style), `width` nibbles.
+pub fn formatHexAttr(value: u64, width: usize, dest: []u8) usize {
+    const p = seq.appendHex(dest, 0, value, width);
+    return seq.append(dest, p, "\n");
+}
+
+/// Format a decimal value with newline (sysfs attribute style).
+pub fn formatU64Attr(value: u64, dest: []u8) usize {
+    const p = seq.appendU64(dest, 0, value);
+    return seq.append(dest, p, "\n");
+}
+
+/// Format PCI address as `BB:DD.F` (bus/device hex, function decimal digit).
+pub fn formatPciAddr(bus: u8, device: u8, function: u8, dest: []u8) usize {
+    var p = seq.appendHex(dest, 0, bus, 2);
+    p = seq.append(dest, p, ":");
+    p = seq.appendHex(dest, p, device, 2);
+    p = seq.append(dest, p, ".");
+    return seq.appendU64(dest, p, function);
+}
+
+/// Parse `BB:DD.F` into bus/device/function. Returns false on malformed input.
+pub fn parsePciAddr(name: []const u8, bus: *u8, device: *u8, function: *u8) bool {
+    if (name.len < 7 or name.len > 8) return false;
+    if (name[2] != ':' or name[5] != '.') return false;
+    bus.* = parseHexByte(name[0..2]) orelse return false;
+    device.* = parseHexByte(name[3..5]) orelse return false;
+    if (name.len == 7) {
+        if (name[6] < '0' or name[6] > '9') return false;
+        function.* = name[6] - '0';
+        return true;
+    }
+    // Two-digit function (rare); keep simple: only single digit.
+    return false;
+}
+
+fn parseHexByte(s: []const u8) ?u8 {
+    if (s.len != 2) return null;
+    const hi = hexNibble(s[0]) orelse return null;
+    const lo = hexNibble(s[1]) orelse return null;
+    return (hi << 4) | lo;
+}
+
+fn hexNibble(c: u8) ?u8 {
+    if (c >= '0' and c <= '9') return c - '0';
+    if (c >= 'a' and c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' and c <= 'F') return c - 'A' + 10;
+    return null;
+}
