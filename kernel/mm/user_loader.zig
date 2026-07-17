@@ -2,6 +2,7 @@ const address = @import("address.zig");
 const page_ref = @import("page_ref.zig");
 const paging = @import("../arch/x86_64/paging.zig");
 const physical = @import("physical.zig");
+const vma = @import("vma.zig");
 const std = @import("std");
 const elf = std.elf;
 
@@ -11,9 +12,20 @@ pub const LoadError = error{
     OutOfMemory,
 };
 
+pub const max_seed_regions = vma.max_vmas;
+
+pub const RegionSeed = struct {
+    base: u64,
+    len: u64,
+    prot: u32,
+    kind: vma.Kind,
+};
+
 pub const LoadedImage = struct {
     entry: u64,
     stack_top: u64,
+    regions: [max_seed_regions]RegionSeed = undefined,
+    region_count: usize = 0,
 };
 
 /// Linux-style user stack layout (must match `process.user_stack_top`).
@@ -37,20 +49,66 @@ pub fn load(cr3: u64, image: []const u8, argv: []const []const u8, envp: []const
         return LoadError.InvalidElf;
     }
 
+    var result: LoadedImage = .{
+        .entry = hdr.e_entry,
+        .stack_top = 0,
+    };
+
     const phdrs: [*]const elf.Elf64_Phdr = @ptrCast(@alignCast(image.ptr + hdr.e_phoff));
     var i: u16 = 0;
     while (i < hdr.e_phnum) : (i += 1) {
         const ph = phdrs[i];
         if (ph.p_type != elf.PT_LOAD) continue;
         try loadSegment(cr3, image, ph);
+        try pushRegionSeed(&result, .{
+            .base = ph.p_vaddr & ~(paging.page_size - 1),
+            .len = pageAlignLen(ph.p_vaddr, ph.p_memsz),
+            .prot = vma.protFromElfFlags(ph.p_flags & elf.PF_W != 0, ph.p_flags & elf.PF_X != 0),
+            .kind = .elf,
+        });
     }
 
-    const stack_top = try setupUserStack(cr3);
-    const sp = try pushInitialStack(cr3, stack_top, argv, envp);
-    return .{
-        .entry = hdr.e_entry,
-        .stack_top = sp,
-    };
+    const stack_mapped_top = try setupUserStack(cr3);
+    const stack_end = user_stack_top + paging.page_size;
+    const stack_start = stack_end - @as(u64, @intCast(user_stack_pages)) * paging.page_size;
+    try pushRegionSeed(&result, .{
+        .base = stack_start,
+        .len = stack_end - stack_start,
+        .prot = vma.PROT_READ | vma.PROT_WRITE,
+        .kind = .stack,
+    });
+    _ = stack_mapped_top;
+
+    const sp = try pushInitialStack(cr3, user_stack_top, argv, envp);
+    result.stack_top = sp;
+    return result;
+}
+
+fn pageAlignLen(vaddr: u64, memsz: u64) u64 {
+    const first = vaddr & ~(paging.page_size - 1);
+    const last = (vaddr + memsz + paging.page_size - 1) & ~(paging.page_size - 1);
+    return last - first;
+}
+
+fn pushRegionSeed(image: *LoadedImage, region: RegionSeed) LoadError!void {
+    if (image.region_count >= max_seed_regions) return LoadError.OutOfMemory;
+    // Merge adjacent ELF segments that share the same page span.
+    if (region.kind == .elf and image.region_count > 0) {
+        const prev = &image.regions[image.region_count - 1];
+        if (prev.kind == .elf and prev.base + prev.len == region.base) {
+            prev.len += region.len;
+            prev.prot |= region.prot;
+            return;
+        }
+        if (prev.kind == .elf and region.base < prev.base + prev.len) {
+            const new_end = @max(prev.base + prev.len, region.base + region.len);
+            prev.len = new_end - prev.base;
+            prev.prot |= region.prot;
+            return;
+        }
+    }
+    image.regions[image.region_count] = region;
+    image.region_count += 1;
 }
 
 fn validateHeader(hdr: *const elf.Elf64_Ehdr, image_len: usize) LoadError!void {

@@ -62,6 +62,7 @@ pub fn execve(path: []const u8, argv: []const []const u8, envp: []const []const 
     previous.destroy();
     signal_mod.resetOnExec(proc);
     proc.brk = process.user_brk_base;
+    process.applyLoadedRegions(proc, &loaded) catch return ExecError.OutOfMemory;
 
     const self = thread.currentThread() orelse thread.exit();
     const kstack = (@intFromPtr(self.stack) + self.stack_size) & ~@as(u64, 15);

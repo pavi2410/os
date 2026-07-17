@@ -15,6 +15,7 @@ const signal_mod = @import("signal.zig");
 const proc_types = @import("types.zig");
 const memory = @import("../mm/memory.zig");
 const orphan = @import("orphan.zig");
+const vma = @import("../mm/vma.zig");
 
 pub const cwd_max_len = path_mod.default_cap;
 pub const Cwd = path_mod.Path(cwd_max_len);
@@ -86,8 +87,10 @@ pub const Process = struct {
     brk: u64,
     cwd: Cwd,
     signals: signal_mod.SignalState,
+    vmas: vma.VmaTable,
 
     pub fn destroy(self: *Process) void {
+        self.vmas.clear();
         self.address_space.destroy();
         self.state = .dead;
         heap.kfree(@ptrCast(self)) catch {};
@@ -236,6 +239,7 @@ pub fn createWithParent(parent_id: usize) ProcessError!*Process {
         .brk = user_brk_base,
         .cwd = cwd,
         .signals = signal_mod.SignalState.init(),
+        .vmas = vma.VmaTable.init(),
     };
     errdefer proc.address_space.destroy();
     table.next_id += 1;
@@ -264,6 +268,7 @@ pub fn forkChild(parent: *Process) ProcessError!*Process {
     };
 
     child.brk = parent.brk;
+    child.vmas.cloneFrom(&parent.vmas);
     child.fds = parent.fds;
     if (!fd_retain.retainAll(&child.fds)) {
         child.fds = FdTable.init();
@@ -345,13 +350,34 @@ pub fn loadElf(
     argv: []const []const u8,
     envp: []const []const u8,
 ) user_loader.LoadError!user_loader.LoadedImage {
-    return user_loader.load(proc.address_space.cr3, image, argv, envp);
+    const loaded = try user_loader.load(proc.address_space.cr3, image, argv, envp);
+    seedVmas(proc, &loaded) catch return user_loader.LoadError.OutOfMemory;
+    return loaded;
+}
+
+fn seedVmas(proc: *Process, loaded: *const user_loader.LoadedImage) vma.VmaError!void {
+    proc.vmas.clear();
+    for (loaded.regions[0..loaded.region_count]) |region| {
+        try proc.vmas.insert(.{
+            .base = region.base,
+            .len = region.len,
+            .prot = region.prot,
+            .flags = vma.MAP_PRIVATE,
+            .kind = region.kind,
+        });
+    }
 }
 
 /// Drop all user mappings and allocate a fresh address space (for `execve`).
 pub fn resetAddressSpace(proc: *Process) ProcessError!void {
+    proc.vmas.clear();
     proc.address_space.destroy();
     proc.address_space = try AddressSpace.create();
+}
+
+/// Apply loader region seeds after a successful image load into `proc`.
+pub fn applyLoadedRegions(proc: *Process, loaded: *const user_loader.LoadedImage) ProcessError!void {
+    seedVmas(proc, loaded) catch return ProcessError.OutOfMemory;
 }
 
 pub fn enterUser(proc: *Process, image: user_loader.LoadedImage, kernel_stack_top: u64) noreturn {
@@ -415,6 +441,7 @@ pub fn terminateCurrent(wait_status: u32) noreturn {
     }
 
     fd_cleanup.closeAll(&proc.fds);
+    proc.vmas.clear();
     proc.address_space.destroy();
     proc.state = .dead;
     unregister(proc);
