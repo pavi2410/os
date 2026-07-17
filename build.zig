@@ -450,6 +450,11 @@ pub fn build(b: *std.Build) void {
     orphan_test_mod.addImport("orphan", orphan_host_mod);
     const run_orphan_tests = helpers.runHostTest(b, orphan_test_mod);
 
+    const ready_queue_host_mod = helpers.hostModule(b, "kernel/proc/ready_queue.zig");
+    const ready_queue_test_mod = helpers.hostTestModule(b, "test/kernel/ready_queue_test.zig");
+    ready_queue_test_mod.addImport("ready_queue", ready_queue_host_mod);
+    const run_ready_queue_tests = helpers.runHostTest(b, ready_queue_test_mod);
+
     const acpi_access_test_mod = helpers.hostTestModule(b, "test/kernel/acpi_access_test.zig");
     acpi_access_test_mod.addImport("common/acpi_sig", host_common.acpi_sig);
     const run_acpi_access_tests = helpers.runHostTest(b, acpi_access_test_mod);
@@ -530,6 +535,7 @@ pub fn build(b: *std.Build) void {
         run_socket_table_tests,
         run_pipe_tests,
         run_orphan_tests,
+        run_ready_queue_tests,
         run_acpi_access_tests,
         run_icmp_tests,
         run_tcp_tests,

@@ -1,9 +1,9 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
 const hal = @import("../hal.zig");
-const heap = @import("../mm/heap.zig");
 const abi_signal = @import("abi_signal");
 const init_launch = @import("init_launch.zig");
 const process = @import("process.zig");
+const ready_queue = @import("ready_queue.zig");
 const signal = @import("signal.zig");
 const thread = @import("thread.zig");
 const proc_types = @import("types.zig");
@@ -18,42 +18,7 @@ pub const SchedulerError = error{
 /// Threads must call `yieldIfRequested()`; true IRQ-level preemption is deferred.
 const time_slice_ticks: u64 = 10;
 
-const ReadyQueue = struct {
-    const Node = struct {
-        thread: *thread.Thread,
-        next: ?*Node,
-    };
-
-    head: ?*Node = null,
-    tail: ?*Node = null,
-
-    fn push(self: *ReadyQueue, t: *thread.Thread) SchedulerError!void {
-        const node_mem = heap.kmalloc(@sizeOf(Node)) catch return SchedulerError.OutOfMemory;
-        const node: *Node = @ptrCast(@alignCast(node_mem));
-        node.* = .{
-            .thread = t,
-            .next = null,
-        };
-        t.state = .ready;
-
-        if (self.tail) |tail| {
-            tail.next = node;
-            self.tail = node;
-        } else {
-            self.head = node;
-            self.tail = node;
-        }
-    }
-
-    fn pop(self: *ReadyQueue) ?*thread.Thread {
-        const head = self.head orelse return null;
-        const t = head.thread;
-        self.head = head.next;
-        if (self.head == null) self.tail = null;
-        heap.kfree(@ptrCast(head)) catch {};
-        return t;
-    }
-};
+const ReadyQueue = ready_queue.ReadyQueue(thread.Thread);
 
 /// Runtime-owned cooperative scheduler service.
 pub const Scheduler = struct {
@@ -102,7 +67,8 @@ pub fn spawnWithProcess(
 ) SchedulerError!*thread.Thread {
     const t = thread.create(entry, name, thread.default_stack_size) catch return SchedulerError.OutOfMemory;
     t.process_id = proc;
-    try state.ready_queue.push(t);
+    t.state = .ready;
+    state.ready_queue.push(t);
     return t;
 }
 
@@ -134,10 +100,8 @@ pub fn yield() void {
     }
     const self = thread.currentThread() orelse return;
     if (self.state != .dead and self != state.idle_thread) {
-        state.ready_queue.push(self) catch {
-            hal.console.println("ready queue push failed", .{});
-            cpu.haltForever();
-        };
+        self.state = .ready;
+        state.ready_queue.push(self);
     }
     schedule();
 }

@@ -42,6 +42,8 @@ pub const Thread = struct {
     stack_size: usize,
     context: SavedContext,
     state: State,
+    /// Intrusive ready-queue link (owned by the scheduler when enqueued).
+    ready_next: ?*Thread = null,
     /// User process bound to this kernel thread (null for idle/bootstrap).
     process_id: ?proc_types.Id = null,
     /// Captured syscall state used only by a newly forked child.
