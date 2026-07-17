@@ -63,7 +63,7 @@ Automated coverage is cheaper than manual QEMU bisection.
 
 - [~] Boot-time self-checks — replaced ad-hoc VFS/UDP log lines with structured TAP in `tap_suite` (see in-guest section)
 - [ ] Syscall round-trip thread at ring 3 (extend [`kernel/syscall/test.zig`](../../kernel/syscall/test.zig) pattern; ring-0 bootstrap caller is unsafe)
-- [ ] Smoke `getcpuinfo` / `getblockdevices` from a kernel-launched user thread
+- [ ] Smoke `cat /proc/cpuinfo` / `ls /sys/block` from a kernel-launched user thread
 
 ---
 

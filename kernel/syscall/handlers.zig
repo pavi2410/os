@@ -97,10 +97,6 @@ fn dispatchSyscall(frame: *Frame) i64 {
         numbers.bind => sysBind(frame.arg0, frame.arg1, frame.arg2),
         numbers.getnetconfig => sysGetnetconfig(frame.arg0),
         numbers.getneighbors => sysGetneighbors(frame.arg0, frame.arg1),
-        numbers.getcpuinfo => sysGetcpuinfo(frame.arg0),
-        numbers.getpcidevices => sysGetpcidevices(frame.arg0, frame.arg1),
-        numbers.getblockdevices => sysGetblockdevices(frame.arg0, frame.arg1),
-        numbers.getmemregions => sysGetmemregions(frame.arg0, frame.arg1),
         numbers.exit, numbers.exit_group => sysExit(frame.arg0),
         else => errno.ENOSYS,
     };
@@ -500,26 +496,6 @@ fn sysGetneighbors(buf_ptr: u64, max: u64) i64 {
     const out = user.slice(net_info.NeighEntry, buf_ptr, cap) orelse return errno.EFAULT;
     const count = net_info.fillNeighbors(out);
     return @intCast(count);
-}
-
-/// Retired: use `/proc/cpuinfo`. Number 1026 remains reserved.
-fn sysGetcpuinfo(_: u64) i64 {
-    return errno.ENOSYS;
-}
-
-/// Retired: use `/sys/bus/pci/devices/...`. Number 1027 remains reserved.
-fn sysGetpcidevices(_: u64, _: u64) i64 {
-    return errno.ENOSYS;
-}
-
-/// Retired: use `/sys/block/...`. Number 1028 remains reserved.
-fn sysGetblockdevices(_: u64, _: u64) i64 {
-    return errno.ENOSYS;
-}
-
-/// Retired: use `/proc/iomem`. Number 1029 remains reserved.
-fn sysGetmemregions(_: u64, _: u64) i64 {
-    return errno.ENOSYS;
 }
 
 fn sysPipe(fd_ptr: u64) i64 {

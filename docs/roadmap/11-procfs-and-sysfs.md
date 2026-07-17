@@ -54,8 +54,7 @@ Problems with the syscall approach (already observed in development):
 ### Userspace migration
 
 - [x] Rewrite `lscpu`, `lspci`, `lsblk`, `lsmem` as thin `open`/`read` parsers
-- [x] Deprecate hw snapshot syscalls; document removal in [`syscall-abi.md`](../syscall-abi.md)
-- [x] Keep ABI numbers reserved; return `ENOSYS`
+- [x] Remove hw snapshot syscalls; document in [`syscall-abi.md`](../syscall-abi.md)
 
 ### Network (optional in this phase)
 

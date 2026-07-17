@@ -1,10 +1,7 @@
-//! Hardware snapshot layouts shared by kernel syscall handlers and userspace ulib.
+//! Kernel-private hardware info layouts used by procfs formatters.
 //!
-//! Use `extern struct` so field order and padding match the C ABI on x86_64.
-//! Fixed-size `[N]u8` name buffers are placed before integers so later scalar
-//! writes cannot clobber string data during incremental fills.
-//!
-//! Validate with `zig build test` (`test/common/abi_test.zig`).
+//! These are not a userspace syscall ABI. Field layout is still asserted for
+//! stable formatter tests (`test/common/abi_test.zig`, `test/kernel/hw_format_test.zig`).
 
 const std = @import("std");
 
@@ -17,25 +14,6 @@ pub const CpuInfo = extern struct {
     model: u8,
     stepping: u8,
     apic_id: u8,
-};
-
-pub const PciDeviceInfo = extern struct {
-    vendor_id: u16,
-    device_id: u16,
-    segment: u16,
-    bus: u8,
-    device: u8,
-    function: u8,
-    class_code: u8,
-    subclass: u8,
-    prog_if: u8,
-    _pad: u8,
-};
-
-pub const BlockDeviceInfo = extern struct {
-    name: [16]u8,
-    sector_size: u32,
-    capacity_sectors: u64,
 };
 
 pub const MEM_CONVENTIONAL: u32 = 0;
@@ -63,23 +41,6 @@ comptime {
             .{ .field = "ioapic_count", .offset = 84 },
             .{ .field = "family", .offset = 88 },
             .{ .field = "apic_id", .offset = 91 },
-        },
-    });
-
-    assertLayout(BlockDeviceInfo, .{
-        .size = 32,
-        .fields = &.{
-            .{ .field = "name", .offset = 0 },
-            .{ .field = "sector_size", .offset = 16 },
-            .{ .field = "capacity_sectors", .offset = 24 },
-        },
-    });
-
-    assertLayout(PciDeviceInfo, .{
-        .size = 14,
-        .fields = &.{
-            .{ .field = "vendor_id", .offset = 0 },
-            .{ .field = "_pad", .offset = 12 },
         },
     });
 

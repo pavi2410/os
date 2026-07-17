@@ -44,7 +44,3 @@ pub const clock_gettime = abi.clock_gettime;
 pub const exit_group = abi.exit_group;
 pub const getnetconfig = abi.getnetconfig;
 pub const getneighbors = abi.getneighbors;
-pub const getcpuinfo = abi.getcpuinfo;
-pub const getpcidevices = abi.getpcidevices;
-pub const getblockdevices = abi.getblockdevices;
-pub const getmemregions = abi.getmemregions;
