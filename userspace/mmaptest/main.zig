@@ -11,12 +11,13 @@ export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) 
     _ = _argv;
 
     tap.Harness.version();
-    tap.Harness.plan(5);
+    tap.Harness.plan(6);
     testAnonMapWriteRead();
     testMunmapFaultKillsChild();
     testMprotectRoWriteFaults();
     testForkAnonPrivate();
     testFileMapRead();
+    testForkMmapCow();
     return tap.Harness.finish();
 }
 
@@ -114,6 +115,42 @@ fn testMprotectRoWriteFaults() void {
     _ = ulib.process.wait(pid, &status, 0);
     _ = ulib.syscall.munmap(addr, len);
     tap.Harness.check("mprotect ro write faults", status != 0);
+}
+
+fn testForkMmapCow() void {
+    const len: usize = 4096;
+    const ptr = ulib.syscall.mmap(
+        0,
+        len,
+        ulib.syscall.PROT_READ | ulib.syscall.PROT_WRITE,
+        ulib.syscall.MAP_PRIVATE | ulib.syscall.MAP_ANONYMOUS,
+        -1,
+        0,
+    );
+    if (ptr < 0) {
+        tap.Harness.notOk("fork mmap cow", "mmap failed");
+        return;
+    }
+    const addr: usize = @intCast(ptr);
+    const base: [*]u32 = @ptrFromInt(addr);
+    base[0] = 7;
+
+    const pid = ulib.process.fork();
+    if (pid < 0) {
+        tap.Harness.notOk("fork mmap cow", "fork failed");
+        _ = ulib.syscall.munmap(addr, len);
+        return;
+    }
+    if (pid == 0) {
+        base[0] = 8;
+        ulib.process.exit(0);
+    }
+
+    var status: u32 = 0;
+    _ = ulib.process.wait(pid, &status, 0);
+    const ok = base[0] == 7 and status == 0;
+    _ = ulib.syscall.munmap(addr, len);
+    tap.Harness.check("fork mmap cow", ok);
 }
 
 fn testFileMapRead() void {

@@ -139,6 +139,30 @@ fn unpinFileRange(proc: *process.Process, base: u64, len: u64) void {
     }
 }
 
+/// Pin cache pages for every present file-backed mapping (e.g. after COW fork share).
+pub fn retainFileCachePins(proc: *process.Process) void {
+    for (proc.vmas.slots) |region| {
+        if (region.kind != .file) continue;
+        var page = region.base;
+        const end = region.end();
+        while (page < end) : (page += paging.page_size) {
+            if (paging.getPhysIn(proc.address_space.cr3, page) == null) continue;
+            const page_index = (region.file.file_offset + (page - region.base)) / paging.page_size;
+            const open = openFileFromVma(region);
+            // getOrAlloc pins; page already populated in parent.
+            _ = file_cache.pinPage(&@import("../fs/fat32.zig").ops, open, page_index) catch {};
+        }
+    }
+}
+
+/// Drop cache pins for present file-backed pages before tearing down the address space.
+pub fn releaseFileCachePins(proc: *process.Process) void {
+    for (proc.vmas.slots) |region| {
+        if (region.kind != .file) continue;
+        unpinFileRange(proc, region.base, region.len);
+    }
+}
+
 pub fn sysMunmap(proc: *process.Process, addr: u64, len: u64) i64 {
     if (len == 0) return errno.EINVAL;
     if (addr % paging.page_size != 0) return errno.EINVAL;

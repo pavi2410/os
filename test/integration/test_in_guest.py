@@ -149,6 +149,10 @@ class TestMmaptestTap:
         report = parse_tap(mmaptest_output)
         assert any(case.name == "file mmap read" and case.passed for case in report.cases)
 
+    def test_fork_mmap_cow(self, mmaptest_output: str) -> None:
+        report = parse_tap(mmaptest_output)
+        assert any(case.name == "fork mmap cow" and case.passed for case in report.cases)
+
     def test_mmaptest_plan(self, mmaptest_output: str) -> None:
         report = parse_tap(mmaptest_output)
         report.assert_all_passed("mmaptest TAP")

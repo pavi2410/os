@@ -6,7 +6,7 @@
 
 **Unlocks:** [Phase 8 — Process environment](08-process-environment.md), [Phase 13 — SMP](13-smp.md) (SMP-safe COW is required before multicore)
 
-**Status:** Paused on a safe eager-copy fallback. The COW primitives and tests exist, but production `fork` uses `cloneUserAddressSpace` until the address-space ownership refactor restores `shareUserAddressSpace` with full guest regression coverage.
+**Status:** Restored. Production `fork` uses `shareUserAddressSpace` again (Phase 9 VMA + refcount teardown).
 
 ---
 
@@ -27,7 +27,7 @@ COW is implemented in [`paging.shareUserAddressSpace`](../../kernel/arch/x86_64/
 ### Physical page sharing
 
 - [x] Reference count (or equivalent) on physical pages used by user mappings ([`page_ref.zig`](../../kernel/mm/page_ref.zig) / [`page_ref_table.zig`](../../kernel/mm/page_ref_table.zig))
-- [ ] Restore production `fork` to map child PTEs to parent's physical pages read-only (user + present) via `shareUserAddressSpace`
+- [x] Restore production `fork` to map child PTEs to parent's physical pages read-only (user + present) via `shareUserAddressSpace`
 - [x] Mark shared user pages in page tables (software `Pte.cow` bit)
 
 ### Page fault promotion

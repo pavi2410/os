@@ -3,6 +3,7 @@ const programs = @import("programs.zig");
 const signal_mod = @import("signal.zig");
 const thread = @import("thread.zig");
 const user_loader = @import("../mm/user_loader.zig");
+const mmap_mod = @import("../mm/mmap.zig");
 
 pub const ExecError = error{
     NotFound,
@@ -57,6 +58,8 @@ pub fn execve(path: []const u8, argv: []const []const u8, envp: []const []const 
     errdefer replacement.destroy();
     const loaded = user_loader.load(replacement.cr3, image_buf, argv_slice, envp_slice) catch return ExecError.InvalidElf;
 
+    mmap_mod.releaseFileCachePins(proc);
+    proc.vmas.clear();
     var previous = proc.address_space;
     proc.address_space = replacement;
     previous.destroy();

@@ -14,6 +14,7 @@ const proc_types = @import("types.zig");
 const memory = @import("../mm/memory.zig");
 const orphan = @import("orphan.zig");
 const vma = @import("../mm/vma.zig");
+const mmap_mod = @import("../mm/mmap.zig");
 
 pub const cwd_max_len = path_mod.default_cap;
 pub const Cwd = path_mod.Path(cwd_max_len);
@@ -96,6 +97,7 @@ pub const Process = struct {
     vmas: vma.VmaTable,
 
     pub fn destroy(self: *Process) void {
+        mmap_mod.releaseFileCachePins(self);
         self.vmas.clear();
         self.address_space.destroy();
         self.state = .dead;
@@ -269,12 +271,13 @@ pub fn forkChild(parent: *Process) ProcessError!*Process {
     const child = try createWithParent(parent.id);
     errdefer destroy(child);
 
-    paging.cloneUserAddressSpace(parent.address_space.cr3, child.address_space.cr3) catch {
+    paging.shareUserAddressSpace(parent.address_space.cr3, child.address_space.cr3) catch {
         return ProcessError.OutOfMemory;
     };
 
     child.brk = parent.brk;
     child.vmas.cloneFrom(&parent.vmas);
+    mmap_mod.retainFileCachePins(child);
     child.fds = parent.fds;
     if (!fd_retain.retainAll(&child.fds)) {
         child.fds = FdTable.init();
@@ -451,6 +454,7 @@ pub fn terminateCurrent(wait_status: u32) noreturn {
     }
 
     fd_cleanup.closeAll(&proc.fds);
+    mmap_mod.releaseFileCachePins(proc);
     proc.vmas.clear();
     proc.address_space.destroy();
     proc.state = .dead;
