@@ -257,6 +257,9 @@ class TestShellTmpfs:
     def test_mount_umount(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "mounttest", "mounttest: ok", case="mount umount remount")
 
+    def test_rename_symlink(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "linktest", "linktest: ok", case="rename and symlink")
+
     def test_tmp_gone_after_reboot(self, rebooted_shell: QemuShell) -> None:
         run_case(rebooted_shell, "cat /tmp/foo", "cat: open failed", case="tmp ephemeral")
 

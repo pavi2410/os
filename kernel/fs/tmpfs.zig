@@ -9,8 +9,9 @@ pub const max_data_bytes = 256 * 1024;
 const tmpfs_id_magic: u64 = 0x746D7066; // "tmpf"
 const attr_dir: u8 = 0x10;
 const attr_file: u8 = 0x20;
+const attr_lnk: u8 = 0x40;
 
-const NodeKind = enum { dir, file };
+const NodeKind = enum { dir, file, symlink };
 
 const Node = struct {
     in_use: bool = false,
@@ -44,6 +45,9 @@ pub const ops: filesystem.Ops = .{
     .unlink = fsUnlink,
     .mkdir = fsMkdir,
     .rmdir = fsRmdir,
+    .rename = fsRename,
+    .symlink = fsSymlink,
+    .readlink = fsReadlink,
 };
 
 pub fn isReady() bool {
@@ -151,11 +155,16 @@ fn walk(path: []const u8) filesystem.Error!WalkResult {
 
 fn toOpenFile(idx: u16) filesystem.OpenFile {
     const n = &nodes[idx];
+    const attr: u8 = switch (n.kind) {
+        .dir => attr_dir,
+        .file => attr_file,
+        .symlink => attr_lnk,
+    };
     return .{
         .id = .{ .a = n.ino, .b = tmpfs_id_magic },
         .start_cluster = idx,
-        .size = if (n.kind == .file) n.data_len else 0,
-        .attr = if (n.kind == .dir) attr_dir else attr_file,
+        .size = if (n.kind == .file or n.kind == .symlink) n.data_len else 0,
+        .attr = attr,
         .loc_cluster = idx,
         .loc_offset = 0,
     };
@@ -214,6 +223,7 @@ fn fsOpen(path: []const u8, flags: filesystem.OpenFlags) filesystem.Error!filesy
             if (!flags.read) return filesystem.Error.IsDirectory;
             return toOpenFile(idx);
         }
+        if (n.kind == .symlink) return filesystem.Error.NotFile;
         if (flags.truncate) {
             n.data_len = 0;
         }
@@ -261,8 +271,12 @@ fn fsStat(path: []const u8, out: *filesystem.Stat) filesystem.Error!void {
     const n = &nodes[idx];
     out.* = .{};
     out.st_ino = n.ino;
-    out.st_mode = if (n.kind == .dir) filesystem.S_IFDIR | n.mode else filesystem.S_IFREG | n.mode;
-    out.st_size = if (n.kind == .file) @intCast(n.data_len) else 0;
+    out.st_mode = switch (n.kind) {
+        .dir => filesystem.S_IFDIR | n.mode,
+        .file => filesystem.S_IFREG | n.mode,
+        .symlink => filesystem.S_IFLNK | n.mode,
+    };
+    out.st_size = if (n.kind == .file or n.kind == .symlink) @intCast(n.data_len) else 0;
     out.st_nlink = 1;
 }
 
@@ -292,7 +306,11 @@ fn fsGetdents64(file: filesystem.OpenFile, dir_skip: *usize, buf: []u8) filesyst
             dir_skip.* = index;
             return written;
         }
-        const dtype: u8 = if (child.kind == .dir) abi_fs.DT_DIR else abi_fs.DT_REG;
+        const dtype: u8 = switch (child.kind) {
+            .dir => abi_fs.DT_DIR,
+            .file => abi_fs.DT_REG,
+            .symlink => abi_fs.DT_LNK,
+        };
         abi_fs.writeDirent64(buf[written .. written + reclen], child.ino, @intCast(index + 1), dtype, name);
         written += reclen;
     }
@@ -303,7 +321,7 @@ fn fsGetdents64(file: filesystem.OpenFile, dir_skip: *usize, buf: []u8) filesyst
 fn fsUnlink(path: []const u8) filesystem.Error!?filesystem.FileId {
     const w = try walk(path);
     const idx = w.idx orelse return filesystem.Error.NotFound;
-    if (nodes[idx].kind != .file) return filesystem.Error.IsDirectory;
+    if (nodes[idx].kind == .dir) return filesystem.Error.IsDirectory;
     const id = toOpenFile(idx).id;
     freeNode(idx);
     return id;
@@ -325,6 +343,48 @@ fn fsRmdir(path: []const u8) filesystem.Error!?filesystem.FileId {
     const id = toOpenFile(idx).id;
     freeNode(idx);
     return id;
+}
+
+fn fsRename(old_path: []const u8, new_path: []const u8) filesystem.Error!void {
+    const old_w = try walk(old_path);
+    const idx = old_w.idx orelse return filesystem.Error.NotFound;
+    if (idx == 0) return filesystem.Error.ReadOnly;
+
+    const new_w = try walk(new_path);
+    if (new_w.idx) |existing| {
+        if (existing == idx) return;
+        return filesystem.Error.Exists;
+    }
+    if (std.mem.eql(u8, new_w.name, "/")) return filesystem.Error.Exists;
+    try setName(&nodes[idx], new_w.name);
+    nodes[idx].parent = new_w.parent;
+}
+
+fn fsSymlink(target: []const u8, linkpath: []const u8) filesystem.Error!void {
+    if (target.len == 0 or target.len > max_data_bytes) return filesystem.Error.NameTooLong;
+    const w = try walk(linkpath);
+    if (w.idx != null) return filesystem.Error.Exists;
+    if (std.mem.eql(u8, w.name, "/")) return filesystem.Error.Exists;
+
+    const idx = try allocNode();
+    errdefer freeNode(idx);
+    try setName(&nodes[idx], w.name);
+    nodes[idx].kind = .symlink;
+    nodes[idx].parent = w.parent;
+    nodes[idx].mode = 0o777;
+    try ensureCapacity(idx, @intCast(target.len));
+    @memcpy(data_pool[nodes[idx].data_off .. nodes[idx].data_off + target.len], target);
+    nodes[idx].data_len = @intCast(target.len);
+}
+
+fn fsReadlink(path: []const u8, buf: []u8) filesystem.Error!usize {
+    const w = try walk(path);
+    const idx = w.idx orelse return filesystem.Error.NotFound;
+    const n = &nodes[idx];
+    if (n.kind != .symlink) return filesystem.Error.NotFile;
+    const take = @min(buf.len, n.data_len);
+    if (take > 0) @memcpy(buf[0..take], data_pool[n.data_off .. n.data_off + take]);
+    return take;
 }
 
 /// Reset state (host tests / remount / umount).

@@ -80,8 +80,11 @@ fn dispatchSyscall(frame: *Frame) i64 {
         numbers.getcwd => sysGetcwd(frame.arg0, frame.arg1),
         numbers.chdir => sysChdir(frame.arg0),
         numbers.unlink => sysUnlink(frame.arg0),
+        numbers.rename => sysRename(frame.arg0, frame.arg1),
         numbers.mkdir => sysMkdir(frame.arg0, frame.arg1),
         numbers.rmdir => sysRmdir(frame.arg0),
+        numbers.symlink => sysSymlink(frame.arg0, frame.arg1),
+        numbers.readlink => sysReadlink(frame.arg0, frame.arg1, frame.arg2),
         numbers.mount => sysMount(frame.arg0, frame.arg1, frame.arg2, frame.arg3, frame.arg4),
         numbers.umount2 => sysUmount2(frame.arg0, frame.arg1),
         numbers.getdents64 => sysGetdents64(frame.arg0, frame.arg1, frame.arg2),
@@ -279,6 +282,40 @@ fn sysUnlink(path_ptr: u64) i64 {
     const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
     runtime.boot().vfs.unlink(path) catch |err| return errno.fromVfs(err);
     return 0;
+}
+
+fn sysRename(old_ptr: u64, new_ptr: u64) i64 {
+    const old_raw = user.cString(old_ptr, 256) orelse return errno.EFAULT;
+    const new_raw = user.cString(new_ptr, 256) orelse return errno.EFAULT;
+    var old_buf: [process.cwd_max_len]u8 = undefined;
+    var new_buf: [process.cwd_max_len]u8 = undefined;
+    const old_path = resolvePathArg(old_raw, &old_buf) orelse return errno.EFAULT;
+    const new_path = resolvePathArg(new_raw, &new_buf) orelse return errno.EFAULT;
+    runtime.boot().vfs.rename(old_path, new_path) catch |err| return errno.fromVfs(err);
+    return 0;
+}
+
+fn sysSymlink(target_ptr: u64, link_ptr: u64) i64 {
+    const target = user.cString(target_ptr, 256) orelse return errno.EFAULT;
+    const link_raw = user.cString(link_ptr, 256) orelse return errno.EFAULT;
+    var link_buf: [process.cwd_max_len]u8 = undefined;
+    const linkpath = resolvePathArg(link_raw, &link_buf) orelse return errno.EFAULT;
+    runtime.boot().vfs.symlink(target, linkpath) catch |err| return errno.fromVfs(err);
+    return 0;
+}
+
+fn sysReadlink(path_ptr: u64, buf_ptr: u64, bufsiz: u64) i64 {
+    if (buf_ptr == 0 or bufsiz == 0) return errno.EINVAL;
+    const path_raw = user.cString(path_ptr, 256) orelse return errno.EFAULT;
+    var path_buf: [process.cwd_max_len]u8 = undefined;
+    const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
+    const max_len: usize = 4096;
+    const len: usize = @intCast(@min(bufsiz, max_len));
+    var kbuf: [4096]u8 = undefined;
+    const n = runtime.boot().vfs.readlink(path, kbuf[0..len]) catch |err| return errno.fromVfs(err);
+    const out = user.bytes(buf_ptr, n) orelse return errno.EFAULT;
+    @memcpy(out[0..n], kbuf[0..n]);
+    return @intCast(n);
 }
 
 fn sysMkdir(path_ptr: u64, mode: u64) i64 {

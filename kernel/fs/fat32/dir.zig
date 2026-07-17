@@ -84,6 +84,43 @@ pub fn createDirectory(path_str: []const u8) FatError!void {
     try writeDirEntry(loc, &name83, entry);
 }
 
+/// Rename a file or directory within the FAT volume (same or different parent).
+pub fn renamePath(old_path: []const u8, new_path: []const u8) FatError!void {
+    if (!core.isMounted()) return FatError.NotReady;
+
+    var old_norm: [256]u8 = undefined;
+    var new_norm: [256]u8 = undefined;
+    const old_clean = try path.normalizePath(old_path, &old_norm);
+    const new_clean = try path.normalizePath(new_path, &new_norm);
+    if (old_clean.len == 0 or new_clean.len == 0) return FatError.IsDirectory;
+    if (std.mem.eql(u8, old_clean, new_clean)) return;
+
+    const old_parent = try lookupParentCluster(old_clean);
+    const old_name = path.parentName(old_clean);
+    const old = try findInDirectoryWithLoc(old_parent, old_name);
+
+    const new_parent = try lookupParentCluster(new_clean);
+    const new_name = path.parentName(new_clean);
+    if (findInDirectoryWithLoc(new_parent, new_name)) |_| return FatError.Exists else |_| {}
+
+    var name83: [11]u8 = undefined;
+    try toShortName(new_name, &name83);
+
+    if (old_parent == new_parent) {
+        try writeDirEntry(old.loc, &name83, old.entry);
+        return;
+    }
+
+    const new_loc = try findFreeDentSlot(new_parent);
+    try writeDirEntry(new_loc, &name83, old.entry);
+
+    try core.readCluster(old.loc.cluster, core.cluster_buf[0..core.clusterBytes()]);
+    const off: usize = @intCast(old.loc.offset);
+    if (off + 32 > core.clusterBytes()) return FatError.IoError;
+    core.cluster_buf[off] = 0xE5;
+    try core.writeCluster(old.loc.cluster, core.cluster_buf[0..core.clusterBytes()]);
+}
+
 /// Remove an empty directory: free its clusters and mark the directory entry deleted.
 pub fn removeDirectory(path_str: []const u8) FatError!DirLoc {
     if (!core.isMounted()) return FatError.NotReady;

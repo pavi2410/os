@@ -22,6 +22,7 @@ pub const Error = FatError || error{
     ReadOnly,
     Busy,
     NotSupported,
+    CrossDevice,
 };
 
 /// Maps a FAT32-layer error into the shared filesystem error set.
@@ -46,6 +47,7 @@ pub fn errnoCode(err: Error) i64 {
         error.ReadOnly => -13,
         error.Busy => -16,
         error.NotSupported => -95,
+        error.CrossDevice => -18,
     };
 }
 
@@ -71,6 +73,7 @@ comptime {
 pub const Stat = abi_fs.Stat;
 pub const S_IFREG = abi_fs.S_IFREG;
 pub const S_IFDIR = abi_fs.S_IFDIR;
+pub const S_IFLNK = abi_fs.S_IFLNK;
 
 pub const FileId = struct {
     a: u64 = 0,
@@ -106,4 +109,7 @@ pub const Ops = struct {
     unlink: *const fn (path: []const u8) Error!?FileId,
     mkdir: *const fn (path: []const u8) Error!void,
     rmdir: *const fn (path: []const u8) Error!?FileId,
+    rename: ?*const fn (old_path: []const u8, new_path: []const u8) Error!void = null,
+    symlink: ?*const fn (target: []const u8, linkpath: []const u8) Error!void = null,
+    readlink: ?*const fn (path: []const u8, buf: []u8) Error!usize = null,
 };

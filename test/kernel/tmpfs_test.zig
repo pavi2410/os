@@ -62,3 +62,16 @@ test "tmpfs stat reports mode and size" {
     try std.testing.expectEqual(@as(i64, 4), st.st_size);
     try std.testing.expect((st.st_mode & filesystem.S_IFREG) != 0);
 }
+
+test "tmpfs rename and symlink round-trip" {
+    try mountFresh();
+    _ = try tmpfs.ops.open("/a", .{ .read = true, .write = true, .create = true });
+    try tmpfs.ops.rename.?("/a", "/b");
+    try std.testing.expectError(filesystem.Error.NotFound, tmpfs.ops.open("/a", .{ .read = true }));
+    _ = try tmpfs.ops.open("/b", .{ .read = true });
+
+    try tmpfs.ops.symlink.?("/b", "/link");
+    var buf: [8]u8 = undefined;
+    const n = try tmpfs.ops.readlink.?("/link", &buf);
+    try std.testing.expectEqualStrings("/b", buf[0..n]);
+}

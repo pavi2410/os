@@ -202,6 +202,18 @@ pub fn unlink(path: [*:0]const u8) isize {
     return syscall6(abi_syscall.unlink, @intFromPtr(path), 0, 0, 0, 0, 0);
 }
 
+pub fn rename(old_path: [*:0]const u8, new_path: [*:0]const u8) isize {
+    return syscall6(abi_syscall.rename, @intFromPtr(old_path), @intFromPtr(new_path), 0, 0, 0, 0);
+}
+
+pub fn symlink(target: [*:0]const u8, linkpath: [*:0]const u8) isize {
+    return syscall6(abi_syscall.symlink, @intFromPtr(target), @intFromPtr(linkpath), 0, 0, 0, 0);
+}
+
+pub fn readlink(path: [*:0]const u8, buf: [*]u8, bufsiz: usize) isize {
+    return syscall6(abi_syscall.readlink, @intFromPtr(path), @intFromPtr(buf), bufsiz, 0, 0, 0);
+}
+
 pub fn mkdir(path: [*:0]const u8, mode: u32) isize {
     return syscall6(abi_syscall.mkdir, @intFromPtr(path), mode, 0, 0, 0, 0);
 }

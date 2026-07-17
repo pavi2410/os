@@ -255,6 +255,31 @@ pub const Vfs = struct {
         if (try resolved.ops.rmdir(resolved.rel_path)) |id| self.invalidateHandlesAt(id);
     }
 
+    pub fn rename(self: *Vfs, old_path: []const u8, new_path: []const u8) VfsError!void {
+        if (devfs.isDevPath(old_path) or devfs.isDevPath(new_path)) return VfsError.ReadOnly;
+        const old_r = try self.resolveFs(old_path);
+        const new_r = try self.resolveFs(new_path);
+        if (old_r.ops != new_r.ops or !std.mem.eql(u8, old_r.mount_path, new_r.mount_path)) {
+            return VfsError.CrossDevice;
+        }
+        const rename_fn = old_r.ops.rename orelse return VfsError.NotSupported;
+        try rename_fn(old_r.rel_path, new_r.rel_path);
+    }
+
+    pub fn symlink(self: *Vfs, target: []const u8, linkpath: []const u8) VfsError!void {
+        if (devfs.isDevPath(linkpath)) return VfsError.ReadOnly;
+        const resolved = try self.resolveFs(linkpath);
+        const symlink_fn = resolved.ops.symlink orelse return VfsError.NotSupported;
+        try symlink_fn(target, resolved.rel_path);
+    }
+
+    pub fn readlink(self: *Vfs, path: []const u8, buf: []u8) VfsError!usize {
+        if (devfs.isDevPath(path)) return VfsError.NotFile;
+        const resolved = try self.resolveFs(path);
+        const readlink_fn = resolved.ops.readlink orelse return VfsError.NotSupported;
+        return try readlink_fn(resolved.rel_path, buf);
+    }
+
     /// Mount or remount the singleton tmpfs at `path`.
     pub fn mountTmpfs(self: *Vfs, path: []const u8) VfsError!void {
         if (!mount.isAbsoluteMountPath(path)) return VfsError.NotFound;

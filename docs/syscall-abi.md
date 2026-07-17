@@ -56,9 +56,12 @@ Negative `RAX` values follow the Linux errno convention (e.g. `-38` = `ENOSYS`).
 | 62 | `kill` | Send signal to process (`pid` > 0) |
 | 79 | `getcwd` | Copy current working directory |
 | 80 | `chdir` | Change current working directory |
+| 82 | `rename` | Rename within one mount (FAT or tmpfs) |
 | 83 | `mkdir` | Create directory |
 | 84 | `rmdir` | Remove directory |
 | 87 | `unlink` | Remove file |
+| 88 | `symlink` | Create symlink (tmpfs only; FAT → `ENOTSUP`) |
+| 89 | `readlink` | Read symlink target (tmpfs only) |
 | 165 | `mount` | Mount filesystem (`fstype` = `tmpfs` only) |
 | 166 | `umount2` | Unmount a tmpfs mount point (not `/`) |
 | 217 | `getdents64` | Directory entries |

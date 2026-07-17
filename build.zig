@@ -127,6 +127,7 @@ pub fn build(b: *std.Build) void {
     const install_envtest = helpers.addUserProgram(b, user_deps, "envtest", "userspace/envtest/main.zig", user_install);
     const install_devtest = helpers.addUserProgram(b, user_deps, "devtest", "userspace/devtest/main.zig", user_install);
     const install_mounttest = helpers.addUserProgram(b, user_deps, "mounttest", "userspace/mounttest/main.zig", user_install);
+    const install_linktest = helpers.addUserProgram(b, user_deps, "linktest", "userspace/linktest/main.zig", user_install);
     const install_init = helpers.addUserProgram(b, user_deps, "init", "userspace/init/main.zig", user_install);
 
     const shell_status_user = helpers.exeModule(b, "userspace/shell/status.zig", user_target, user_optimize);
@@ -181,6 +182,7 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_envtest.step);
     b.getInstallStep().dependOn(&install_devtest.step);
     b.getInstallStep().dependOn(&install_mounttest.step);
+    b.getInstallStep().dependOn(&install_linktest.step);
     b.getInstallStep().dependOn(&install_init.step);
 
     const limine_kernel_mod = helpers.exeModule(b, "kernel/boot/limine.zig", kernel_target, optimize);

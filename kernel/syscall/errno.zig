@@ -24,6 +24,7 @@ pub const ENOSPC: i64 = -28;
 pub const ENOSYS: i64 = -38;
 pub const ENOTEMPTY: i64 = -39;
 pub const EBUSY: i64 = -16;
+pub const EXDEV: i64 = -18;
 pub const ENOTSUP: i64 = -95;
 pub const ENOTCONN: i64 = -107;
 pub const ETIMEDOUT: i64 = -110;

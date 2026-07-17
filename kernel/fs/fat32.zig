@@ -34,6 +34,7 @@ pub const ops: filesystem.Ops = .{
     .unlink = fsUnlink,
     .mkdir = fsMkdir,
     .rmdir = fsRmdir,
+    .rename = fsRename,
 };
 
 pub fn mount() FatError!void {
@@ -137,6 +138,10 @@ fn fsMkdir(path_str: []const u8) filesystem.Error!void {
 fn fsRmdir(path_str: []const u8) filesystem.Error!?filesystem.FileId {
     const loc = removeDirectory(path_str) catch |err| return filesystem.liftFat(err);
     return fileId(loc);
+}
+
+fn fsRename(old_path: []const u8, new_path: []const u8) filesystem.Error!void {
+    dir.renamePath(old_path, new_path) catch |err| return filesystem.liftFat(err);
 }
 
 fn toFsFile(opened: OpenResult) filesystem.OpenFile {

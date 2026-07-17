@@ -32,6 +32,7 @@ test "errnoCode maps filesystem errors to linux errno values" {
     try std.testing.expectEqual(@as(i64, -22), filesystem.errnoCode(filesystem.Error.NameTooLong));
     try std.testing.expectEqual(@as(i64, -16), filesystem.errnoCode(filesystem.Error.Busy));
     try std.testing.expectEqual(@as(i64, -95), filesystem.errnoCode(filesystem.Error.NotSupported));
+    try std.testing.expectEqual(@as(i64, -18), filesystem.errnoCode(filesystem.Error.CrossDevice));
 }
 
 test "open flags pack into a single byte" {

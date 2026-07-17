@@ -73,6 +73,18 @@ pub fn unlink(path: [*:0]const u8) Result {
     return @intCast(syscall.unlink(path));
 }
 
+pub fn rename(old_path: [*:0]const u8, new_path: [*:0]const u8) Result {
+    return @intCast(syscall.rename(old_path, new_path));
+}
+
+pub fn symlink(target: [*:0]const u8, linkpath: [*:0]const u8) Result {
+    return @intCast(syscall.symlink(target, linkpath));
+}
+
+pub fn readlink(path: [*:0]const u8, buf: [*]u8, bufsiz: usize) Result {
+    return @intCast(syscall.readlink(path, buf, bufsiz));
+}
+
 pub fn mkdir(path: [*:0]const u8, mode: u32) Result {
     return @intCast(syscall.mkdir(path, mode));
 }
