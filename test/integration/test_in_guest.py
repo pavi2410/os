@@ -59,6 +59,17 @@ def cowtest_output(repo_root: Path) -> str:
         shell.close()
 
 
+@pytest.fixture(scope="module")
+def mmaptest_output(repo_root: Path) -> str:
+    shell = QemuShell(repo_root)
+    shell.start()
+    try:
+        shell.wait_ready()
+        return shell.run("mmaptest")
+    finally:
+        shell.close()
+
+
 class TestKernelTap:
     def test_vfs_readme_read(self, kernel_boot_log: str) -> None:
         report = parse_tap(extract_between(kernel_boot_log, KERNEL_TAP_START, KERNEL_TAP_END))
@@ -115,3 +126,25 @@ class TestCowtestTap:
     def test_cowtest_plan(self, cowtest_output: str) -> None:
         report = parse_tap(cowtest_output)
         report.assert_all_passed("cowtest TAP")
+
+
+class TestMmaptestTap:
+    def test_anon_mmap_write_read(self, mmaptest_output: str) -> None:
+        report = parse_tap(mmaptest_output)
+        assert any(case.name == "anon mmap write read" and case.passed for case in report.cases)
+
+    def test_munmap_fault_kills_child(self, mmaptest_output: str) -> None:
+        report = parse_tap(mmaptest_output)
+        assert any(case.name == "munmap then fault kills child" and case.passed for case in report.cases)
+
+    def test_mprotect_ro_write_faults(self, mmaptest_output: str) -> None:
+        report = parse_tap(mmaptest_output)
+        assert any(case.name == "mprotect ro write faults" and case.passed for case in report.cases)
+
+    def test_fork_anon_private(self, mmaptest_output: str) -> None:
+        report = parse_tap(mmaptest_output)
+        assert any(case.name == "fork anon private" and case.passed for case in report.cases)
+
+    def test_mmaptest_plan(self, mmaptest_output: str) -> None:
+        report = parse_tap(mmaptest_output)
+        report.assert_all_passed("mmaptest TAP")

@@ -1,0 +1,152 @@
+const std_root = @import("std_root");
+pub const std_options_debug_io = std_root.std_options_debug_io;
+pub const std_options = std_root.std_options;
+pub const panic = @import("ulib").panic.handler;
+
+const ulib = @import("ulib");
+const tap = @import("mmaptest_tap");
+
+export fn main(_argc: usize, _argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8 {
+    _ = _argc;
+    _ = _argv;
+
+    tap.Harness.version();
+    tap.Harness.plan(4);
+    testAnonMapWriteRead();
+    testMunmapFaultKillsChild();
+    testMprotectRoWriteFaults();
+    testForkAnonPrivate();
+    return tap.Harness.finish();
+}
+
+fn testAnonMapWriteRead() void {
+    const len: usize = 4096;
+    const ptr = ulib.syscall.mmap(
+        0,
+        len,
+        ulib.syscall.PROT_READ | ulib.syscall.PROT_WRITE,
+        ulib.syscall.MAP_PRIVATE | ulib.syscall.MAP_ANONYMOUS,
+        -1,
+        0,
+    );
+    if (ptr < 0) {
+        tap.Harness.notOk("anon mmap write read", "mmap failed");
+        return;
+    }
+    const base: [*]u8 = @ptrFromInt(@as(usize, @intCast(ptr)));
+    base[0] = 0xAB;
+    base[4095] = 0xCD;
+    const ok = base[0] == 0xAB and base[4095] == 0xCD;
+    _ = ulib.syscall.munmap(@as(usize, @intCast(ptr)), len);
+    tap.Harness.check("anon mmap write read", ok);
+}
+
+fn testMunmapFaultKillsChild() void {
+    const len: usize = 4096;
+    const ptr = ulib.syscall.mmap(
+        0,
+        len,
+        ulib.syscall.PROT_READ | ulib.syscall.PROT_WRITE,
+        ulib.syscall.MAP_PRIVATE | ulib.syscall.MAP_ANONYMOUS,
+        -1,
+        0,
+    );
+    if (ptr < 0) {
+        tap.Harness.notOk("munmap then fault kills child", "mmap failed");
+        return;
+    }
+    const addr: usize = @intCast(ptr);
+    _ = ulib.syscall.munmap(addr, len);
+
+    const pid = ulib.process.fork();
+    if (pid < 0) {
+        tap.Harness.notOk("munmap then fault kills child", "fork failed");
+        return;
+    }
+    if (pid == 0) {
+        const p: *volatile u8 = @ptrFromInt(addr);
+        p.* = 1;
+        ulib.process.exit(0);
+    }
+
+    var status: u32 = 0;
+    _ = ulib.process.wait(pid, &status, 0);
+    tap.Harness.check("munmap then fault kills child", status != 0);
+}
+
+fn testMprotectRoWriteFaults() void {
+    const len: usize = 4096;
+    const ptr = ulib.syscall.mmap(
+        0,
+        len,
+        ulib.syscall.PROT_READ | ulib.syscall.PROT_WRITE,
+        ulib.syscall.MAP_PRIVATE | ulib.syscall.MAP_ANONYMOUS,
+        -1,
+        0,
+    );
+    if (ptr < 0) {
+        tap.Harness.notOk("mprotect ro write faults", "mmap failed");
+        return;
+    }
+    const addr: usize = @intCast(ptr);
+    const base: [*]u8 = @ptrFromInt(addr);
+    base[0] = 1;
+    if (ulib.syscall.mprotect(addr, len, ulib.syscall.PROT_READ) < 0) {
+        tap.Harness.notOk("mprotect ro write faults", "mprotect failed");
+        _ = ulib.syscall.munmap(addr, len);
+        return;
+    }
+
+    const pid = ulib.process.fork();
+    if (pid < 0) {
+        tap.Harness.notOk("mprotect ro write faults", "fork failed");
+        _ = ulib.syscall.munmap(addr, len);
+        return;
+    }
+    if (pid == 0) {
+        const p: *volatile u8 = @ptrFromInt(addr);
+        p.* = 2;
+        ulib.process.exit(0);
+    }
+
+    var status: u32 = 0;
+    _ = ulib.process.wait(pid, &status, 0);
+    _ = ulib.syscall.munmap(addr, len);
+    tap.Harness.check("mprotect ro write faults", status != 0);
+}
+
+fn testForkAnonPrivate() void {
+    const len: usize = 4096;
+    const ptr = ulib.syscall.mmap(
+        0,
+        len,
+        ulib.syscall.PROT_READ | ulib.syscall.PROT_WRITE,
+        ulib.syscall.MAP_PRIVATE | ulib.syscall.MAP_ANONYMOUS,
+        -1,
+        0,
+    );
+    if (ptr < 0) {
+        tap.Harness.notOk("fork anon private", "mmap failed");
+        return;
+    }
+    const addr: usize = @intCast(ptr);
+    const base: [*]u32 = @ptrFromInt(addr);
+    base[0] = 42;
+
+    const pid = ulib.process.fork();
+    if (pid < 0) {
+        tap.Harness.notOk("fork anon private", "fork failed");
+        _ = ulib.syscall.munmap(addr, len);
+        return;
+    }
+    if (pid == 0) {
+        base[0] = 99;
+        ulib.process.exit(0);
+    }
+
+    var status: u32 = 0;
+    _ = ulib.process.wait(pid, &status, 0);
+    const ok = base[0] == 42 and status == 0;
+    _ = ulib.syscall.munmap(addr, len);
+    tap.Harness.check("fork anon private", ok);
+}

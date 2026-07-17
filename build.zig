@@ -109,6 +109,21 @@ pub fn build(b: *std.Build) void {
     cowtest.root_module.addImport("cowtest_tap", cowtest_tap);
     const install_cowtest = b.addInstallArtifact(cowtest, user_install);
 
+    const mmaptest_tap = helpers.exeModule(b, "userspace/mmaptest/tap.zig", user_target, user_optimize);
+    mmaptest_tap.addImport("ulib", user_ulib);
+    mmaptest_tap.addImport("common/tap", common_tap_user);
+
+    const mmaptest = b.addExecutable(.{
+        .name = "mmaptest",
+        .root_module = helpers.exeModule(b, "userspace/mmaptest/main.zig", user_target, user_optimize),
+    });
+    mmaptest.setLinkerScript(b.path("userspace/linker.ld"));
+    mmaptest.root_module.link_libc = false;
+    mmaptest.root_module.addImport("ulib", user_ulib);
+    mmaptest.root_module.addImport("std_root", std_root);
+    mmaptest.root_module.addImport("mmaptest_tap", mmaptest_tap);
+    const install_mmaptest = b.addInstallArtifact(mmaptest, user_install);
+
     const install_envtest = helpers.addUserProgram(b, user_deps, "envtest", "userspace/envtest/main.zig", user_install);
     const install_devtest = helpers.addUserProgram(b, user_deps, "devtest", "userspace/devtest/main.zig", user_install);
     const install_init = helpers.addUserProgram(b, user_deps, "init", "userspace/init/main.zig", user_install);
@@ -161,6 +176,7 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_lsmem.step);
     b.getInstallStep().dependOn(&install_utest.step);
     b.getInstallStep().dependOn(&install_cowtest.step);
+    b.getInstallStep().dependOn(&install_mmaptest.step);
     b.getInstallStep().dependOn(&install_envtest.step);
     b.getInstallStep().dependOn(&install_devtest.step);
     b.getInstallStep().dependOn(&install_init.step);
