@@ -1,5 +1,6 @@
 const heap = @import("heap.zig");
 const page_ref = @import("page_ref.zig");
+const page_cache = @import("page_cache.zig");
 const physical = @import("physical.zig");
 const virtual = @import("virtual.zig");
 const paging = @import("../arch/x86_64/paging.zig");
@@ -14,6 +15,7 @@ pub const Memory = struct {
         virtual.init();
         try heap.init();
         try page_ref.init(physical.maxPfn());
+        page_cache.init();
         self.initialized = true;
     }
 };

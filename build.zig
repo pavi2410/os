@@ -252,6 +252,11 @@ pub fn build(b: *std.Build) void {
     vma_test_mod.addImport("vma", vma_host_mod);
     const run_vma_tests = helpers.runHostTest(b, vma_test_mod);
 
+    const page_cache_host_mod = helpers.hostModule(b, "kernel/mm/page_cache_core.zig");
+    const page_cache_test_mod = helpers.hostTestModule(b, "test/kernel/page_cache_test.zig");
+    page_cache_test_mod.addImport("page_cache", page_cache_host_mod);
+    const run_page_cache_tests = helpers.runHostTest(b, page_cache_test_mod);
+
     const physical_test_mod = helpers.hostTestModule(b, "test/kernel/physical_test.zig");
     physical_test_mod.addImport("physical_bitmap", physical_bitmap_host_mod);
     const run_physical_tests = helpers.runHostTest(b, physical_test_mod);
@@ -475,6 +480,7 @@ pub fn build(b: *std.Build) void {
         run_memory_map_tests,
         run_page_ref_tests,
         run_vma_tests,
+        run_page_cache_tests,
         run_physical_tests,
         run_device_registry_tests,
         run_virtio_queue_index_tests,
