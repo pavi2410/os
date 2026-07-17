@@ -210,6 +210,22 @@ pub fn rmdir(path: [*:0]const u8) isize {
     return syscall6(abi_syscall.rmdir, @intFromPtr(path), 0, 0, 0, 0, 0);
 }
 
+pub fn mount(
+    source: ?[*:0]const u8,
+    target: [*:0]const u8,
+    fstype: [*:0]const u8,
+    flags: u64,
+    data: ?[*:0]const u8,
+) isize {
+    const src: u64 = if (source) |s| @intFromPtr(s) else 0;
+    const dat: u64 = if (data) |d| @intFromPtr(d) else 0;
+    return syscall6(abi_syscall.mount, src, @intFromPtr(target), @intFromPtr(fstype), flags, dat, 0);
+}
+
+pub fn umount2(target: [*:0]const u8, flags: u32) isize {
+    return syscall6(abi_syscall.umount2, @intFromPtr(target), flags, 0, 0, 0, 0);
+}
+
 pub fn getcwd(buf: [*]u8, size: usize) isize {
     return syscall6(abi_syscall.getcwd, @intFromPtr(buf), size, 0, 0, 0, 0);
 }

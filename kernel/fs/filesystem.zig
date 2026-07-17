@@ -20,6 +20,8 @@ pub const Error = FatError || error{
     BadHandle,
     InvalidWhence,
     ReadOnly,
+    Busy,
+    NotSupported,
 };
 
 /// Maps a FAT32-layer error into the shared filesystem error set.
@@ -42,6 +44,8 @@ pub fn errnoCode(err: Error) i64 {
         error.NoSpace => -28,
         error.NotEmpty => -39,
         error.ReadOnly => -13,
+        error.Busy => -16,
+        error.NotSupported => -95,
     };
 }
 

@@ -2,6 +2,7 @@ const filesystem = @import("filesystem.zig");
 const std = @import("std");
 
 pub const max_mounts = 8;
+pub const max_path_len = 64;
 
 pub const MountError = error{
     TooManyMounts,
@@ -10,8 +11,13 @@ pub const MountError = error{
 };
 
 pub const MountEntry = struct {
-    path: []const u8 = "",
+    path_buf: [max_path_len]u8 = undefined,
+    path_len: u8 = 0,
     ops: ?*const filesystem.Ops = null,
+
+    pub fn path(self: *const MountEntry) []const u8 {
+        return self.path_buf[0..self.path_len];
+    }
 };
 
 pub const Resolved = struct {
@@ -24,17 +30,21 @@ pub const Resolved = struct {
 pub const Table = struct {
     entries: [max_mounts]MountEntry = @splat(.{}),
 
-    pub fn add(self: *Table, path: []const u8, ops: *const filesystem.Ops) MountError!void {
-        if (!isAbsoluteMountPath(path)) return MountError.InvalidPath;
+    pub fn add(self: *Table, mount_path: []const u8, ops: *const filesystem.Ops) MountError!void {
+        if (!isAbsoluteMountPath(mount_path)) return MountError.InvalidPath;
+        if (mount_path.len > max_path_len) return MountError.InvalidPath;
+
         for (&self.entries) |*e| {
-            if (e.ops != null and std.mem.eql(u8, e.path, path)) {
+            if (e.ops != null and std.mem.eql(u8, e.path(), mount_path)) {
                 e.ops = ops;
                 return;
             }
         }
         for (&self.entries) |*e| {
             if (e.ops == null) {
-                e.* = .{ .path = path, .ops = ops };
+                @memcpy(e.path_buf[0..mount_path.len], mount_path);
+                e.path_len = @intCast(mount_path.len);
+                e.ops = ops;
                 return;
             }
         }
@@ -47,11 +57,10 @@ pub const Table = struct {
         var best_i: ?usize = null;
         var best_len: usize = 0;
         for (self.entries, 0..) |e, i| {
-            const ops = e.ops orelse continue;
-            _ = ops;
-            if (!prefixMatches(e.path, path)) continue;
-            if (e.path.len > best_len) {
-                best_len = e.path.len;
+            if (e.ops == null) continue;
+            if (!prefixMatches(e.path(), path)) continue;
+            if (e.path_len > best_len) {
+                best_len = e.path_len;
                 best_i = i;
             }
         }
@@ -59,22 +68,36 @@ pub const Table = struct {
         const e = self.entries[i];
         return .{
             .ops = e.ops.?,
-            .rel_path = relativePath(e.path, path),
-            .mount_path = e.path,
+            .rel_path = relativePath(e.path(), path),
+            .mount_path = e.path(),
         };
     }
 
-    pub fn remove(self: *Table, path: []const u8) MountError!void {
-        if (!isAbsoluteMountPath(path)) return MountError.InvalidPath;
+    pub fn remove(self: *Table, mount_path: []const u8) MountError!void {
+        if (!isAbsoluteMountPath(mount_path)) return MountError.InvalidPath;
         // Never remove the filesystem root.
-        if (path.len == 1 and path[0] == '/') return MountError.InvalidPath;
+        if (mount_path.len == 1 and mount_path[0] == '/') return MountError.InvalidPath;
         for (&self.entries) |*e| {
-            if (e.ops != null and std.mem.eql(u8, e.path, path)) {
+            if (e.ops != null and std.mem.eql(u8, e.path(), mount_path)) {
                 e.* = .{};
                 return;
             }
         }
         return MountError.NotFound;
+    }
+
+    pub fn findExact(self: *const Table, mount_path: []const u8) ?*const MountEntry {
+        for (&self.entries) |*e| {
+            if (e.ops != null and std.mem.eql(u8, e.path(), mount_path)) return e;
+        }
+        return null;
+    }
+
+    pub fn findOps(self: *const Table, ops: *const filesystem.Ops) ?*const MountEntry {
+        for (&self.entries) |*e| {
+            if (e.ops == ops) return e;
+        }
+        return null;
     }
 
     /// Basename of a non-root mount path (`/tmp` → `tmp`), or null for `/`.

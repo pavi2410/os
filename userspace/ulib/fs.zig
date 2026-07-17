@@ -81,6 +81,20 @@ pub fn rmdir(path: [*:0]const u8) Result {
     return @intCast(syscall.rmdir(path));
 }
 
+pub fn mount(
+    source: ?[*:0]const u8,
+    target: [*:0]const u8,
+    fstype: [*:0]const u8,
+    flags: u64,
+    data: ?[*:0]const u8,
+) Result {
+    return @intCast(syscall.mount(source, target, fstype, flags, data));
+}
+
+pub fn umount(target: [*:0]const u8) Result {
+    return @intCast(syscall.umount2(target, 0));
+}
+
 pub fn getcwd(buf: [*]u8, size: usize) Result {
     return @intCast(syscall.getcwd(buf, size));
 }

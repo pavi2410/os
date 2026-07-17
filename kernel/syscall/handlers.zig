@@ -82,6 +82,8 @@ fn dispatchSyscall(frame: *Frame) i64 {
         numbers.unlink => sysUnlink(frame.arg0),
         numbers.mkdir => sysMkdir(frame.arg0, frame.arg1),
         numbers.rmdir => sysRmdir(frame.arg0),
+        numbers.mount => sysMount(frame.arg0, frame.arg1, frame.arg2, frame.arg3, frame.arg4),
+        numbers.umount2 => sysUmount2(frame.arg0, frame.arg1),
         numbers.getdents64 => sysGetdents64(frame.arg0, frame.arg1, frame.arg2),
         numbers.clock_gettime => sysClockGettime(frame.arg0, frame.arg1),
         numbers.socket => sysSocket(frame.arg0, frame.arg1, frame.arg2),
@@ -293,6 +295,29 @@ fn sysRmdir(path_ptr: u64) i64 {
     var path_buf: [process.cwd_max_len]u8 = undefined;
     const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
     runtime.boot().vfs.rmdir(path) catch |err| return errno.fromVfs(err);
+    return 0;
+}
+
+fn sysMount(source_ptr: u64, target_ptr: u64, fstype_ptr: u64, flags: u64, data_ptr: u64) i64 {
+    _ = source_ptr;
+    _ = flags;
+    _ = data_ptr;
+    const target_raw = user.cString(target_ptr, 256) orelse return errno.EFAULT;
+    const fstype = user.cString(fstype_ptr, 32) orelse return errno.EFAULT;
+    if (!std.mem.eql(u8, fstype, "tmpfs")) return errno.EINVAL;
+
+    var path_buf: [process.cwd_max_len]u8 = undefined;
+    const target = resolvePathArg(target_raw, &path_buf) orelse return errno.EFAULT;
+    runtime.boot().vfs.mountTmpfs(target) catch |err| return errno.fromVfs(err);
+    return 0;
+}
+
+fn sysUmount2(target_ptr: u64, flags: u64) i64 {
+    _ = flags;
+    const target_raw = user.cString(target_ptr, 256) orelse return errno.EFAULT;
+    var path_buf: [process.cwd_max_len]u8 = undefined;
+    const target = resolvePathArg(target_raw, &path_buf) orelse return errno.EFAULT;
+    runtime.boot().vfs.umount(target) catch |err| return errno.fromVfs(err);
     return 0;
 }
 

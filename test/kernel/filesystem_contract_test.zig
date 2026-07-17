@@ -30,6 +30,8 @@ test "errnoCode maps filesystem errors to linux errno values" {
     try std.testing.expectEqual(@as(i64, -5), filesystem.errnoCode(filesystem.Error.InvalidBpb));
     try std.testing.expectEqual(@as(i64, -13), filesystem.errnoCode(filesystem.Error.ReadOnly));
     try std.testing.expectEqual(@as(i64, -22), filesystem.errnoCode(filesystem.Error.NameTooLong));
+    try std.testing.expectEqual(@as(i64, -16), filesystem.errnoCode(filesystem.Error.Busy));
+    try std.testing.expectEqual(@as(i64, -95), filesystem.errnoCode(filesystem.Error.NotSupported));
 }
 
 test "open flags pack into a single byte" {

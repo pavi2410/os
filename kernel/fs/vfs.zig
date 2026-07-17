@@ -222,7 +222,7 @@ pub const Vfs = struct {
         count += 1;
         for (self.mounts.entries) |e| {
             if (e.ops == null) continue;
-            if (mount.Table.mountBasename(e.path)) |base| {
+            if (mount.Table.mountBasename(e.path())) |base| {
                 names[count] = base;
                 count += 1;
             }
@@ -253,6 +253,33 @@ pub const Vfs = struct {
         if (devfs.isDevPath(path)) return VfsError.ReadOnly;
         const resolved = try self.resolveFs(path);
         if (try resolved.ops.rmdir(resolved.rel_path)) |id| self.invalidateHandlesAt(id);
+    }
+
+    /// Mount or remount the singleton tmpfs at `path`.
+    pub fn mountTmpfs(self: *Vfs, path: []const u8) VfsError!void {
+        if (!mount.isAbsoluteMountPath(path)) return VfsError.NotFound;
+        if (path.len == 1 and path[0] == '/') return VfsError.Busy;
+
+        if (self.mounts.findOps(&tmpfs.ops)) |existing| {
+            if (!std.mem.eql(u8, existing.path(), path)) return VfsError.Busy;
+            try tmpfs.ops.mount();
+            return;
+        }
+        try tmpfs.ops.mount();
+        self.mounts.add(path, &tmpfs.ops) catch |err| switch (err) {
+            mount.MountError.TooManyMounts => return VfsError.NoSpace,
+            mount.MountError.InvalidPath => return VfsError.NotFound,
+            mount.MountError.NotFound => return VfsError.NotFound,
+        };
+    }
+
+    pub fn umount(self: *Vfs, path: []const u8) VfsError!void {
+        if (!mount.isAbsoluteMountPath(path)) return VfsError.NotFound;
+        if (path.len == 1 and path[0] == '/') return VfsError.Busy;
+        const entry = self.mounts.findExact(path) orelse return VfsError.NotFound;
+        if (entry.ops != &tmpfs.ops) return VfsError.Busy;
+        self.mounts.remove(path) catch return VfsError.NotFound;
+        tmpfs.unmount();
     }
 
     fn invalidateHandlesAt(self: *Vfs, id: filesystem.FileId) void {

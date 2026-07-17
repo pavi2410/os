@@ -327,10 +327,14 @@ fn fsRmdir(path: []const u8) filesystem.Error!?filesystem.FileId {
     return id;
 }
 
-/// Reset state (host tests / remount).
+/// Reset state (host tests / remount / umount).
 pub fn resetForTest() void {
     mounted = false;
     data_used = 0;
     next_ino = 1;
     @memset(std.mem.asBytes(&nodes), 0);
+}
+
+pub fn unmount() void {
+    resetForTest();
 }

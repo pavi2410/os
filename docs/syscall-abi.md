@@ -59,6 +59,8 @@ Negative `RAX` values follow the Linux errno convention (e.g. `-38` = `ENOSYS`).
 | 83 | `mkdir` | Create directory |
 | 84 | `rmdir` | Remove directory |
 | 87 | `unlink` | Remove file |
+| 165 | `mount` | Mount filesystem (`fstype` = `tmpfs` only) |
+| 166 | `umount2` | Unmount a tmpfs mount point (not `/`) |
 | 217 | `getdents64` | Directory entries |
 | 228 | `clock_gettime` | Realtime/monotonic clocks |
 | 231 | `exit_group` | Process exit |
