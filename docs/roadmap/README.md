@@ -1,6 +1,6 @@
 # Kernel roadmap
 
-Phased plan for kernel development after the Limine bootloader. Phases 0–5 and 7 are complete; phases 6 and 8–14 are the active forward plan in execution order.
+Phased plan for kernel development after the Limine bootloader. Phases 0–5, 7, and 9 are complete; phases 6, 8, and 10–14 are the active forward plan in execution order.
 
 | Phase | Document | Status | Summary |
 |-------|----------|--------|---------|
@@ -13,7 +13,7 @@ Phased plan for kernel development after the Limine bootloader. Phases 0–5 and
 | 6 | [06-testing-and-quality.md](06-testing-and-quality.md) | **Next** | Automated tests, ABI guards, CI gate |
 | 7 | [07-copy-on-write-fork.md](07-copy-on-write-fork.md) | Done | COW fork, shared pages, fault promotion |
 | 8 | [08-process-environment.md](08-process-environment.md) | Planned | Signals, IPC, cwd, env, PATH, init, devfs, TTY |
-| 9 | [09-virtual-memory-and-page-cache.md](09-virtual-memory-and-page-cache.md) | Planned | `mmap`, demand paging, page cache, W^X |
+| 9 | [09-virtual-memory-and-page-cache.md](09-virtual-memory-and-page-cache.md) | Done | `mmap`, demand paging, page cache, W^X |
 | 10 | [10-filesystems-ext2-tmpfs.md](10-filesystems-ext2-tmpfs.md) | Planned | ext2, `mount`, tmpfs, permissions, VFS ops |
 | 11 | [11-procfs-and-sysfs.md](11-procfs-and-sysfs.md) | Planned | `/proc`, `/sys`; retire hw snapshot syscalls |
 | 12 | [12-preemptive-scheduling.md](12-preemptive-scheduling.md) | Planned | Involuntary timer preemption (SMP gate) |

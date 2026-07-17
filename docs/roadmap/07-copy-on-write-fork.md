@@ -80,4 +80,4 @@ Uniprocessor COW first. When bringing up APs in [phase 13](13-smp.md):
 
 - See also [phase 4](04-userspace.md) — eager copy was temporary and has been replaced.
 - Do not implement COW without phase 6 tests; faults and refcounts are easy to get wrong.
-- Eager `cloneUserAddressSpace` is the current safety fallback. Remove it only after COW passes the shell, in-guest, and repeated-fork regression suites.
+- Eager `cloneUserAddressSpace` remains available as a non-production helper; production `fork` uses `shareUserAddressSpace`.

@@ -78,11 +78,13 @@ Linux numbers are used. Full flag matrix is not required.
 | `MAP_PRIVATE \| MAP_ANONYMOUS` | Yes (anonymous mappings) |
 | `MAP_FIXED` | Exact free hole only |
 | `MAP_SHARED` file | Not yet (writable shared deferred) |
-| File-backed `MAP_PRIVATE` | Read-only first |
+| File-backed `MAP_PRIVATE` | Read-only (`PROT_READ` / `PROT_EXEC`) |
 | `PROT_READ` / `PROT_WRITE` / `PROT_EXEC` | Yes; **W^X** — `PROT_WRITE\|PROT_EXEC` rejected |
 | `PROT_NONE` | Reserved / unreadable |
 
-Anonymous mappings are demand-zero (no physical page until first touch).
+Anonymous mappings and lazy `brk` are demand-zero (no physical page until first touch).
+
+File-backed `MAP_PRIVATE` pages and `read`/`write` on the same file share page-cache frames. Writable private file maps and `MAP_SHARED` are not supported yet.
 
 ## Segments
 
