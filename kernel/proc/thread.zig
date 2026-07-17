@@ -2,6 +2,7 @@ const cpu = @import("../arch/x86_64/cpu.zig");
 const gdt = @import("../arch/x86_64/gdt.zig");
 const heap = @import("../mm/heap.zig");
 const hal = @import("../hal.zig");
+const preempt = @import("preempt.zig");
 const user_mode = @import("../arch/x86_64/user.zig");
 const arch_context = @import("../arch/x86_64/context.zig");
 const proc_types = @import("types.zig");
@@ -44,6 +45,8 @@ pub const Thread = struct {
     state: State,
     /// Intrusive ready-queue link (owned by the scheduler when enqueued).
     ready_next: ?*Thread = null,
+    /// Nesting depth for `preempt.disable` while this thread is current.
+    preempt_count: usize = 0,
     /// User process bound to this kernel thread (null for idle/bootstrap).
     process_id: ?proc_types.Id = null,
     /// Captured syscall state used only by a newly forked child.
@@ -58,6 +61,9 @@ pub const Thread = struct {
         runtime.current = other;
         other.activateKernelStack();
         runtime.activate_cr3(other.process_id);
+        // Switch the active preempt counter before parking this thread so the
+        // next thread does not inherit a disable held across the switch.
+        preempt.setCurrentCount(&other.preempt_count);
         arch_context.switchContext(@ptrCast(&self.context), @ptrCast(&other.context));
         if (self.state != .dead) {
             runtime.activate_cr3(self.process_id);
@@ -65,6 +71,7 @@ pub const Thread = struct {
             runtime.activate_cr3(null);
         }
         runtime.current = self;
+        preempt.setCurrentCount(&self.preempt_count);
         self.state = prev_state;
         self.activateKernelStack();
     }
@@ -117,6 +124,11 @@ pub fn currentThread() ?*Thread {
 
 pub fn setCurrent(t: ?*Thread) void {
     runtime.current = t;
+    if (t) |thread| {
+        preempt.setCurrentCount(&thread.preempt_count);
+    } else {
+        preempt.clearCurrent();
+    }
 }
 
 pub fn setProcess(proc: ?proc_types.Id) void {

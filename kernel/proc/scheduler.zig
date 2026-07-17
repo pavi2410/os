@@ -15,9 +15,9 @@ pub const SchedulerError = error{
     OutOfMemory,
 };
 
-/// Timer ticks between preemption requests.
-/// Threads must call `yieldIfRequested()`; true IRQ-level preemption is deferred.
-const time_slice_ticks: u64 = 10;
+/// Timer ticks between preemption requests (~100 ms at 100 Hz LAPIC).
+/// Fixed round-robin slice; not CFS. Tunable at compile time.
+pub const time_slice_ticks: u64 = 10;
 
 const ReadyQueue = ready_queue.ReadyQueue(thread.Thread);
 
@@ -114,6 +114,21 @@ pub fn yieldIfRequested() void {
     }
 }
 
+/// Involuntary preemption from the timer IRQ (after EOI).
+/// Leaves the full IRQ frame on the preempted thread's kernel stack; resume
+/// returns into `irq_stub` → `iretq`. No TTY/signal side effects.
+pub fn scheduleFromIrq() void {
+    if (!canPreempt()) return;
+    if (!state.preempt_requested.swap(false, .monotonic)) return;
+
+    const self = thread.currentThread() orelse return;
+    if (self.state != .dead and self != state.idle_thread) {
+        self.state = .ready;
+        state.ready_queue.push(self);
+    }
+    scheduleSwitch();
+}
+
 pub fn cooperativePoll() void {
     cpu.sti();
     if (process.currentProcess()) |proc| signal.tryApply(proc);
@@ -151,11 +166,16 @@ pub fn start() noreturn {
 }
 
 fn schedule() void {
+    scheduleSwitch();
+    if (process.currentProcess()) |proc| signal.tryApply(proc);
+}
+
+/// Context switch only — used by IRQ path (no signal delivery).
+fn scheduleSwitch() void {
     const self = thread.currentThread() orelse return;
     const next = state.ready_queue.pop() orelse state.idle_thread;
     if (next == self) return;
     self.switchTo(next);
-    if (process.currentProcess()) |proc| signal.tryApply(proc);
 }
 
 fn exitCurrent() noreturn {

@@ -114,6 +114,7 @@ pub fn timerIrqHandler(vector: u8) void {
     _ = timer_ticks.fetchAdd(1, .monotonic);
     apic.lapicEoi();
     scheduler.onTimerTick();
+    scheduler.scheduleFromIrq();
 }
 
 fn readCr2() u64 {
