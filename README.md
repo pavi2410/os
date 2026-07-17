@@ -22,7 +22,7 @@ The kernel boots under QEMU, starts userspace `/BIN/INIT` as PID 1 (which spawns
 
 **Next up** (see [docs/roadmap/](docs/roadmap/))
 
-Phase 6 — testing and quality; then process environment (IPC/cwd/init/devfs), virtual memory, ext2/tmpfs, procfs, preemption, SMP, and GUI.
+Phase 6 — testing and quality; then process environment (IPC/cwd/init/devfs), virtual memory, mount/tmpfs, procfs, preemption, SMP, and GUI.
 
 ## 🚀 Goals
 
@@ -31,7 +31,7 @@ Phase 6 — testing and quality; then process environment (IPC/cwd/init/devfs), 
 * Modern 64-bit higher-half kernel
 * Linux-compatible syscall interface
 * Multicore threading (SMP)
-* FAT32 filesystem (ext2 possible later)
+* FAT32 filesystem (sole on-disk FS; tmpfs for `/tmp`)
 * BSD-style sockets and TCP/IP networking
 * Simple terminal with ANSI parsing
 * GUI with basic window manager (future)
@@ -165,8 +165,8 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 | 6 — Testing | **Next** | ABI tests, shell integration tests, CI gate |
 | 7 — COW fork | Done | Shared mappings, write fault promotion |
 | 8 — Process env | Planned | Signals, pipes, cwd, env, PATH, init, devfs, TTY |
-| 9 — Virtual memory | Planned | `mmap`, page cache, demand paging, W^X |
-| 10 — Filesystems | Planned | ext2, `mount`, tmpfs, permissions, rename/symlink |
+| 9 — Virtual memory | Done | `mmap`, page cache, demand paging, W^X |
+| 10 — Mount / tmpfs | Planned | mount table, tmpfs, rename/symlink |
 | 11 — procfs/sysfs | Planned | `/proc`, `/sys`; retire hw snapshot syscalls |
 | 12 — Preemption | Planned | Involuntary timer preemption (SMP gate) |
 | 13 — SMP | Planned | Multicore bring-up, ACPI, SMP-safe kernel |
@@ -185,7 +185,7 @@ Full details and recommended order: [docs/roadmap/README.md](docs/roadmap/README
 **Deferred**
 
 * [ ] TCP/IP hardening under load (minimal TCP is enough for now)
-* [ ] ext4, btrfs, ZFS (ext2 is the next on-disk FS — phase 10)
+* [ ] ext2/ext4, btrfs, ZFS (not planned; FAT is the sole on-disk FS)
 * [ ] `poll`, `listen`/`accept`, pthreads, dynamic linking — see roadmap deferred backlog
 
 **Phase 6 — next**

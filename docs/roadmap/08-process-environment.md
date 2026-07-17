@@ -19,7 +19,7 @@ Interaction today is entirely over **serial**: shell, `curl` output, kernel pani
 - ~~**Init is the shell**~~ — `/BIN/INIT` is PID 1; shell runs as its child (done)
 - ~~No **`/dev`** nodes~~ — kernel devfs exposes `/dev/null`, `/dev/zero`, `/dev/ttyS0` (done)
 
-Polish this layer before `mmap`, ext2, and SMP.
+Polish this layer before `mmap`, mount/tmpfs, and SMP.
 
 ---
 

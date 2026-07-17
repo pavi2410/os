@@ -79,4 +79,4 @@ All criteria met.
 - Prefer one device type per category for QEMU (`virtio-blk-pci`, `virtio-net-pci`).
 - Minimal TCP is sufficient for now; hardening is explicitly deferred.
 - Hardware snapshot syscalls are a stepping stone; migrate to `/proc` and `/sys` in [phase 11](11-procfs-and-sysfs.md).
-- Do **not** add ext4, ZFS, or btrfs here — see [phase 10](10-filesystems-ext2-tmpfs.md) for the next filesystem work.
+- Do **not** add ext2/ext4, ZFS, or btrfs here — see [phase 10](10-mount-and-tmpfs.md) for mount + tmpfs (FAT remains the only on-disk FS).

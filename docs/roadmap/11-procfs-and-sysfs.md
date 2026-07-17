@@ -2,7 +2,7 @@
 
 **Goal:** Expose kernel and hardware state as files under `/proc` and `/sys`, replacing bespoke snapshot syscalls with path-based introspection.
 
-**Depends on:** [Phase 10 — Filesystems](10-filesystems-ext2-tmpfs.md) (mount + pseudo-fs pattern)
+**Depends on:** [Phase 10 — Mount and tmpfs](10-mount-and-tmpfs.md) (mount + pseudo-fs pattern)
 
 **Unlocks:** [Phase 13 — SMP](13-smp.md) (cleaner introspection before scaling to multicore)
 

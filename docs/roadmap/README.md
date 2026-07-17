@@ -14,7 +14,7 @@ Phased plan for kernel development after the Limine bootloader. Phases 0–5, 7,
 | 7 | [07-copy-on-write-fork.md](07-copy-on-write-fork.md) | Done | COW fork, shared pages, fault promotion |
 | 8 | [08-process-environment.md](08-process-environment.md) | Planned | Signals, IPC, cwd, env, PATH, init, devfs, TTY |
 | 9 | [09-virtual-memory-and-page-cache.md](09-virtual-memory-and-page-cache.md) | Done | `mmap`, demand paging, page cache, W^X |
-| 10 | [10-filesystems-ext2-tmpfs.md](10-filesystems-ext2-tmpfs.md) | Planned | ext2, `mount`, tmpfs, permissions, VFS ops |
+| 10 | [10-mount-and-tmpfs.md](10-mount-and-tmpfs.md) | Planned | mount table, tmpfs, rename/symlink, VFS ops |
 | 11 | [11-procfs-and-sysfs.md](11-procfs-and-sysfs.md) | Planned | `/proc`, `/sys`; retire hw snapshot syscalls |
 | 12 | [12-preemptive-scheduling.md](12-preemptive-scheduling.md) | Planned | Involuntary timer preemption (SMP gate) |
 | 13 | [13-smp.md](13-smp.md) | Planned | Multicore bring-up, ACPI, SMP-safe kernel |
@@ -35,8 +35,8 @@ Work that is valid but intentionally postponed:
 | TCP/IP hardening | Minimal TCP works (`curl`, `ping`); stress/concurrency polish deferred |
 | `listen` / `accept` | TCP server sockets — see [phase 5 backlog](05-io-stack.md#deferred-phase-5-backlog) |
 | Linux ABI tier 2 | `poll`/`select`/`epoll`, `clone`/futex/pthreads, dynamic linking (`ld.so`) |
-| ext4 / btrfs / ZFS | ext2 is the next real FS; modern FSes are multi-year efforts |
-| Security hardening | ASLR/KASLR, capabilities, seccomp — after basic permissions (phase 10) |
+| ext2 / ext4 / btrfs / ZFS | Not planned; FAT is the sole on-disk FS (see [phase 10](10-mount-and-tmpfs.md)) |
+| Security hardening | ASLR/KASLR, capabilities, seccomp — after light tmpfs modes (phase 10) |
 | Swap / OOM | Optional until memory pressure under real workloads |
 | DHCP / `getaddrinfo` | Static IP + `dig` sufficient for now |
 | Real hardware bring-up | After QEMU path is solid (ACPI, drivers, SMP) |

@@ -4,7 +4,7 @@
 
 **Depends on:** [Phase 8 — Process environment](08-process-environment.md), [Phase 7 — Copy-on-write fork](07-copy-on-write-fork.md) (COW applies to shared/file-backed pages)
 
-**Unlocks:** [Phase 10 — Filesystems](10-filesystems-ext2-tmpfs.md) (ext2 benefits from page cache), dynamic linking (long-term)
+**Unlocks:** [Phase 10 — Mount and tmpfs](10-mount-and-tmpfs.md) (multi-mount page cache), dynamic linking (long-term)
 
 **Status:** Done
 
@@ -19,7 +19,7 @@ Heap growth was **`brk` only**. Phase 4 noted `mmap` as a long-term goal; it is 
 - Shared mappings and future dynamic linking
 - **W^X** — separate writable and executable user pages
 
-A **page cache** decouples VFS read/write from direct block I/O and is prerequisite for efficient ext2 and procfs.
+A **page cache** decouples VFS read/write from direct block I/O and is prerequisite for efficient multi-mount I/O and procfs.
 
 ---
 
@@ -77,6 +77,6 @@ A **page cache** decouples VFS read/write from direct block I/O and is prerequis
 ## Notes
 
 - Full Linux `mmap` flag matrix is not required — supported subset is in [`syscall-abi.md`](../syscall-abi.md).
-- File-backed `MAP_SHARED` writable mappings wait until ext2 write path is solid ([phase 10](10-filesystems-ext2-tmpfs.md)).
+- File-backed `MAP_SHARED` writable mappings wait until multi-mount writeback is solid ([phase 10](10-mount-and-tmpfs.md)).
 - Dynamic linking (`ld.so`) stays deferred.
 - Mapped file pages and `read`/`write` share the same page-cache frames; private writable file maps remain out of scope.
