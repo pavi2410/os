@@ -167,7 +167,7 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 | 8 — Process env | Planned | Signals, pipes, cwd, env, PATH, init, devfs, TTY |
 | 9 — Virtual memory | Done | `mmap`, page cache, demand paging, W^X |
 | 10 — Mount / tmpfs | Done | mount table, tmpfs, rename/symlink |
-| 11 — procfs/sysfs | Planned | `/proc`, `/sys`; retire hw snapshot syscalls |
+| 11 — procfs/sysfs | Done | `/proc`, `/sys`; hw snapshot syscalls → `ENOSYS` |
 | 12 — Preemption | Planned | Involuntary timer preemption (SMP gate) |
 | 13 — SMP | Planned | Multicore bring-up, ACPI, SMP-safe kernel |
 | 14 — GUI | Planned | Framebuffer, input, minimal window manager |
@@ -180,7 +180,7 @@ Full details and recommended order: [docs/roadmap/README.md](docs/roadmap/README
 * [x] User programs on FAT disk (`/BIN/*`), shell file builtins, `cd`/`pwd`
 * [x] VirtIO-net, ARP/IPv4/UDP/ICMP, minimal TCP client
 * [x] Socket syscalls; `ip`, `ping`, `dig`, `curl`
-* [x] Hardware tools: `lscpu`, `lspci`, `lsblk`, `lsmem` (interim syscalls → procfs in phase 11)
+* [x] Hardware tools: `lscpu`, `lspci`, `lsblk`, `lsmem` (via `/proc` and `/sys`)
 
 **Deferred**
 

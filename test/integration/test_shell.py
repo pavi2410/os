@@ -247,6 +247,25 @@ class TestShellDevfs:
         run_case(shell_session, "devtest", "devtest: ok", case="devnull and devzero")
 
 
+class TestShellProcfs:
+    def test_root_lists_proc_sys(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "ls /", "proc", case="ls shows proc mount")
+        run_case(shell_session, "ls /", "sys", case="ls shows sys mount")
+
+    def test_proc_cpuinfo(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "ls /proc", "cpuinfo", case="ls /proc")
+        out = run_case(shell_session, "cat /proc/cpuinfo", "vendor_id", case="cat cpuinfo")
+        assert_contains(out, "cpu family", "cpuinfo family")
+        assert_contains(out, "model name", "cpuinfo model name")
+        assert_contains(out, "cpu cores", "cpuinfo cores")
+
+    def test_proc_iomem(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "cat /proc/iomem", " : ", case="cat iomem")
+
+    def test_sys_block(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "ls /sys/block", case="ls /sys/block")
+
+
 class TestShellTmpfs:
     def test_tmp_round_trip(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "ls /", "tmp", case="ls shows tmp mount")
@@ -267,7 +286,18 @@ class TestShellTmpfs:
 @pytest.mark.network
 class TestShellPrograms:
     def test_lscpu(self, shell_session: QemuShell) -> None:
-        run_case(shell_session, "lscpu", "Architecture:", case="fork/exec lscpu")
+        out = run_case(shell_session, "lscpu", "Architecture:", case="fork/exec lscpu")
+        assert_contains(out, "Vendor ID:", "lscpu vendor")
+        assert_contains(out, "CPU(s):", "lscpu cpu count")
+
+    def test_lsmem(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "lsmem", "START", case="lsmem header")
+
+    def test_lsblk(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "lsblk", "NAME", case="lsblk header")
+
+    def test_lspci(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "lspci", "class ", case="lspci class field")
 
     def test_dig(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "dig example.com", "ANSWER SECTION", case="dig example.com")

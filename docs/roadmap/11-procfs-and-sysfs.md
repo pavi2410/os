@@ -64,9 +64,9 @@ Problems with the syscall approach (already observed in development):
 
 ### Tests
 
-- [ ] Golden-file tests for `/proc/cpuinfo` line format (host parse)
-- [ ] Integration: `cat /proc/cpuinfo` matches prior `lscpu` fields
-- [ ] Integration: `ls` pseudo directory entries
+- [x] Golden-file tests for `/proc/cpuinfo` line format (host parse)
+- [x] Integration: `cat /proc/cpuinfo` / `lscpu` fields
+- [x] Integration: `ls` pseudo directory entries (`/proc`, `/sys`)
 
 ---
 

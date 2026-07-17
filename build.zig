@@ -398,6 +398,19 @@ pub fn build(b: *std.Build) void {
     tmpfs_test_mod.addImport("abi_fs", abi_host.fs);
     const run_tmpfs_tests = helpers.runHostTest(b, tmpfs_test_mod);
 
+    const seq_host_mod = helpers.hostModule(b, "kernel/fs/seq.zig");
+    const seq_test_mod = helpers.hostTestModule(b, "test/kernel/seq_test.zig");
+    seq_test_mod.addImport("seq", seq_host_mod);
+    const run_seq_tests = helpers.runHostTest(b, seq_test_mod);
+
+    const hw_format_host_mod = helpers.hostModule(b, "kernel/hw/format.zig");
+    hw_format_host_mod.addImport("abi_hw", abi_host.hw);
+    hw_format_host_mod.addImport("../fs/seq.zig", seq_host_mod);
+    const hw_format_test_mod = helpers.hostTestModule(b, "test/kernel/hw_format_test.zig");
+    hw_format_test_mod.addImport("hw_format", hw_format_host_mod);
+    hw_format_test_mod.addImport("abi_hw", abi_host.hw);
+    const run_hw_format_tests = helpers.runHostTest(b, hw_format_test_mod);
+
     const syscall_user_host_mod = helpers.hostModule(b, "kernel/syscall/user.zig");
 
     const syscall_user_test_mod = helpers.hostTestModule(b, "test/kernel/syscall_user_test.zig");
@@ -508,6 +521,8 @@ pub fn build(b: *std.Build) void {
         run_filesystem_contract_tests,
         run_mount_tests,
         run_tmpfs_tests,
+        run_seq_tests,
+        run_hw_format_tests,
         run_devfs_tests,
         run_syscall_user_tests,
         run_crash_tests,
