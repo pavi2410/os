@@ -1,4 +1,5 @@
 const paging = @import("../arch/x86_64/paging.zig");
+const preempt = @import("../proc/preempt.zig");
 const std = @import("std");
 const virtual = @import("virtual.zig");
 
@@ -51,6 +52,10 @@ pub fn init() HeapError!void {
 }
 
 pub fn kmalloc(size: usize) HeapError![*]u8 {
+    // Freelist is non-preemptible: timer IRQ must not switch mid-alloc.
+    preempt.disable();
+    defer preempt.enable();
+
     if (size == 0) return @ptrCast(@alignCast(@as([*]u8, @ptrFromInt(min_align))));
 
     const needed = std.mem.alignForward(usize, size + @sizeOf(BlockHeader), min_align);
@@ -95,6 +100,9 @@ pub fn kmalloc(size: usize) HeapError![*]u8 {
 }
 
 pub fn kfree(ptr: [*]u8) HeapError!void {
+    preempt.disable();
+    defer preempt.enable();
+
     if (@intFromPtr(ptr) <= min_align) return;
 
     const block = BlockHeader.fromPayload(ptr);

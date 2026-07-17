@@ -2,6 +2,7 @@ const cpu = @import("../arch/x86_64/cpu.zig");
 const hal = @import("../hal.zig");
 const abi_signal = @import("abi_signal");
 const init_launch = @import("init_launch.zig");
+const preempt = @import("preempt.zig");
 const process = @import("process.zig");
 const ready_queue = @import("ready_queue.zig");
 const signal = @import("signal.zig");
@@ -20,7 +21,14 @@ const time_slice_ticks: u64 = 10;
 
 const ReadyQueue = ready_queue.ReadyQueue(thread.Thread);
 
-/// Runtime-owned cooperative scheduler service.
+/// Non-preemptible regions (uniprocessor):
+/// - Heap freelist (`kmalloc`/`kfree` hold `preempt.disable`)
+/// - Ready-queue mutations and voluntary `yield` entry
+/// - TTY ctrl-c poll/send inside `yield`
+/// Syscalls also run with IF cleared (SFMASK), so they are non-preemptible.
+///
+/// `preempt` count blocks *involuntary* preemption only (`scheduleFromIrq` /
+/// `yieldIfRequested`). Explicit `yield` still switches.
 pub const Scheduler = struct {
     bootstrap: thread.Thread = undefined,
     idle_thread: *thread.Thread = undefined,
@@ -34,6 +42,23 @@ var state: *Scheduler = &default_state;
 pub fn install(next: *Scheduler) void {
     state = next;
     state.* = .{};
+}
+
+pub fn preemptDisable() void {
+    preempt.disable();
+}
+
+pub fn preemptEnable() void {
+    preempt.enable();
+}
+
+pub fn preemptCount() usize {
+    return preempt.count();
+}
+
+/// True when involuntary preemption is allowed.
+pub fn canPreempt() bool {
+    return preempt.canPreempt();
 }
 
 pub fn init() void {
@@ -67,8 +92,10 @@ pub fn spawnWithProcess(
 ) SchedulerError!*thread.Thread {
     const t = thread.create(entry, name, thread.default_stack_size) catch return SchedulerError.OutOfMemory;
     t.process_id = proc;
+    preemptDisable();
     t.state = .ready;
     state.ready_queue.push(t);
+    preemptEnable();
     return t;
 }
 
@@ -80,6 +107,8 @@ pub fn onTimerTick() void {
 }
 
 pub fn yieldIfRequested() void {
+    // Leave the flag set while preemption is disabled (sticky across critical sections).
+    if (!canPreempt()) return;
     if (state.preempt_requested.swap(false, .monotonic)) {
         yield();
     }
@@ -94,6 +123,10 @@ pub fn cooperativePoll() void {
 }
 
 pub fn yield() void {
+    // Block IRQ-driven switch while mutating TTY/scheduler state and switching.
+    preemptDisable();
+    defer preemptEnable();
+
     tty.get().pollCtrlC();
     if (tty.get().takePendingCtrlC()) |pid| {
         _ = signal.send(pid, abi_signal.SIGINT);
