@@ -36,4 +36,12 @@ pub const AddressSpaceManager = struct {
     pub fn mapUser(cr3: u64, virt: u64, phys: u64, perm: paging.Pte) paging.MapError!void {
         return paging.mapUserPageIn(cr3, virt, phys, perm);
     }
+
+    pub fn unmapUser(cr3: u64, virt: u64) paging.MapError!void {
+        return paging.unmapUserPageIn(cr3, virt);
+    }
+
+    pub fn unmapUserRange(cr3: u64, base: u64, len: u64) paging.MapError!void {
+        return paging.unmapUserRangeIn(cr3, base, len);
+    }
 };

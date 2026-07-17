@@ -672,6 +672,45 @@ pub fn remapUserPageIn(cr3_phys: u64, virt: u64, phys: u64, perm: Pte) MapError!
     leaf.* = makeEntry(phys, Pte.mergePermissions(perm, .{ .user = 1 }));
 }
 
+/// Clear a present user leaf in `cr3_phys`, invalidate TLB if active, and release the frame ref.
+/// Returns successfully (no-op) when the virtual page is not mapped.
+pub fn unmapUserPageIn(cr3_phys: u64, virt: u64) MapError!void {
+    if (virt & (page_size - 1) != 0) return MapError.UnalignedAddress;
+
+    const idx = virtIndices(virt);
+    const pml4 = tableFromPhys(cr3_phys);
+
+    const pdpt_entry = pml4[idx.pml4];
+    if (!isPresent(pdpt_entry) or isHuge(pdpt_entry)) return;
+    const pdpt = tableFromPhys(physAddr(pdpt_entry));
+
+    const pd_entry = pdpt[idx.pdpt];
+    if (!isPresent(pd_entry) or isHuge(pd_entry)) return;
+    const pd = tableFromPhys(physAddr(pd_entry));
+
+    const pt_entry = pd[idx.pd];
+    if (!isPresent(pt_entry) or isHuge(pt_entry)) return;
+    const pt = tableFromPhys(physAddr(pt_entry));
+
+    const leaf = &pt[idx.pt];
+    if (!isPresent(leaf.*)) return;
+
+    const phys = leaf.framePhys();
+    leaf.* = .{};
+    if (readCr3() == cr3_phys) invlpg(virt);
+    page_ref.release(phys) catch {};
+}
+
+/// Unmap every present user page in `[base, base+len)`.
+pub fn unmapUserRangeIn(cr3_phys: u64, base: u64, len: u64) MapError!void {
+    if (base % page_size != 0 or len % page_size != 0) return MapError.UnalignedAddress;
+    var page = base;
+    const end = base + len;
+    while (page < end) : (page += page_size) {
+        try unmapUserPageIn(cr3_phys, page);
+    }
+}
+
 pub fn setPageFlagsIn(cr3_phys: u64, virt: u64, perm: Pte) MapError!void {
     if (virt & (page_size - 1) != 0) return MapError.UnalignedAddress;
 

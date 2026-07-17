@@ -75,6 +75,14 @@ pub const AddressSpace = struct {
     pub fn mapUserPage(self: *const AddressSpace, virt: u64, phys: u64, perm: paging.Pte) ProcessError!void {
         memory.AddressSpaceManager.mapUser(self.cr3, virt, phys, perm) catch return ProcessError.OutOfMemory;
     }
+
+    pub fn unmapUserPage(self: *const AddressSpace, virt: u64) void {
+        memory.AddressSpaceManager.unmapUser(self.cr3, virt) catch {};
+    }
+
+    pub fn unmapUserRange(self: *const AddressSpace, base: u64, len: u64) void {
+        memory.AddressSpaceManager.unmapUserRange(self.cr3, base, len) catch {};
+    }
 };
 
 pub const Process = struct {
