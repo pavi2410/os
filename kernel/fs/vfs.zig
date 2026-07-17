@@ -1,6 +1,7 @@
 const fat32 = @import("fat32.zig");
 const devfs = @import("devfs.zig");
 const filesystem = @import("filesystem.zig");
+const file_cache = @import("file_cache.zig");
 const hal = @import("../hal.zig");
 const std = @import("std");
 
@@ -110,7 +111,7 @@ pub const Vfs = struct {
     const h = try self.getHandle(handle);
     if (h.is_directory) return VfsError.NotFile;
     if (h.kind == .dev_root) return VfsError.NotFile;
-    const n = try active_fs.read(h.open, h.offset, buf);
+    const n = try file_cache.read(&active_fs, h.open, h.offset, buf);
     h.offset += n;
     return n;
     }
@@ -120,7 +121,7 @@ pub const Vfs = struct {
     if (h.is_directory) return VfsError.IsDirectory;
     if (h.kind == .dev_root) return VfsError.IsDirectory;
     if (!h.writable) return VfsError.ReadOnly;
-    const n = try active_fs.write_at(&h.open, h.offset, buf);
+    const n = try file_cache.write(&active_fs, &h.open, h.offset, buf);
     h.offset += n;
     return n;
     }

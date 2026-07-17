@@ -22,6 +22,8 @@ pub const Slot = struct {
     key: Key = .{},
     phys: u64 = 0,
     dirty: bool = false,
+    /// False until file contents (or zeros) have been loaded into the frame.
+    valid: bool = false,
     pinned: u32 = 0,
     referenced: bool = false,
     used: bool = false,
@@ -128,6 +130,7 @@ pub const PageCache = struct {
             .key = key,
             .phys = phys,
             .dirty = false,
+            .valid = false,
             .pinned = 0,
             .referenced = true,
             .used = true,
