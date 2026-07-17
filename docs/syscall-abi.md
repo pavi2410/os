@@ -34,6 +34,9 @@ Negative `RAX` values follow the Linux errno convention (e.g. `-38` = `ENOSYS`).
 | 3 | `close` | Close file descriptor |
 | 4 | `stat` | Minimal stat metadata |
 | 8 | `lseek` | File offset seek |
+| 9 | `mmap` | Map memory (see supported flags below) |
+| 10 | `mprotect` | Change mapping protection (W^X enforced) |
+| 11 | `munmap` | Unmap a range |
 | 12 | `brk` | Userspace heap break |
 | 13 | `rt_sigaction` | Install `SIG_DFL` / `SIG_IGN` handler (no user handlers yet) |
 | 14 | `rt_sigprocmask` | Block/unblock signals (`sigsetsize` = 8) |
@@ -64,6 +67,21 @@ Negative `RAX` values follow the Linux errno convention (e.g. `-38` = `ENOSYS`).
 | 1027 | `getpcidevices` | PCI device table snapshot for `lspci` |
 | 1028 | `getblockdevices` | Block device table snapshot for `lsblk` |
 | 1029 | `getmemregions` | Physical memory map snapshot for `lsmem` |
+
+## `mmap` / `mprotect` / `munmap` (supported subset)
+
+Linux numbers are used. Full flag matrix is not required.
+
+| Item | Supported |
+|------|-----------|
+| `MAP_PRIVATE \| MAP_ANONYMOUS` | Yes (anonymous mappings) |
+| `MAP_FIXED` | Exact free hole only |
+| `MAP_SHARED` file | Not yet (writable shared deferred) |
+| File-backed `MAP_PRIVATE` | Read-only first |
+| `PROT_READ` / `PROT_WRITE` / `PROT_EXEC` | Yes; **W^X** — `PROT_WRITE\|PROT_EXEC` rejected |
+| `PROT_NONE` | Reserved / unreadable |
+
+Anonymous mappings are demand-zero (no physical page until first touch).
 
 ## Segments
 

@@ -5,6 +5,9 @@ pub const open = 2;
 pub const close = 3;
 pub const stat = 4;
 pub const lseek = 8;
+pub const mmap = 9;
+pub const mprotect = 10;
+pub const munmap = 11;
 pub const brk = 12;
 pub const rt_sigaction = 13;
 pub const rt_sigprocmask = 14;
@@ -54,6 +57,7 @@ pub const errno = struct {
     pub const fault: i64 = 14;
     pub const inval: i64 = 22;
     pub const mfile: i64 = 24;
+    pub const nomem: i64 = 12;
     pub const nosys: i64 = 38;
 
     pub fn negative(code: i64) i64 {

@@ -61,6 +61,9 @@ fn dispatchSyscall(frame: *Frame) i64 {
         numbers.close => sysClose(frame.arg0),
         numbers.stat => sysStat(frame.arg0, frame.arg1),
         numbers.lseek => sysLseek(frame.arg0, @bitCast(@as(i64, @intCast(frame.arg1))), @truncate(frame.arg2)),
+        numbers.mmap => sysMmap(frame.arg0, frame.arg1, frame.arg2, frame.arg3, frame.arg4, frame.arg5),
+        numbers.mprotect => sysMprotect(frame.arg0, frame.arg1, frame.arg2),
+        numbers.munmap => sysMunmap(frame.arg0, frame.arg1),
         numbers.brk => sysBrk(frame.arg0),
         numbers.rt_sigaction => sysRtSigaction(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
         numbers.rt_sigprocmask => sysRtSigprocmask(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
@@ -182,6 +185,29 @@ fn sysStat(path_ptr: u64, stat_ptr: u64) i64 {
 fn sysLseek(fd: u64, offset: i64, whence: u32) i64 {
     const slot = fdtab.currentSlot(fd) catch return errno.EBADF;
     return fd_ops.lseek(slot, offset, whence);
+}
+
+fn sysMmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64) i64 {
+    _ = addr;
+    _ = len;
+    _ = prot;
+    _ = flags;
+    _ = fd;
+    _ = offset;
+    return errno.ENOSYS;
+}
+
+fn sysMprotect(addr: u64, len: u64, prot: u64) i64 {
+    _ = addr;
+    _ = len;
+    _ = prot;
+    return errno.ENOSYS;
+}
+
+fn sysMunmap(addr: u64, len: u64) i64 {
+    _ = addr;
+    _ = len;
+    return errno.ENOSYS;
 }
 
 fn sysBrk(addr: u64) i64 {

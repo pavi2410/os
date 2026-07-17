@@ -12,6 +12,7 @@ pub const EBADF: i64 = -9;
 pub const EAGAIN: i64 = -11;
 pub const EACCES: i64 = -13;
 pub const EFAULT: i64 = -14;
+pub const ENOMEM: i64 = -12;
 pub const EEXIST: i64 = -17;
 pub const ENOTDIR: i64 = -20;
 pub const EINVAL: i64 = -22;
