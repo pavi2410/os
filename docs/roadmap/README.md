@@ -1,6 +1,6 @@
 # Kernel roadmap
 
-Phased plan for kernel development after the Limine bootloader. Phases 0–5, 7, 9, and 10 are complete; phases 6, 8, and 11–14 are the active forward plan in execution order.
+Phased plan for kernel development after the Limine bootloader. Phases 0–5, 7, 9–12 are complete; phases 6, 8, 11 (follow-ups), 13, and 14 are the active forward plan in execution order.
 
 | Phase | Document | Status | Summary |
 |-------|----------|--------|---------|
@@ -16,13 +16,13 @@ Phased plan for kernel development after the Limine bootloader. Phases 0–5, 7,
 | 9 | [09-virtual-memory-and-page-cache.md](09-virtual-memory-and-page-cache.md) | Done | `mmap`, demand paging, page cache, W^X |
 | 10 | [10-mount-and-tmpfs.md](10-mount-and-tmpfs.md) | Done | mount table, tmpfs, rename/symlink, VFS ops |
 | 11 | [11-procfs-and-sysfs.md](11-procfs-and-sysfs.md) | Done | `/proc`, `/sys`; hw snapshot syscalls removed |
-| 12 | [12-preemptive-scheduling.md](12-preemptive-scheduling.md) | Planned | Involuntary timer preemption (SMP gate) |
+| 12 | [12-preemptive-scheduling.md](12-preemptive-scheduling.md) | Done | Involuntary timer preemption (SMP gate) |
 | 13 | [13-smp.md](13-smp.md) | Planned | Multicore bring-up, ACPI, SMP-safe kernel |
 | 14 | [14-gui.md](14-gui.md) | Planned | GOP framebuffer, input, minimal window manager |
 
 **Current focus:** [Phase 6 — Testing and quality](06-testing-and-quality.md)
 
-**Hard gates:** do not start phase 13 (SMP) until phase 7 (COW — done) and phase 12 (preemption) are done on one CPU. GUI ([phase 14](14-gui.md)) follows SMP.
+**Hard gates:** do not start phase 13 (SMP) until phase 7 (COW) and phase 12 (preemption — done on one CPU) stay green. GUI ([phase 14](14-gui.md)) follows SMP. Note: production fork currently uses eager clone until COW share is re-fixed.
 
 See also the high-level checklist in the [project README](../../README.md#-roadmap).
 

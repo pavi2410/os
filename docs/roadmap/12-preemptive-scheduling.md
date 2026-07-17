@@ -2,6 +2,8 @@
 
 **Goal:** Move from timer-quantum cooperative scheduling to **involuntary preemption** from the LAPIC timer IRQ — required before SMP and fair multi-process behavior.
 
+**Status:** Done (uniprocessor)
+
 **Depends on:** [Phase 7 — Copy-on-write fork](07-copy-on-write-fork.md), [Phase 8 — Process environment](08-process-environment.md) (signals + safe syscall boundaries)
 
 **Unlocks:** [Phase 13 — SMP](13-smp.md)
@@ -10,11 +12,7 @@
 
 ## Background
 
-Since [phase 3](03-kernel-runtime.md), the LAPIC timer sets `preempt_requested`; threads honor it only at `yieldIfRequested()` boundaries ([`kernel/proc/scheduler.zig`](../../kernel/proc/scheduler.zig)). That is cooperative, not true preemption:
-
-- A CPU-bound loop in ring 0 or a thread that never yields can starve others
-- SMP reschedule IPIs assume the scheduler can force a context switch from interrupt context
-- Interactive shell and network stack benefit from fair time slicing
+Phase 3 used a LAPIC timer flag honored only at `yieldIfRequested()` boundaries. Phase 12 switches from the timer IRQ via `scheduleFromIrq()` while leaving the IRQ frame on the preempted thread’s kernel stack (`SavedContext` + existing `irq_stub` → `iretq`).
 
 ---
 
@@ -36,43 +34,43 @@ Syscalls remain non-preemptible mid-handler (SFMASK clears IF). Sticky `preempt_
 
 ### Interrupt-context context switch
 
-- [ ] Save full thread context from timer IRQ handler (or defer to a dedicated preemption trap path)
-- [ ] Safe preemption points: not while holding spinlocks that must not nest across threads
-- [ ] Document which kernel paths are non-preemptible (short critical sections)
-- [ ] Replace or supplement `yieldIfRequested()` with true IRQ-driven switch where safe
+- [x] Save full thread context from timer IRQ handler (stack-preserving `SavedContext` switch)
+- [x] Safe preemption points: `preempt.disable` for heap, ready-queue, and voluntary `yield`
+- [x] Document which kernel paths are non-preemptible (see `scheduler.zig` / `preempt.zig`)
+- [x] Replace or supplement `yieldIfRequested()` with true IRQ-driven switch where safe (`scheduleFromIrq`)
 
 ### Scheduler invariants
 
-- [ ] Running thread always on correct CR3 when switched away mid-syscall (audit syscall entry/exit)
-- [ ] Preemption disabled counter or equivalent for critical sections
-- [ ] Idle thread still runs when all runnable threads blocked
+- [x] Running thread always on correct CR3 when switched away mid-syscall (`switchTo` activates CR3 + TSS rsp0)
+- [x] Preemption disabled counter (`preempt.zig`, per-thread across switches)
+- [x] Idle thread still runs when all runnable threads blocked
 
 ### User-visible behavior
 
-- [ ] CPU-bound user loop no longer freezes shell indefinitely (within one quantum)
-- [ ] Timer quantum tunable; document default vs Linux-ish values
-- [ ] Optional: `sched_yield` syscall stub
+- [x] CPU-bound user loop no longer freezes shell indefinitely (within one quantum)
+- [x] Timer quantum tunable; document default vs Linux-ish values
+- [x] Optional: `sched_yield` syscall stub (Linux number 24)
 
 ### Tests
 
-- [ ] Kernel stress: two busy threads make progress without manual yield
-- [ ] Integration: shell remains responsive while background busy loop runs
-- [ ] No stack corruption over long preempt-heavy runs (10k+ switches)
+- [x] Kernel stress: two busy threads make progress without manual yield (`/BIN/preempt`)
+- [x] Integration: shell remains responsive while background busy loop runs (`test_shell` / in-guest)
+- [x] No stack corruption over long preempt-heavy runs (covered by preempt TAP + soak note)
 
 ---
 
 ## Acceptance criteria
 
-1. **Involuntary preemption** — timer IRQ can switch threads without cooperative `yield`.
-2. **Shell responsiveness** — interactive input works while another thread spins.
-3. **Syscall safety** — preemption during or after syscalls does not corrupt process state.
-4. **Stable under load** — 60+ seconds of timer-driven scheduling without panic.
+1. **Involuntary preemption** — timer IRQ can switch threads without cooperative `yield`. **Met.**
+2. **Shell responsiveness** — interactive input works while another thread spins. **Met** (`/BIN/preempt`).
+3. **Syscall safety** — preemption during or after syscalls does not corrupt process state. **Met** (IF off mid-syscall; sticky flag on return).
+4. **Stable under load** — 60+ seconds of timer-driven scheduling without panic. **Manual soak** (CI uses shorter gate).
 
 ---
 
 ## Notes
 
-- Phase 3 deliberately deferred this; it is now a hard gate before [phase 13 (SMP)](13-smp.md).
-- SMP adds IPI reschedule on top of this — get uniprocessor preemption correct first.
+- SMP IPI reschedule ([phase 13](13-smp.md)) builds on `scheduleFromIrq` — do not start 13 until this phase stays green on one CPU.
 - GUI redraw loops ([phase 14](14-gui.md)) assume a fair scheduler.
-- Soak: after landing, boot under load for 60s+ of timer-driven scheduling without panic (CI uses a shorter gate; manual soak is fine).
+- Soak: boot under load for 60s+ of timer-driven scheduling without panic (CI uses a shorter gate; manual soak is fine).
+- Related: production fork temporarily uses eager `cloneUserAddressSpace` again until COW `shareUserAddressSpace` is fixed (boot regression from commit `6d2d458`).
