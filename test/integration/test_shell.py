@@ -247,6 +247,17 @@ class TestShellDevfs:
         run_case(shell_session, "devtest", "devtest: ok", case="devnull and devzero")
 
 
+class TestShellTmpfs:
+    def test_tmp_round_trip(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "ls /", "tmp", case="ls shows tmp mount")
+        run_case(shell_session, "write /tmp/foo hello-tmp", "write: ok", case="write tmp")
+        run_case(shell_session, "cat /tmp/foo", "hello-tmp", case="cat tmp")
+        run_case(shell_session, "ls /tmp", "foo", case="ls tmp")
+
+    def test_tmp_gone_after_reboot(self, rebooted_shell: QemuShell) -> None:
+        run_case(rebooted_shell, "cat /tmp/foo", "cat: open failed", case="tmp ephemeral")
+
+
 @pytest.mark.network
 class TestShellPrograms:
     def test_lscpu(self, shell_session: QemuShell) -> None:

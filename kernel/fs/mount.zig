@@ -76,6 +76,13 @@ pub const Table = struct {
         }
         return MountError.NotFound;
     }
+
+    /// Basename of a non-root mount path (`/tmp` → `tmp`), or null for `/`.
+    pub fn mountBasename(path: []const u8) ?[]const u8 {
+        if (path.len <= 1) return null;
+        if (path[0] != '/') return null;
+        return path[1..];
+    }
 };
 
 pub fn isAbsoluteMountPath(path: []const u8) bool {

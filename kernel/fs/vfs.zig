@@ -1,8 +1,10 @@
 const fat32 = @import("fat32.zig");
+const tmpfs = @import("tmpfs.zig");
 const devfs = @import("devfs.zig");
 const filesystem = @import("filesystem.zig");
 const file_cache = @import("file_cache.zig");
 const mount = @import("mount.zig");
+const abi_fs = @import("abi_fs");
 const hal = @import("../hal.zig");
 const std = @import("std");
 
@@ -30,9 +32,10 @@ pub const Handle = struct {
     offset: u64 = 0,
     writable: bool = false,
     is_directory: bool = false,
-    is_fs_root: bool = false,
+    /// True when this handle is the `/` mount root (synthetic mount dirents apply).
+    is_vfs_root: bool = false,
     dir_skip: usize = 0,
-    root_mount_emitted: bool = false,
+    root_extra_index: usize = 0,
 };
 
 /// Owns VFS open-file slots independently of mount policy.
@@ -58,7 +61,7 @@ pub const HandleTable = struct {
     }
 };
 
-/// Runtime-owned filesystem service with a multi-mount table (FAT at `/`).
+/// Runtime-owned filesystem service with a multi-mount table (FAT at `/`, tmpfs at `/tmp`).
 pub const Vfs = struct {
     handles: HandleTable = .{},
     mounts: mount.Table = .{},
@@ -68,6 +71,8 @@ pub const Vfs = struct {
         self.mounts = .{};
         try fat32.ops.mount();
         self.mounts.add("/", &fat32.ops) catch return VfsError.IoError;
+        try tmpfs.ops.mount();
+        self.mounts.add("/tmp", &tmpfs.ops) catch return VfsError.IoError;
         file_cache.bindOps(&fat32.ops);
     }
 
@@ -99,6 +104,8 @@ pub const Vfs = struct {
         if (flags.truncate and !flags.write) return VfsError.ReadOnly;
 
         const is_directory = opened.isDirectory();
+        const is_vfs_root = is_directory and resolved.mount_path.len == 1 and resolved.mount_path[0] == '/' and
+            resolved.rel_path.len == 1 and resolved.rel_path[0] == '/';
         const slot = self.handles.alloc() orelse return VfsError.TooManyOpenFiles;
         self.handles.slots[slot] = .{
             .in_use = true,
@@ -109,7 +116,7 @@ pub const Vfs = struct {
             .offset = if (flags.append and !is_directory) opened.size else 0,
             .writable = flags.write and !is_directory,
             .is_directory = is_directory,
-            .is_fs_root = is_directory and resolved.rel_path.len == 1 and resolved.rel_path[0] == '/',
+            .is_vfs_root = is_vfs_root,
             .dir_skip = 0,
         };
         return slot;
@@ -204,10 +211,30 @@ pub const Vfs = struct {
         const n = try ops.getdents64(h.open, &h.dir_skip, buf);
         if (n > 0) return n;
 
-        if (!h.is_fs_root or h.root_mount_emitted) return 0;
-        const extra = devfs.appendRootMountDirent(buf) orelse return 0;
-        h.root_mount_emitted = true;
-        return extra;
+        if (!h.is_vfs_root) return 0;
+        return self.appendRootExtras(h, buf);
+    }
+
+    fn appendRootExtras(self: *const Vfs, h: *Handle, buf: []u8) VfsError!usize {
+        var names: [mount.max_mounts + 1][]const u8 = undefined;
+        var count: usize = 0;
+        names[count] = "dev";
+        count += 1;
+        for (self.mounts.entries) |e| {
+            if (e.ops == null) continue;
+            if (mount.Table.mountBasename(e.path)) |base| {
+                names[count] = base;
+                count += 1;
+            }
+        }
+        if (h.root_extra_index >= count) return 0;
+        const name = names[h.root_extra_index];
+        const reclen = abi_fs.dirent64Reclen(name.len);
+        if (buf.len < reclen) return VfsError.BufferTooSmall;
+        const ino: u64 = @intCast(1000 + h.root_extra_index);
+        abi_fs.writeDirent64(buf[0..reclen], ino, @intCast(h.root_extra_index + 1), abi_fs.DT_DIR, name);
+        h.root_extra_index += 1;
+        return reclen;
     }
 
     pub fn unlink(self: *Vfs, path: []const u8) VfsError!void {
@@ -245,7 +272,8 @@ pub const Vfs = struct {
             hal.console.println("FAT32 not mounted", .{});
             return;
         }
-        hal.console.println("FAT32 mounted (read/write)", .{});
+        hal.console.println("FAT32 mounted at / (read/write)", .{});
+        hal.console.println("tmpfs mounted at /tmp", .{});
         hal.console.println("devfs: /dev/null, /dev/zero, /dev/ttyS0", .{});
     }
 

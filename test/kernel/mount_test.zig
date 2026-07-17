@@ -102,3 +102,8 @@ test "add rejects bad mount paths" {
     try std.testing.expectError(mount.MountError.InvalidPath, table.add("tmp", &tmp_ops));
     try std.testing.expectError(mount.MountError.InvalidPath, table.add("/tmp/", &tmp_ops));
 }
+
+test "mountBasename strips leading slash" {
+    try std.testing.expectEqualStrings("tmp", mount.Table.mountBasename("/tmp").?);
+    try std.testing.expect(mount.Table.mountBasename("/") == null);
+}
