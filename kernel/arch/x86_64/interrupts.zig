@@ -1,5 +1,6 @@
 const apic = @import("apic.zig");
 const cow = @import("../../mm/cow.zig");
+const demand = @import("../../mm/demand.zig");
 const cpu = @import("cpu.zig");
 const crash = @import("../../proc/crash.zig");
 const exc_frame = @import("frame.zig");
@@ -54,7 +55,11 @@ pub fn dispatchIrq(frame_ptr: *Frame) void {
 fn handleUserException(frame_ptr: *Frame) bool {
     if (frame_ptr.vector == 14) {
         const cr2 = readCr2();
+        // Order: COW promotion for present RO shared pages, then demand-zero
+        // for non-present anonymous/heap/stack VMAs. Unmapped gaps (including
+        // the stack guard page below the stack VMA) still terminate the process.
         if (cow.tryHandleUserPageFault(cr2, frame_ptr.error_code)) return true;
+        if (demand.tryHandleUserPageFault(cr2, frame_ptr.error_code)) return true;
     }
 
     const info = crash.Info{

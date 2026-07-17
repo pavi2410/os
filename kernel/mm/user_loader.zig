@@ -186,6 +186,8 @@ fn loadSegment(cr3: u64, image: []const u8, ph: elf.Elf64_Phdr) LoadError!void {
 fn setupUserStack(cr3: u64) LoadError!u64 {
     const stack_end = user_stack_top + paging.page_size;
     const stack_start = stack_end - @as(u64, @intCast(user_stack_pages)) * paging.page_size;
+    // The page immediately below `stack_start` is intentionally left unmapped
+    // as a stack guard (see `process.user_brk_limit`).
 
     var page = stack_start;
     while (page < stack_end) : (page += paging.page_size) {
