@@ -265,6 +265,20 @@ class TestShellProcfs:
     def test_sys_block(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "ls /sys/block", case="ls /sys/block")
 
+    def test_lscpu(self, shell_session: QemuShell) -> None:
+        out = run_case(shell_session, "lscpu", "Architecture:", case="fork/exec lscpu")
+        assert_contains(out, "Vendor ID:", "lscpu vendor")
+        assert_contains(out, "CPU(s):", "lscpu cpu count")
+
+    def test_lsmem(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "lsmem", "START", case="lsmem header")
+
+    def test_lsblk(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "lsblk", "NAME", case="lsblk header")
+
+    def test_lspci(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "lspci", "class ", case="lspci class field")
+
 
 class TestShellTmpfs:
     def test_tmp_round_trip(self, shell_session: QemuShell) -> None:
@@ -285,20 +299,6 @@ class TestShellTmpfs:
 
 @pytest.mark.network
 class TestShellPrograms:
-    def test_lscpu(self, shell_session: QemuShell) -> None:
-        out = run_case(shell_session, "lscpu", "Architecture:", case="fork/exec lscpu")
-        assert_contains(out, "Vendor ID:", "lscpu vendor")
-        assert_contains(out, "CPU(s):", "lscpu cpu count")
-
-    def test_lsmem(self, shell_session: QemuShell) -> None:
-        run_case(shell_session, "lsmem", "START", case="lsmem header")
-
-    def test_lsblk(self, shell_session: QemuShell) -> None:
-        run_case(shell_session, "lsblk", "NAME", case="lsblk header")
-
-    def test_lspci(self, shell_session: QemuShell) -> None:
-        run_case(shell_session, "lspci", "class ", case="lspci class field")
-
     def test_dig(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "dig example.com", "ANSWER SECTION", case="dig example.com")
         run_case(shell_session, "dig example.com", "IN  A", case="dig A record")
