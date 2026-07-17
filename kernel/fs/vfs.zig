@@ -1,5 +1,7 @@
 const fat32 = @import("fat32.zig");
 const tmpfs = @import("tmpfs.zig");
+const procfs = @import("procfs.zig");
+const sysfs = @import("sysfs.zig");
 const devfs = @import("devfs.zig");
 const filesystem = @import("filesystem.zig");
 const file_cache = @import("file_cache.zig");
@@ -73,6 +75,10 @@ pub const Vfs = struct {
         self.mounts.add("/", &fat32.ops) catch return VfsError.IoError;
         try tmpfs.ops.mount();
         self.mounts.add("/tmp", &tmpfs.ops) catch return VfsError.IoError;
+        try procfs.ops.mount();
+        self.mounts.add("/proc", &procfs.ops) catch return VfsError.IoError;
+        try sysfs.ops.mount();
+        self.mounts.add("/sys", &sysfs.ops) catch return VfsError.IoError;
         file_cache.bindOps(&fat32.ops);
     }
 
@@ -141,7 +147,10 @@ pub const Vfs = struct {
         if (h.is_directory) return VfsError.NotFile;
         if (h.kind == .dev_root) return VfsError.NotFile;
         const ops = try handleOps(h);
-        const n = try file_cache.read(ops, h.open, h.offset, buf);
+        const n = if (ops.use_page_cache)
+            try file_cache.read(ops, h.open, h.offset, buf)
+        else
+            try ops.read(h.open, h.offset, buf);
         h.offset += n;
         return n;
     }
@@ -326,6 +335,8 @@ pub const Vfs = struct {
         }
         hal.console.println("FAT32 mounted at / (read/write)", .{});
         hal.console.println("tmpfs mounted at /tmp", .{});
+        hal.console.println("procfs mounted at /proc", .{});
+        hal.console.println("sysfs mounted at /sys", .{});
         hal.console.println("devfs: /dev/null, /dev/zero, /dev/ttyS0", .{});
     }
 

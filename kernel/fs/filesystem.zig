@@ -112,4 +112,6 @@ pub const Ops = struct {
     rename: ?*const fn (old_path: []const u8, new_path: []const u8) Error!void = null,
     symlink: ?*const fn (target: []const u8, linkpath: []const u8) Error!void = null,
     readlink: ?*const fn (path: []const u8, buf: []u8) Error!usize = null,
+    /// When false, VFS skips the page cache (procfs/sysfs generate-on-read).
+    use_page_cache: bool = true,
 };
