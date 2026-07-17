@@ -13,6 +13,7 @@ pub const brk = abi.brk;
 pub const rt_sigaction = abi.rt_sigaction;
 pub const rt_sigprocmask = abi.rt_sigprocmask;
 pub const pipe = abi.pipe;
+pub const sched_yield = abi.sched_yield;
 pub const dup = abi.dup;
 pub const dup2 = abi.dup2;
 pub const getpid = abi.getpid;

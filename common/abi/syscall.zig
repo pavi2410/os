@@ -12,6 +12,7 @@ pub const brk = 12;
 pub const rt_sigaction = 13;
 pub const rt_sigprocmask = 14;
 pub const pipe = 22;
+pub const sched_yield = 24;
 pub const dup = 32;
 pub const dup2 = 33;
 pub const getpid = 39;

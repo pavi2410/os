@@ -1,15 +1,17 @@
 const bytes = @import("common/bytes");
 const dns_codec = @import("dns_codec");
 const tap = @import("utest_tap");
+const ulib = @import("ulib");
 
 pub fn runAll() u8 {
     tap.Harness.version();
-    tap.Harness.plan(5);
+    tap.Harness.plan(6);
     testBytesBe();
     testBytesLe();
     testDnsBuildQuery();
     testDnsEncodeNameRejects();
     testDnsParseFirstA();
+    testSchedYield();
     return tap.Harness.finish();
 }
 
@@ -72,4 +74,9 @@ fn testDnsParseFirstA() void {
     var ip: [4]u8 = undefined;
     const ok = dns_codec.parseFirstA(&reply, &ip) and ip[0] == 104 and ip[3] == 154;
     tap.Harness.check("dns parseFirstA", ok);
+}
+
+fn testSchedYield() void {
+    const ok = ulib.syscall.schedYield() == 0;
+    tap.Harness.check("sched_yield returns 0", ok);
 }

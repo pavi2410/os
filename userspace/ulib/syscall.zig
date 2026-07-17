@@ -50,6 +50,10 @@ pub fn getpid() isize {
     return syscall6(abi_syscall.getpid, 0, 0, 0, 0, 0, 0);
 }
 
+pub fn schedYield() isize {
+    return syscall6(abi_syscall.sched_yield, 0, 0, 0, 0, 0, 0);
+}
+
 pub fn fork() isize {
     return syscall6(abi_syscall.fork, 0, 0, 0, 0, 0, 0);
 }

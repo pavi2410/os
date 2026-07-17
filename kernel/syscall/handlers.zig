@@ -76,6 +76,7 @@ fn dispatchSyscall(frame: *Frame) i64 {
         numbers.rt_sigaction => sysRtSigaction(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
         numbers.rt_sigprocmask => sysRtSigprocmask(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
         numbers.pipe => sysPipe(frame.arg0),
+        numbers.sched_yield => sysSchedYield(),
         numbers.dup => sysDup(frame.arg0),
         numbers.dup2 => sysDup2(frame.arg0, frame.arg1),
         numbers.getpid => sysGetpid(),
@@ -220,6 +221,11 @@ fn sysBrk(addr: u64) i64 {
 fn sysGetpid() i64 {
     const proc = process.currentProcess() orelse return 1;
     return @intCast(proc.id);
+}
+
+fn sysSchedYield() i64 {
+    scheduler.yield();
+    return 0;
 }
 
 fn sysFsync(fd: u64) i64 {
