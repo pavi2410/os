@@ -378,6 +378,13 @@ pub fn build(b: *std.Build) void {
     filesystem_contract_test_mod.addImport("filesystem", filesystem_host_mod);
     const run_filesystem_contract_tests = helpers.runHostTest(b, filesystem_contract_test_mod);
 
+    const mount_host_mod = helpers.hostModule(b, "kernel/fs/mount.zig");
+    mount_host_mod.addImport("filesystem.zig", filesystem_host_mod);
+    const mount_test_mod = helpers.hostTestModule(b, "test/kernel/mount_test.zig");
+    mount_test_mod.addImport("mount", mount_host_mod);
+    mount_test_mod.addImport("filesystem", filesystem_host_mod);
+    const run_mount_tests = helpers.runHostTest(b, mount_test_mod);
+
     const syscall_user_host_mod = helpers.hostModule(b, "kernel/syscall/user.zig");
 
     const syscall_user_test_mod = helpers.hostTestModule(b, "test/kernel/syscall_user_test.zig");
@@ -486,6 +493,7 @@ pub fn build(b: *std.Build) void {
         run_virtio_queue_index_tests,
         run_virtio_descriptor_tests,
         run_filesystem_contract_tests,
+        run_mount_tests,
         run_devfs_tests,
         run_syscall_user_tests,
         run_crash_tests,
