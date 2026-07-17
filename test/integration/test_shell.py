@@ -104,6 +104,12 @@ class TestShellBuiltins:
     def test_ls_bin(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "ls /BIN", "SHELL", case="ls /BIN")
 
+    def test_preempt(self, shell_session: QemuShell) -> None:
+        """Busy children must not starve the parent (involuntary preemption)."""
+        window = shell_session.run("preempt", timeout=30.0)
+        assert_contains(window, "ok 1 - parent progress under busy child", "preempt 1")
+        assert_contains(window, "ok 2 - two busy children parent progress", "preempt 2")
+
     def test_pid(self, shell_session: QemuShell) -> None:
         pid_out = run_case(shell_session, "pid", case="pid")
         assert any(ch.isdigit() for ch in pid_out), f"pid: no digits in:\n{pid_out}"

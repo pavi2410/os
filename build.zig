@@ -109,6 +109,23 @@ pub fn build(b: *std.Build) void {
     cowtest.root_module.addImport("cowtest_tap", cowtest_tap);
     const install_cowtest = b.addInstallArtifact(cowtest, user_install);
 
+    const preempttest_tap = helpers.exeModule(b, "userspace/preempttest/tap.zig", user_target, user_optimize);
+    preempttest_tap.addImport("ulib", user_ulib);
+    preempttest_tap.addImport("common/tap", common_tap_user);
+
+    const preempttest = b.addExecutable(.{
+        .name = "preempt",
+        .root_module = helpers.exeModule(b, "userspace/preempttest/main.zig", user_target, user_optimize),
+    });
+    preempttest.setLinkerScript(b.path("userspace/linker.ld"));
+    preempttest.root_module.link_libc = false;
+    preempttest.root_module.addImport("ulib", user_ulib);
+    preempttest.root_module.addImport("std_root", std_root);
+    preempttest.root_module.addImport("preempttest_tap", preempttest_tap);
+    const install_preempttest = b.addInstallArtifact(preempttest, user_install);
+
+    const install_busyloop = helpers.addUserProgram(b, user_deps, "busyloop", "userspace/busyloop/main.zig", user_install);
+
     const mmaptest_tap = helpers.exeModule(b, "userspace/mmaptest/tap.zig", user_target, user_optimize);
     mmaptest_tap.addImport("ulib", user_ulib);
     mmaptest_tap.addImport("common/tap", common_tap_user);
@@ -178,6 +195,8 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_lsmem.step);
     b.getInstallStep().dependOn(&install_utest.step);
     b.getInstallStep().dependOn(&install_cowtest.step);
+    b.getInstallStep().dependOn(&install_preempttest.step);
+    b.getInstallStep().dependOn(&install_busyloop.step);
     b.getInstallStep().dependOn(&install_mmaptest.step);
     b.getInstallStep().dependOn(&install_envtest.step);
     b.getInstallStep().dependOn(&install_devtest.step);

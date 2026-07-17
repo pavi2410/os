@@ -116,7 +116,7 @@ pub fn yieldIfRequested() void {
 
 /// Involuntary preemption from the timer IRQ (after EOI).
 /// Leaves the full IRQ frame on the preempted thread's kernel stack; resume
-/// returns into `irq_stub` → `iretq`. No TTY/signal side effects.
+/// returns into `irq_stub` → `iretq`. No TTY side effects; signals applied on resume.
 pub fn scheduleFromIrq() void {
     if (!canPreempt()) return;
     if (!state.preempt_requested.swap(false, .monotonic)) return;
@@ -127,6 +127,7 @@ pub fn scheduleFromIrq() void {
         state.ready_queue.push(self);
     }
     scheduleSwitch();
+    if (process.currentProcess()) |proc| signal.tryApply(proc);
 }
 
 pub fn cooperativePoll() void {
@@ -160,8 +161,11 @@ pub fn start() noreturn {
     init_launch.launch();
 
     hal.console.println("Enabling interrupts", .{});
+    // Prevent timer scheduleFromIrq from nesting inside the first scheduleSwitch.
+    preemptDisable();
     cpu.sti();
     schedule();
+    preemptEnable();
     cpu.haltForever();
 }
 

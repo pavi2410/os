@@ -271,13 +271,12 @@ pub fn forkChild(parent: *Process) ProcessError!*Process {
     const child = try createWithParent(parent.id);
     errdefer destroy(child);
 
-    paging.shareUserAddressSpace(parent.address_space.cr3, child.address_space.cr3) catch {
+    paging.cloneUserAddressSpace(parent.address_space.cr3, child.address_space.cr3) catch {
         return ProcessError.OutOfMemory;
     };
 
     child.brk = parent.brk;
     child.vmas.cloneFrom(&parent.vmas);
-    mmap_mod.retainFileCachePins(child);
     child.fds = parent.fds;
     if (!fd_retain.retainAll(&child.fds)) {
         child.fds = FdTable.init();

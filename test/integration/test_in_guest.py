@@ -70,6 +70,17 @@ def mmaptest_output(repo_root: Path) -> str:
         shell.close()
 
 
+@pytest.fixture(scope="module")
+def preempt_output(repo_root: Path) -> str:
+    shell = QemuShell(repo_root)
+    shell.start()
+    try:
+        shell.wait_ready()
+        return shell.run("preempt", timeout=30.0)
+    finally:
+        shell.close()
+
+
 class TestKernelTap:
     def test_vfs_readme_read(self, kernel_boot_log: str) -> None:
         report = parse_tap(extract_between(kernel_boot_log, KERNEL_TAP_START, KERNEL_TAP_END))
@@ -109,9 +120,31 @@ class TestUtestTap:
         report = parse_tap(utest_output)
         assert any(case.name == "dns parseFirstA" and case.passed for case in report.cases)
 
+    def test_sched_yield(self, utest_output: str) -> None:
+        report = parse_tap(utest_output)
+        assert any(case.name == "sched_yield returns 0" and case.passed for case in report.cases)
+
     def test_utest_plan(self, utest_output: str) -> None:
         report = parse_tap(utest_output)
         report.assert_all_passed("utest TAP")
+
+
+class TestPreempttestTap:
+    def test_parent_progress_under_busy_child(self, preempt_output: str) -> None:
+        report = parse_tap(preempt_output)
+        assert any(
+            case.name == "parent progress under busy child" and case.passed for case in report.cases
+        )
+
+    def test_two_busy_children_parent_progress(self, preempt_output: str) -> None:
+        report = parse_tap(preempt_output)
+        assert any(
+            case.name == "two busy children parent progress" and case.passed for case in report.cases
+        )
+
+    def test_preempt_plan(self, preempt_output: str) -> None:
+        report = parse_tap(preempt_output)
+        report.assert_all_passed("preempt TAP")
 
 
 class TestCowtestTap:
