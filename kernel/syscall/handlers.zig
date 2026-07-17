@@ -194,10 +194,8 @@ fn sysMmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64) i64
 }
 
 fn sysMprotect(addr: u64, len: u64, prot: u64) i64 {
-    _ = addr;
-    _ = len;
-    _ = prot;
-    return errno.ENOSYS;
+    const proc = process.currentProcess() orelse return errno.ENOMEM;
+    return mmap_sys.sysMprotect(proc, addr, len, prot);
 }
 
 fn sysMunmap(addr: u64, len: u64) i64 {

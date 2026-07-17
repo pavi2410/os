@@ -1,5 +1,6 @@
 const process = @import("../proc/process.zig");
 const vma = @import("vma.zig");
+const demand = @import("demand.zig");
 const paging = @import("../arch/x86_64/paging.zig");
 const errno = @import("../syscall/errno.zig");
 
@@ -90,5 +91,31 @@ pub fn sysMunmap(proc: *process.Process, addr: u64, len: u64) i64 {
 
     proc.address_space.unmapUserRange(addr, map_len);
     proc.vmas.unmapRange(addr, map_len) catch return errno.EINVAL;
+    return 0;
+}
+
+pub fn sysMprotect(proc: *process.Process, addr: u64, len: u64, prot_u: u64) i64 {
+    if (len == 0) return errno.EINVAL;
+    if (addr % paging.page_size != 0) return errno.EINVAL;
+    const prot: u32 = @truncate(prot_u);
+    if (vma.violatesWx(prot)) return errno.EINVAL;
+
+    const map_len = alignUp(len, paging.page_size);
+    var page = addr;
+    const end = addr + map_len;
+    while (page < end) : (page += paging.page_size) {
+        if (proc.vmas.find(page) == null) return errno.ENOMEM;
+    }
+
+    proc.vmas.setProt(addr, map_len, prot) catch return errno.ENOMEM;
+
+    const perm = demand.pteFromProt(prot);
+    page = addr;
+    while (page < end) : (page += paging.page_size) {
+        if (paging.getPhysIn(proc.address_space.cr3, page)) |phys| {
+            paging.remapUserPageIn(proc.address_space.cr3, page, phys, perm) catch return errno.ENOMEM;
+            if (paging.readCr3() == proc.address_space.cr3) paging.invlpg(page);
+        }
+    }
     return 0;
 }
