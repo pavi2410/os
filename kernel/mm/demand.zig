@@ -24,6 +24,21 @@ pub fn pteFromProt(prot: u32) paging.Pte {
     return pte;
 }
 
+/// Ensure `virt`'s page is present for read or write access (syscall copy paths).
+/// Returns true if the page was already mapped or was successfully demand-filled.
+pub fn ensureMapped(proc: *process.Process, virt: u64, for_write: bool) bool {
+    const page = virt & ~(paging.page_size - 1);
+    if (paging.getPhysIn(proc.address_space.cr3, page) != null) return true;
+
+    const region = proc.vmas.find(page) orelse return false;
+    if (for_write) {
+        if (!region.isWritable()) return false;
+    } else if (!region.isReadable()) {
+        return false;
+    }
+    return populatePage(proc, region, page);
+}
+
 /// Allocate and map a zero page for a non-present fault in an anonymous/heap/stack VMA.
 /// Called only after the COW path declines the fault.
 pub fn tryHandleUserPageFault(fault_addr: u64, error_code: u64) bool {
@@ -39,9 +54,12 @@ pub fn tryHandleUserPageFault(fault_addr: u64, error_code: u64) bool {
 
     const virt = fault_addr & ~(paging.page_size - 1);
     if (paging.getPhysIn(proc.address_space.cr3, virt) != null) return false;
+    return populatePage(proc, region, virt);
+}
 
+fn populatePage(proc: *process.Process, region: vma.Vma, page: u64) bool {
     if (region.kind == .file) {
-        return mapFilePage(proc, region, virt);
+        return mapFilePage(proc, region, page);
     }
 
     switch (region.kind) {
@@ -54,17 +72,17 @@ pub fn tryHandleUserPageFault(fault_addr: u64, error_code: u64) bool {
     @memset(buf, 0);
 
     const perm = pteFromProt(region.prot);
-    paging.mapUserPageIn(proc.address_space.cr3, virt, phys, perm) catch {
+    paging.mapUserPageIn(proc.address_space.cr3, page, phys, perm) catch {
         physical.freePage(phys) catch {};
         return false;
     };
     page_ref.retain(phys) catch {
-        paging.unmapUserPageIn(proc.address_space.cr3, virt) catch {};
+        paging.unmapUserPageIn(proc.address_space.cr3, page) catch {};
         return false;
     };
 
     const tlb = @import("tlb.zig");
-    tlb.invalidatePage(proc.address_space.cr3, virt);
+    tlb.invalidatePage(proc.address_space.cr3, page);
     return true;
 }
 
