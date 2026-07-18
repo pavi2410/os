@@ -378,10 +378,10 @@ pub fn loadElf(
     return loaded;
 }
 
-fn seedVmasInto(table: *vma.VmaTable, loaded: *const user_loader.LoadedImage) vma.VmaError!void {
-    table.clear();
+fn seedVmasInto(vmas: *vma.VmaTable, loaded: *const user_loader.LoadedImage) vma.VmaError!void {
+    vmas.clear();
     for (loaded.regions[0..loaded.region_count]) |region| {
-        try table.insert(.{
+        try vmas.insert(.{
             .base = region.base,
             .len = region.len,
             .prot = region.prot,
@@ -397,9 +397,9 @@ fn seedVmas(proc: *Process, loaded: *const user_loader.LoadedImage) vma.VmaError
 
 /// Populate a staging VMA table from a loaded image without touching the process.
 pub fn buildLoadedVmas(loaded: *const user_loader.LoadedImage) ProcessError!vma.VmaTable {
-    var table = vma.VmaTable.init();
-    seedVmasInto(&table, loaded) catch return ProcessError.OutOfMemory;
-    return table;
+    var vmas = vma.VmaTable.init();
+    seedVmasInto(&vmas, loaded) catch return ProcessError.OutOfMemory;
+    return vmas;
 }
 
 /// Drop all user mappings and allocate a fresh address space (for `execve`).
