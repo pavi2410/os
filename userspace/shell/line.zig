@@ -80,6 +80,47 @@ pub fn chainPartCount(segment: []const u8) usize {
     return splitByOperators(segment, &parts, &ops) catch 0;
 }
 
+/// Simulate which `&&`/`||` chain parts would run given per-part exit codes.
+/// `exits.len` must equal the chain part count; `ran` is filled with the same length.
+/// Pipe-linked groups are treated as a single step using the last part's exit code.
+pub fn simulateShortCircuit(segment: []const u8, exits: []const u8, ran: []bool) error{ TooManyParts, LenMismatch }!usize {
+    var parts: [max_chain_parts]PartRange = undefined;
+    var ops: [max_chain_parts - 1]Op = undefined;
+    const part_count = try splitByOperators(segment, &parts, &ops);
+    if (exits.len != part_count or ran.len < part_count) return error.LenMismatch;
+
+    @memset(ran[0..part_count], false);
+    var exit_code: u8 = 0;
+    var i: usize = 0;
+    while (i < part_count) {
+        if (i > 0) {
+            switch (ops[i - 1]) {
+                .and_op => if (exit_code != 0) {
+                    i += 1;
+                    continue;
+                },
+                .or_op => if (exit_code == 0) {
+                    i += 1;
+                    continue;
+                },
+                .pipe_op => {},
+            }
+        }
+
+        var pipe_end = i;
+        while (pipe_end + 1 < part_count and ops[pipe_end] == .pipe_op) {
+            pipe_end += 1;
+        }
+        var j = i;
+        while (j <= pipe_end) : (j += 1) {
+            ran[j] = true;
+        }
+        exit_code = exits[pipe_end];
+        i = pipe_end + 1;
+    }
+    return part_count;
+}
+
 fn runSegment(segment: []u8, expand_bufs: *[argv.max_args][expand.max_arg_len]u8) void {
     const trimmed_len = trimSegment(segment, 0, segment.len);
     if (trimmed_len == 0) return;
