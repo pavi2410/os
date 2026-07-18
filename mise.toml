@@ -6,7 +6,29 @@ uv = "latest"
 [tasks.build]
 description = "Build kernel and compact bootable userspace binaries"
 sources = ["build.zig", "build.zig.zon", "kernel/**/*", "userspace/**/*"]
-outputs = ["zig-out/bin/kernel", "zig-out/userspace/bin/shell", "zig-out/userspace/bin/dig", "zig-out/userspace/bin/ping", "zig-out/userspace/bin/curl", "zig-out/userspace/bin/ip", "zig-out/userspace/bin/lscpu", "zig-out/userspace/bin/lspci", "zig-out/userspace/bin/lsblk", "zig-out/userspace/bin/lsmem", "zig-out/userspace/bin/utest", "zig-out/userspace/bin/cowtest", "zig-out/userspace/bin/mmaptest"]
+outputs = [
+  "zig-out/bin/kernel",
+  "zig-out/userspace/bin/init",
+  "zig-out/userspace/bin/shell",
+  "zig-out/userspace/bin/dig",
+  "zig-out/userspace/bin/ping",
+  "zig-out/userspace/bin/curl",
+  "zig-out/userspace/bin/ip",
+  "zig-out/userspace/bin/lscpu",
+  "zig-out/userspace/bin/lspci",
+  "zig-out/userspace/bin/lsblk",
+  "zig-out/userspace/bin/lsmem",
+  "zig-out/userspace/bin/neofetch",
+  "zig-out/userspace/bin/utest",
+  "zig-out/userspace/bin/cowtest",
+  "zig-out/userspace/bin/mmaptest",
+  "zig-out/userspace/bin/preempt",
+  "zig-out/userspace/bin/busyloop",
+  "zig-out/userspace/bin/envtest",
+  "zig-out/userspace/bin/devtest",
+  "zig-out/userspace/bin/mnttest",
+  "zig-out/userspace/bin/linktest",
+]
 run = "zig build"
 
 [tasks."uv-sync"]
