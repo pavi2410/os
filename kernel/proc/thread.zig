@@ -1,5 +1,4 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
-const gdt = @import("../arch/x86_64/gdt.zig");
 const heap = @import("../mm/heap.zig");
 const hal = @import("../hal.zig");
 const preempt = @import("preempt.zig");
@@ -59,6 +58,8 @@ pub const Thread = struct {
         }
         other.state = .running;
         runtime.current = other;
+        const smp = @import("../arch/x86_64/smp.zig");
+        smp.thisCpu().current = other;
         other.activateKernelStack();
         runtime.activate_cr3(other.process_id);
         // Switch the active preempt counter before parking this thread so the
@@ -71,6 +72,7 @@ pub const Thread = struct {
             runtime.activate_cr3(null);
         }
         runtime.current = self;
+        smp.thisCpu().current = self;
         preempt.setCurrentCount(&self.preempt_count);
         self.state = prev_state;
         self.activateKernelStack();
@@ -81,7 +83,8 @@ pub const Thread = struct {
     fn activateKernelStack(self: *Thread) void {
         if (self.stack_size == 0) return;
         const top = (@intFromPtr(self.stack) + self.stack_size) & ~@as(u64, 15);
-        gdt.setKernelStack(top);
+        const smp = @import("../arch/x86_64/smp.zig");
+        smp.setKernelStack(top);
     }
 };
 
@@ -119,13 +122,19 @@ comptime {
 }
 
 pub fn currentThread() ?*Thread {
+    const smp = @import("../arch/x86_64/smp.zig");
+    if (smp.thisCpu().current) |ptr| {
+        return @ptrCast(@alignCast(ptr));
+    }
     return runtime.current;
 }
 
 pub fn setCurrent(t: ?*Thread) void {
+    const smp = @import("../arch/x86_64/smp.zig");
     runtime.current = t;
-    if (t) |thread| {
-        preempt.setCurrentCount(&thread.preempt_count);
+    smp.thisCpu().current = t;
+    if (t) |thread_ptr| {
+        preempt.setCurrentCount(&thread_ptr.preempt_count);
     } else {
         preempt.clearCurrent();
     }

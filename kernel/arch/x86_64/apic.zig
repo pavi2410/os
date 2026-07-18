@@ -1,6 +1,7 @@
 const acpi_madt = @import("../../acpi/madt.zig");
 const cpu = @import("cpu.zig");
 const virtual = @import("../../mm/virtual.zig");
+const std = @import("std");
 
 pub const ApicError = error{
     MadtParseFailed,
@@ -24,6 +25,8 @@ const lapic_reg = struct {
     pub const timer_init_count: u32 = 0x380;
     pub const timer_current_count: u32 = 0x390;
     pub const timer_divide: u32 = 0x3E0;
+    pub const icr_low: u32 = 0x300;
+    pub const icr_high: u32 = 0x310;
 };
 
 const lapic_timer_divide: u32 = 0x3;
@@ -142,6 +145,29 @@ fn enableLocalApic(local_apic_address: u64) ApicError!void {
 
     lapicWrite(lapic_reg.spurious, 0x1FF);
     lapicWrite(lapic_reg.tpr, 0);
+}
+
+/// Enable this CPU's LAPIC after BSP already mapped lapic_mmio.
+pub fn enableOnAp() void {
+    var msr = cpu.rdmsr(IA32_APIC_BASE);
+    msr &= ~@as(u64, 1 << 10);
+    msr |= 1 << 11;
+    cpu.wrmsr(IA32_APIC_BASE, msr);
+    if (lapic_mmio != 0) {
+        lapicWrite(lapic_reg.spurious, 0x1FF);
+        lapicWrite(lapic_reg.tpr, 0);
+    }
+}
+
+/// Fixed IPI to a destination local APIC id (xAPIC).
+pub fn sendIpi(dest_lapic_id: u32, vector: u8) void {
+    // Wait for prior ICR delivery.
+    while (lapicRead(lapic_reg.icr_low) & (1 << 12) != 0) {
+        std.atomic.spinLoopHint();
+    }
+    lapicWrite(lapic_reg.icr_high, dest_lapic_id << 24);
+    // Fixed delivery, physical dest, assert, edge.
+    lapicWrite(lapic_reg.icr_low, @as(u32, vector) | (1 << 14));
 }
 
 fn maskAllPins(ioapic_index: usize) void {

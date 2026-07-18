@@ -109,12 +109,14 @@ pub fn init(ctx: BootContext) void {
     tty.init();
     runtime.ipc.init();
     initApic(ctx.rsdp_virt);
+    smp.initBsp();
     initPci(ctx.rsdp_virt);
     initBlock();
     initNetwork();
     initTimer();
     rtc.init();
     initScheduler();
+    smp.startAps();
 
     if (boot_debug.thread_switch_test) {
         thread.runSwitchTest(10_000);

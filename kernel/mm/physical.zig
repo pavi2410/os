@@ -35,7 +35,8 @@ pub fn init() void {
 
     const max_pfn_val = max_addr / page_size;
     max_pfn = max_pfn_val;
-    bitmap_byte_len = (max_pfn_val + 7) / 8;
+    // Bits for PFNs 0..=max_pfn inclusive.
+    bitmap_byte_len = (max_pfn_val / 8) + 1;
     const bitmap_page_count = (bitmap_byte_len + page_size - 1) / page_size;
 
     const bitmap_phys = findBitmapLocation(regions, bitmap_page_count) orelse {

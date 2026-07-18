@@ -2,6 +2,7 @@ const abi_hw = @import("abi_hw");
 const apic = @import("../arch/x86_64/apic.zig");
 const cpuid = @import("../arch/x86_64/cpuid.zig");
 const memory_map = @import("../mm/memory_map.zig");
+const smp = @import("../arch/x86_64/smp.zig");
 const std = @import("std");
 
 pub const CpuInfo = abi_hw.CpuInfo;
@@ -12,12 +13,12 @@ pub fn fillCpuInfo(out: *CpuInfo) void {
 
     const basic = cpuid.leaf(1, 0);
     const fms = cpuid.familyModelStepping(basic.eax);
-    out.logical_cpus = @max(@as(u32, 1), (basic.ebx >> 16) & 0xFF);
+    out.logical_cpus = @max(@as(u32, 1), @as(u32, @intCast(smp.onlineCpuCount())));
     out.ioapic_count = @intCast(apic.ioApicCount());
     out.family = fms.family;
     out.model = fms.model;
     out.stepping = fms.stepping;
-    out.apic_id = @truncate(basic.ebx >> 24);
+    out.apic_id = @truncate(smp.thisCpu().lapic_id);
 
     var vendor_raw: [12]u8 = undefined;
     cpuid.vendorString(&vendor_raw);

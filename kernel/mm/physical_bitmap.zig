@@ -30,7 +30,8 @@ pub const PageBitmap = struct {
         }
 
         const max_pfn = highest / page_size;
-        if (max_pfn >= bitmap.len * 8) {
+        // Need bits for PFNs 0..=max_pfn inclusive.
+        if (max_pfn + 1 > bitmap.len * 8) {
             @panic("physical page bitmap too small");
         }
 

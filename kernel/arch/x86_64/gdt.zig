@@ -1,4 +1,4 @@
-const GdtEntry = packed struct(u64) {
+pub const GdtEntry = packed struct(u64) {
     limit_low: u16,
     base_low: u16,
     base_mid: u8,
@@ -96,11 +96,23 @@ comptime {
 extern fn gdt_load(ptr: *const GdtPointer) callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn tss_load(selector: u16) callconv(.{ .x86_64_sysv = .{} }) void;
 
-fn installTssDescriptor() void {
-    const base = @intFromPtr(&tss);
+pub fn fillStandardEntries(entries: *[7]GdtEntry) void {
+    entries.* = .{
+        .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0, .limit_high_flags = 0, .base_high = 0 },
+        .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0x9A, .limit_high_flags = 0xA0, .base_high = 0 },
+        .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0x92, .limit_high_flags = 0xC0, .base_high = 0 },
+        .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0xF2, .limit_high_flags = 0xC0, .base_high = 0 },
+        .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0xFA, .limit_high_flags = 0xA0, .base_high = 0 },
+        .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0, .limit_high_flags = 0, .base_high = 0 },
+        .{ .limit_low = 0, .base_low = 0, .base_mid = 0, .access = 0, .limit_high_flags = 0, .base_high = 0 },
+    };
+}
+
+pub fn installTssDescriptor(entries: *[7]GdtEntry, tss_ptr: *Tss) void {
+    const base = @intFromPtr(tss_ptr);
     const limit: u32 = @sizeOf(Tss) - 1;
 
-    gdt[5] = .{
+    entries[5] = .{
         .limit_low = @truncate(limit),
         .base_low = @truncate(base),
         .base_mid = @truncate(base >> 16),
@@ -108,7 +120,7 @@ fn installTssDescriptor() void {
         .limit_high_flags = @truncate((limit >> 16) & 0xF),
         .base_high = @truncate(base >> 24),
     };
-    gdt[6] = .{
+    entries[6] = .{
         .limit_low = @truncate(base >> 32),
         .base_low = @truncate(base >> 48),
         .base_mid = 0,
@@ -118,8 +130,16 @@ fn installTssDescriptor() void {
     };
 }
 
-/// Mirror of `tss.rsp0`, read directly (RIP-relative) by the syscall stub.
+fn installTssDescriptorGlobal() void {
+    installTssDescriptor(&gdt, &tss);
+}
+
+/// Mirror of `tss.rsp0`, read directly (RIP-relative) by the syscall stub as fallback.
 export var gdt_kernel_rsp0: u64 = 0;
+
+pub fn setKernelStackExport(stack_top: u64) void {
+    gdt_kernel_rsp0 = stack_top;
+}
 
 pub fn setKernelStack(stack_top: u64) void {
     tss.rsp0 = stack_top;
@@ -127,15 +147,19 @@ pub fn setKernelStack(stack_top: u64) void {
 }
 
 pub fn init() void {
-    installTssDescriptor();
+    installTssDescriptorGlobal();
     const top = (@intFromPtr(&ist_stack) + ist_stack_size) & ~@as(u64, 15);
     tss.ist1 = top;
 }
 
 pub fn load() void {
+    loadFrom(&gdt);
+}
+
+pub fn loadFrom(entries: *const [7]GdtEntry) void {
     const ptr = GdtPointer{
         .limit = @sizeOf(@TypeOf(gdt)) - 1,
-        .base = @intFromPtr(&gdt),
+        .base = @intFromPtr(entries),
     };
     gdt_load(&ptr);
     tss_load(tss_selector);

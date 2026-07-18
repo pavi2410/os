@@ -17,10 +17,23 @@ const pit_frequency_hz: u32 = 1193182;
 /// Calibrate over this many milliseconds using the PIT.
 const calibration_ms: u32 = 10;
 
+var calibrated_ticks_per_irq: u32 = 0;
+
 pub fn init() TimerError!u32 {
     const ticks_per_irq = try calibrateTicksPerIrq();
+    calibrated_ticks_per_irq = ticks_per_irq;
     apic.startLapicTimer(timer_vector, ticks_per_irq);
     return ticks_per_irq;
+}
+
+/// Start the periodic LAPIC timer on an AP using BSP calibration.
+pub fn startOnAp() void {
+    if (calibrated_ticks_per_irq == 0) return;
+    apic.startLapicTimer(timer_vector, calibrated_ticks_per_irq);
+}
+
+pub fn ticksPerIrq() u32 {
+    return calibrated_ticks_per_irq;
 }
 
 fn calibrateTicksPerIrq() TimerError!u32 {

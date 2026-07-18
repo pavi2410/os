@@ -17,7 +17,8 @@ comptime {
         \\.global syscall_entry
         \\.type syscall_entry, @function
         \\syscall_entry:
-        \\  mov %rsp, syscall_user_rsp(%rip); mov gdt_kernel_rsp0(%rip), %rsp
+        \\  mov %rsp, syscall_user_rsp(%rip)
+        \\  mov %gs:0, %rsp
         \\  pushq syscall_user_rsp(%rip); push %r11; push %rcx; push %rax; push %rdi; push %rsi; push %rdx; push %r10; push %r8; push %r9; push %rbx; push %rbp; push %r12; push %r13; push %r14; push %r15
         \\  mov %rsp, %rdi; call syscall_dispatch
         \\  pop %r15; pop %r14; pop %r13; pop %r12; pop %rbp; pop %rbx; pop %r9; pop %r8; pop %r10; pop %rdx; pop %rsi; pop %rdi; add $8, %rsp; pop %rcx; pop %r11; pop %rsp
