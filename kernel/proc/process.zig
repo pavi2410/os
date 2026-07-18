@@ -278,6 +278,7 @@ pub fn forkChild(parent: *Process) ProcessError!*Process {
 
     child.brk = parent.brk;
     child.vmas.cloneFrom(&parent.vmas);
+    mmap_mod.retainFileCachePins(child);
     child.fds = parent.fds;
     if (!fd_retain.retainAll(&child.fds)) {
         child.fds = FdTable.init();
