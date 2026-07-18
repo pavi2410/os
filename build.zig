@@ -480,6 +480,11 @@ pub fn build(b: *std.Build) void {
     preempt_test_mod.addImport("preempt", preempt_host_mod);
     const run_preempt_tests = helpers.runHostTest(b, preempt_test_mod);
 
+    const spinlock_host_mod = helpers.hostModule(b, "kernel/sync/spinlock.zig");
+    const spinlock_test_mod = helpers.hostTestModule(b, "test/kernel/spinlock_test.zig");
+    spinlock_test_mod.addImport("spinlock", spinlock_host_mod);
+    const run_spinlock_tests = helpers.runHostTest(b, spinlock_test_mod);
+
     const acpi_access_test_mod = helpers.hostTestModule(b, "test/kernel/acpi_access_test.zig");
     acpi_access_test_mod.addImport("common/acpi_sig", host_common.acpi_sig);
     const run_acpi_access_tests = helpers.runHostTest(b, acpi_access_test_mod);
@@ -562,6 +567,7 @@ pub fn build(b: *std.Build) void {
         run_orphan_tests,
         run_ready_queue_tests,
         run_preempt_tests,
+        run_spinlock_tests,
         run_acpi_access_tests,
         run_icmp_tests,
         run_tcp_tests,
