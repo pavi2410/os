@@ -24,7 +24,7 @@ Phased plan for kernel development after the Limine bootloader. Phases 0–5, 7,
 
 **Hard gates:** phase 13 (SMP) is done on QEMU `-smp N`. GUI ([phase 14](14-gui.md)) follows.
 
-See also the high-level checklist in the [project README](../../README.md#-roadmap).
+See also the high-level checklist in the [project README](../../README.md#roadmap).
 
 ## Deferred backlog (not scheduled)
 
