@@ -176,7 +176,21 @@ def sync_disk(path: Path, readme: bytes, user_bins: dict[str, Path]) -> None:
     pf.open(str(path), read_only=False)
     try:
         _write_file(pf, "/README.TXT", readme)
-        _ensure_dir(pf, "/BIN")
+        bin_dir = _ensure_dir(pf, "/BIN")
+        desired = {name.upper() for name in user_bins}
+        for entry in list(bin_dir.get_entries()):
+            if entry.is_special() or entry.is_directory() or entry.is_volume_id():
+                continue
+            name = (entry.get_long_name() or entry.get_short_name() or "").upper()
+            if not name or name in desired:
+                continue
+            cluster = entry.get_cluster()
+            if cluster:
+                pf.free_cluster_chain(cluster)
+            bin_dir.remove_dir_entry(entry.get_short_name())
+            logger.info("disk: removed stale /BIN/%s", name)
+        pf.update_directory_entry(bin_dir)
+        pf.flush_fat()
         for dest_name, src in user_bins.items():
             _write_file(pf, f"/BIN/{dest_name}", src.read_bytes())
     finally:
