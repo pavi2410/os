@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import os
 import shutil
@@ -19,6 +20,8 @@ LIMINE_URL = (
     "https://github.com/Limine-Bootloader/Limine/releases/download/"
     f"{LIMINE_VERSION}/limine-binary.tar.gz"
 )
+# sha256 of limine-binary.tar.gz for LIMINE_VERSION
+LIMINE_SHA256 = "205f98218bb0d5a8ccabf5f903dba9d935f7b0aa66f4262a99b0f5a8e668ec6d"
 
 REQUIRED_SHARE_FILES = (
     "limine-bios.sys",
@@ -101,7 +104,13 @@ def install_limine_binary(root: Path) -> None:
     with urllib.request.urlopen(LIMINE_URL) as response:
         data = response.read()
 
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != LIMINE_SHA256:
+        raise RuntimeError(
+            f"Limine download hash mismatch: got {digest}, expected {LIMINE_SHA256}"
+        )
+
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
-        archive.extractall(root)
+        archive.extractall(root, filter="data")
 
     subprocess.run(["make", "-C", str(target)], check=True)
