@@ -276,6 +276,14 @@ class TestShellProcfs:
         assert_contains(out, "Vendor ID:", "lscpu vendor")
         assert_contains(out, "CPU(s):", "lscpu cpu count")
 
+    def test_neofetch(self, shell_session: QemuShell) -> None:
+        # When this is the first command after boot (-k neofetch), COM1 may drop
+        # the leading byte; settle with a cheap builtin first.
+        shell_session.run("true")
+        out = run_case(shell_session, "neofetch", "OS:", case="fork/exec neofetch")
+        assert_contains(out, "CPU:", "neofetch cpu")
+        assert_contains(out, "Memory:", "neofetch memory")
+
     def test_lsmem(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "lsmem", "START", case="lsmem header")
 

@@ -70,6 +70,7 @@ pub fn build(b: *std.Build) void {
     const install_lspci = helpers.addUserProgram(b, user_deps, "lspci", "userspace/lspci/main.zig", user_install);
     const install_lsblk = helpers.addUserProgram(b, user_deps, "lsblk", "userspace/lsblk/main.zig", user_install);
     const install_lsmem = helpers.addUserProgram(b, user_deps, "lsmem", "userspace/lsmem/main.zig", user_install);
+    const install_neofetch = helpers.addUserProgram(b, user_deps, "neofetch", "userspace/neofetch/main.zig", user_install);
 
     const common_tap_user = helpers.exeModule(b, "common/tap.zig", user_target, user_optimize);
     const utest_tap = helpers.exeModule(b, "userspace/utest/tap.zig", user_target, user_optimize);
@@ -194,6 +195,7 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_lspci.step);
     b.getInstallStep().dependOn(&install_lsblk.step);
     b.getInstallStep().dependOn(&install_lsmem.step);
+    b.getInstallStep().dependOn(&install_neofetch.step);
     b.getInstallStep().dependOn(&install_utest.step);
     b.getInstallStep().dependOn(&install_cowtest.step);
     b.getInstallStep().dependOn(&install_preempttest.step);
