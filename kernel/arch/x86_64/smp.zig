@@ -22,9 +22,12 @@ pub const CpuDesc = struct {
 };
 
 /// Per-CPU state. `kernel_rsp0` is at offset 0 so the syscall stub can use `%gs:0`.
+/// `syscall_user_rsp` at offset 8 holds the user stack while switching to the kernel stack.
 /// Large/aligned members live in parallel arrays so Zig does not reorder this struct.
 pub const CpuLocal = extern struct {
     kernel_rsp0: u64 = 0,
+    /// Scratch for user `%rsp` during `syscall` entry (must be per-CPU, not process-global).
+    syscall_user_rsp: u64 = 0,
     cpu_id: u32 = 0,
     lapic_id: u32 = 0,
     online: u8 = 0,
@@ -37,8 +40,10 @@ pub const CpuLocal = extern struct {
 };
 
 pub const kernel_rsp0_offset = @offsetOf(CpuLocal, "kernel_rsp0");
+pub const syscall_user_rsp_offset = @offsetOf(CpuLocal, "syscall_user_rsp");
 comptime {
     if (kernel_rsp0_offset != 0) @compileError("CpuLocal.kernel_rsp0 must be at offset 0");
+    if (syscall_user_rsp_offset != 8) @compileError("CpuLocal.syscall_user_rsp must be at offset 8");
 }
 
 var cpu_locals: [max_cpus]CpuLocal = [_]CpuLocal{.{}} ** max_cpus;
