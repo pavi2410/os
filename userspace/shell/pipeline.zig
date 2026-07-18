@@ -24,20 +24,26 @@ pub fn run(
     const pipe_count = cmd_count - 1;
 
     var pipe_fds: [max_pipes][2]i32 = undefined;
+    var pipes_created: usize = 0;
     var i: usize = 0;
     while (i < pipe_count) : (i += 1) {
         if (ulib.fs.pipe(&pipe_fds[i]) < 0) {
+            closePipeEnds(pipe_fds[0..pipes_created]);
             io.writeStr("pipe failed\n");
             return 1;
         }
+        pipes_created += 1;
     }
 
     var pids: [max_pipes + 1]ulib.process.ProcessId = undefined;
+    var spawned: usize = 0;
 
     i = 0;
     while (i < cmd_count) : (i += 1) {
         const pid = ulib.process.fork();
         if (pid < 0) {
+            closePipeEnds(pipe_fds[0..pipes_created]);
+            waitSpawned(pids[0..spawned]);
             io.writeStr("fork failed\n");
             return 1;
         }
@@ -103,25 +109,36 @@ pub fn run(
         }
 
         pids[i] = pid;
+        spawned += 1;
     }
 
-    var j: usize = 0;
-    while (j < pipe_count) : (j += 1) {
-        _ = ulib.fs.close(@intCast(pipe_fds[j][0]));
-        _ = ulib.fs.close(@intCast(pipe_fds[j][1]));
-    }
+    closePipeEnds(pipe_fds[0..pipes_created]);
 
     var exit_code: u8 = 0;
     var k: usize = 0;
-    while (k < cmd_count) : (k += 1) {
+    while (k < spawned) : (k += 1) {
         var wstatus: u32 = 0;
         _ = ulib.process.wait(pids[k], &wstatus, 0);
-        if (k == cmd_count - 1) {
+        if (k == spawned - 1) {
             exit_code = status.codeFromWait(wstatus);
         }
     }
 
     return exit_code;
+}
+
+fn closePipeEnds(pipes: [][2]i32) void {
+    for (pipes) |ends| {
+        _ = ulib.fs.close(@intCast(ends[0]));
+        _ = ulib.fs.close(@intCast(ends[1]));
+    }
+}
+
+fn waitSpawned(pids: []const ulib.process.ProcessId) void {
+    for (pids) |pid| {
+        var wstatus: u32 = 0;
+        _ = ulib.process.wait(pid, &wstatus, 0);
+    }
 }
 
 fn trimSegment(buf: []u8, start: usize, end: usize) usize {
