@@ -294,7 +294,7 @@ class TestShellTmpfs:
         run_case(shell_session, "ls /tmp", "foo", case="ls tmp")
 
     def test_mount_umount(self, shell_session: QemuShell) -> None:
-        run_case(shell_session, "mounttest", "mounttest: ok", case="mount umount remount")
+        run_case(shell_session, "mnttest", "mounttest: ok", case="mount umount remount")
 
     def test_rename_symlink(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "linktest", "linktest: ok", case="rename and symlink")

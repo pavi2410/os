@@ -15,6 +15,7 @@ const memory = @import("../mm/memory.zig");
 const orphan = @import("orphan.zig");
 const vma = @import("../mm/vma.zig");
 const mmap_mod = @import("../mm/mmap.zig");
+const fork_cow = @import("../mm/fork_cow.zig");
 
 pub const cwd_max_len = path_mod.default_cap;
 pub const Cwd = path_mod.Path(cwd_max_len);
@@ -271,7 +272,7 @@ pub fn forkChild(parent: *Process) ProcessError!*Process {
     const child = try createWithParent(parent.id);
     errdefer destroy(child);
 
-    paging.cloneUserAddressSpace(parent.address_space.cr3, child.address_space.cr3) catch {
+    fork_cow.shareForFork(parent.address_space.cr3, child.address_space.cr3) catch {
         return ProcessError.OutOfMemory;
     };
 

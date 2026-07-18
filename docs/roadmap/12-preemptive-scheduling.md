@@ -73,4 +73,4 @@ Syscalls remain non-preemptible mid-handler (SFMASK clears IF). Sticky `preempt_
 - SMP IPI reschedule ([phase 13](13-smp.md)) builds on `scheduleFromIrq` — do not start 13 until this phase stays green on one CPU.
 - GUI redraw loops ([phase 14](14-gui.md)) assume a fair scheduler.
 - Soak: boot under load for 60s+ of timer-driven scheduling without panic (CI uses a shorter gate; manual soak is fine).
-- Related: production fork temporarily uses eager `cloneUserAddressSpace` again until COW `shareUserAddressSpace` is fixed (boot regression from commit `6d2d458`).
+- Related: COW fork was reimplemented in `fork_cow.zig` (two-phase share + safe promote; copy-out promotes COW).

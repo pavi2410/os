@@ -423,9 +423,11 @@ fn virtFromIndices(pml4_idx: usize, pdpt_idx: usize, pd_idx: usize, pt_idx: usiz
         (@as(u64, pt_idx) << 12);
 }
 
-/// Share mapped user pages from `src_cr3` into `dst_cr3` (copy-on-write).
-pub fn shareUserAddressSpace(src_cr3: u64, dst_cr3: u64) MapError!void {
-    const src_pml4 = tableFromPhys(src_cr3);
+pub const UserLeafFn = *const fn (ctx: *anyopaque, virt: u64, pte: Pte) MapError!void;
+
+/// Walk every present user-accessible 4KiB leaf in the lower half of `cr3`.
+pub fn forEachUserLeaf(cr3: u64, ctx: *anyopaque, cb: UserLeafFn) MapError!void {
+    const src_pml4 = tableFromPhys(cr3);
 
     var pml4_idx: usize = 0;
     while (pml4_idx < kernel_pml4_start) : (pml4_idx += 1) {
@@ -452,18 +454,7 @@ pub fn shareUserAddressSpace(src_cr3: u64, dst_cr3: u64) MapError!void {
                     if (leaf.user == 0) continue;
 
                     const virt = virtFromIndices(pml4_idx, pdpt_idx, pd_idx, pt_idx);
-                    const src_phys = physAddr(leaf);
-                    var pte = leaf;
-                    const was_writable = pte.writable != 0;
-                    if (was_writable) pte.markCowShared();
-
-                    mapUserPageIn(dst_cr3, virt, src_phys, pte) catch |err| return err;
-                    page_ref.retain(src_phys) catch return MapError.OutOfTables;
-
-                    if (was_writable) {
-                        setPageFlagsIn(src_cr3, virt, pte) catch |err| return err;
-                        if (src_cr3 == readCr3()) invlpg(virt);
-                    }
+                    try cb(ctx, virt, leaf);
                 }
             }
         }
@@ -733,4 +724,31 @@ pub fn setPageFlagsIn(cr3_phys: u64, virt: u64, perm: Pte) MapError!void {
     if (!isPresent(leaf.*)) return MapError.NotMapped;
 
     leaf.* = makeEntry(leaf.framePhys(), Pte.mergePermissions(perm, .{ .user = 1 }));
+}
+
+/// Replace permission bits on a present user leaf, preserving the physical frame
+/// and avoiding `mergePermissions` (which clears `no_exec` when OR-merged with defaults).
+pub fn writeUserLeafFlagsIn(cr3_phys: u64, virt: u64, writable: bool, cow: bool) MapError!void {
+    if (virt & (page_size - 1) != 0) return MapError.UnalignedAddress;
+
+    const idx = virtIndices(virt);
+    const pml4 = tableFromPhys(cr3_phys);
+
+    const pdpt_entry = pml4[idx.pml4];
+    if (!isPresent(pdpt_entry) or isHuge(pdpt_entry)) return MapError.NotMapped;
+    const pdpt = tableFromPhys(physAddr(pdpt_entry));
+
+    const pd_entry = pdpt[idx.pdpt];
+    if (!isPresent(pd_entry) or isHuge(pd_entry)) return MapError.NotMapped;
+    const pd = tableFromPhys(physAddr(pd_entry));
+
+    const pt_entry = pd[idx.pd];
+    if (!isPresent(pt_entry) or isHuge(pt_entry)) return MapError.NotMapped;
+    const pt = tableFromPhys(physAddr(pt_entry));
+
+    const leaf = &pt[idx.pt];
+    if (!isPresent(leaf.*) or leaf.user == 0) return MapError.NotMapped;
+
+    leaf.writable = if (writable) 1 else 0;
+    leaf.cow = if (cow) 1 else 0;
 }

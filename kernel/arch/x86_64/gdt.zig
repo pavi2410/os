@@ -12,17 +12,14 @@ const GdtPointer = packed struct {
     base: u64,
 };
 
-/// Dedicated stack for IST1 exception handlers (#DF, #GP, #PF).
+/// Dedicated stack for IST1 exception handlers (#DF, #GP, #PF) when IST is enabled.
 const ist_stack_size: usize = 16 * 1024;
 var ist_stack: [ist_stack_size]u8 align(16) = undefined;
 
-/// IST index used by critical exception vectors in the IDT.
-pub const exception_ist: u8 = 1;
-
 /// Minimal 64-bit TSS; `rsp0` for syscalls/interrupts, `ist1` for fault handlers.
-/// Architectural 64-bit TSS layout. `rsp0` begins at byte 4, so this must be
-/// packed; an aligned Zig struct inserts four bytes of padding and makes the
-/// CPU load a corrupt ring-0 stack pointer on every privilege transition.
+/// Architectural 64-bit TSS layout (Intel SDM Vol. 3). Must be packed: an aligned
+/// Zig struct inserts padding before `rsp0` and corrupts ring-0 stack selection.
+/// `ist1` is at offset 0x2C.
 pub const Tss = packed struct {
     reserved0: u32 = 0,
     rsp0: u64 = 0,
@@ -30,9 +27,6 @@ pub const Tss = packed struct {
     rsp2: u64 = 0,
     reserved1: u64 = 0,
     reserved2: u64 = 0,
-    reserved3: u64 = 0,
-    reserved4: u32 = 0,
-    reserved5: u32 = 0,
     ist1: u64 = 0,
     ist2: u64 = 0,
     ist3: u64 = 0,
@@ -40,11 +34,18 @@ pub const Tss = packed struct {
     ist5: u64 = 0,
     ist6: u64 = 0,
     ist7: u64 = 0,
-    reserved6: u64 = 0,
-    reserved7: u32 = 0,
+    reserved3: u32 = 0,
+    reserved4: u32 = 0,
+    reserved5: u16 = 0,
     iopb_offset: u16 = 0,
-    reserved8: u16 = 0,
 };
+
+comptime {
+    if (@offsetOf(Tss, "rsp0") != 0x04) @compileError("TSS rsp0 must be at 0x04");
+    if (@offsetOf(Tss, "ist1") != 0x2C) @compileError("TSS ist1 must be at 0x2C");
+    if (@offsetOf(Tss, "iopb_offset") != 0x6E) @compileError("TSS iopb_offset must be at 0x6E");
+    if (@sizeOf(Tss) != 0x70) @compileError("TSS size must be 0x70");
+}
 
 // Order is required by SYSCALL/SYSRET: user data must sit at
 // `kernel_data_selector + 8` and user code at `kernel_data_selector + 16`.

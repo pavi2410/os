@@ -6,7 +6,7 @@
 
 **Unlocks:** [Phase 8 — Process environment](08-process-environment.md), [Phase 13 — SMP](13-smp.md) (SMP-safe COW is required before multicore)
 
-**Status:** Restored. Production `fork` uses `shareUserAddressSpace` again (Phase 9 VMA + refcount teardown).
+**Status:** Done. Production `fork` uses [`fork_cow.shareForFork`](../../kernel/mm/fork_cow.zig) (two-phase share + promote). User `#PF` uses RSP0 (`IST=0`); TSS `ist1` layout is corrected at offset `0x2C` for a future IST re-enable.
 
 ---
 
@@ -18,7 +18,7 @@
 - Future daemons, pipes, and job control need cheap fork
 - SMP will require COW with correct TLB shootdown anyway — better to learn COW on one CPU first
 
-COW is implemented in [`paging.shareUserAddressSpace`](../../kernel/arch/x86_64/paging.zig) and [`kernel/mm/cow.zig`](../../kernel/mm/cow.zig), but is not currently selected by production `fork`.
+COW is implemented in [`kernel/mm/fork_cow.zig`](../../kernel/mm/fork_cow.zig) (share + promote) with `#PF` / copy-out entry points in [`kernel/mm/cow.zig`](../../kernel/mm/cow.zig).
 
 ---
 
@@ -27,7 +27,7 @@ COW is implemented in [`paging.shareUserAddressSpace`](../../kernel/arch/x86_64/
 ### Physical page sharing
 
 - [x] Reference count (or equivalent) on physical pages used by user mappings ([`page_ref.zig`](../../kernel/mm/page_ref.zig) / [`page_ref_table.zig`](../../kernel/mm/page_ref_table.zig))
-- [x] Restore production `fork` to map child PTEs to parent's physical pages read-only (user + present) via `shareUserAddressSpace`
+- [x] Restore production `fork` to map child PTEs to parent's physical pages read-only (user + present) via `fork_cow.shareForFork`
 - [x] Mark shared user pages in page tables (software `Pte.cow` bit)
 
 ### Page fault promotion
@@ -80,4 +80,7 @@ Uniprocessor COW first. When bringing up APs in [phase 13](13-smp.md):
 
 - See also [phase 4](04-userspace.md) — eager copy was temporary and has been replaced.
 - Do not implement COW without phase 6 tests; faults and refcounts are easy to get wrong.
-- Eager `cloneUserAddressSpace` remains available as a non-production helper; production `fork` uses `shareUserAddressSpace`.
+- Eager `cloneUserAddressSpace` remains available as a non-production helper; production `fork` uses `fork_cow.shareForFork`.
+- Kernel `copy_out` / user-access validation must promote COW pages before writing (e.g. `wait` status), not only the `#PF` path.
+- User `#PF` must be deliverable after COW write-protects the stack. TSS `ist1` belongs at offset `0x2C` (fixed from a layout that left IST null). Exception gates currently use RSP0 (`IST=0`) because IST delivery still failed in QEMU after that fix — re-enable IST once validated.
+- `shareForFork` repairs `page_ref.count == 0` leaves before retaining for the child so exec/teardown cannot free a frame the parent still maps.

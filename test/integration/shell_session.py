@@ -5,6 +5,7 @@ from __future__ import annotations
 import pexpect
 import re
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -66,6 +67,9 @@ class QemuShell:
 
     def run(self, cmd: str, *, timeout: float | None = None) -> str:
         wait = self.command_timeout if timeout is None else timeout
+        # After COW fork the shell may still be faulting in; brief settle reduces
+        # COM1 FIFO overruns (RX is polled, no UART IRQ).
+        time.sleep(0.1)
         self.proc.send(cmd + "\r")
         self.proc.expect(self.PROMPT, timeout=wait)
         return self.proc.before or ""

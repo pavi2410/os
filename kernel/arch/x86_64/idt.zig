@@ -254,12 +254,13 @@ pub fn init() void {
     for (0..256) |vector| {
         setHandler(vector, isr_default, 0);
     }
-    const ist = gdt.exception_ist;
-    setHandler(0, isr_0, ist);
-    setHandler(6, isr_6, ist);
-    setHandler(8, isr_8, ist);
-    setHandler(13, isr_13, ist);
-    setHandler(14, isr_14, ist);
+    // Use RSP0 (IST=0) for exception delivery. A prior TSS layout bug left IST1
+    // null; keep exceptions on RSP0 until IST delivery is re-validated.
+    setHandler(0, isr_0, 0);
+    setHandler(6, isr_6, 0);
+    setHandler(8, isr_8, 0);
+    setHandler(13, isr_13, 0);
+    setHandler(14, isr_14, 0);
 
     for (irq_vector_start..irq_vector_end) |vector| {
         setHandler(vector, irqHandler(vector), 0);
@@ -273,3 +274,4 @@ pub fn load() void {
     };
     idt_load(&ptr);
 }
+

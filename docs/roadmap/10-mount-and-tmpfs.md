@@ -64,7 +64,7 @@
 |---|-----------|--------|
 | 1 | tmpfs mounts at `/tmp`; shell and programs can create ephemeral files | **Done** |
 | 2 | FAT boot disk unchanged — `/BIN/*` still loads | **Done** |
-| 3 | `mount` / `umount2` work for tmpfs (root FAT remains mounted) | **Done** (`mounttest`) |
+| 3 | `mount` / `umount2` work for tmpfs (root FAT remains mounted) | **Done** (`mnttest`) |
 | 4 | `rename` on FAT and tmpfs; `symlink` / `readlink` on tmpfs | **Done** (`linktest`) |
 | 5 | Host + integration tests cover mount resolve and tmpfs round-trip | **Done** |
 
