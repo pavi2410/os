@@ -4,6 +4,7 @@ const io = @import("io.zig");
 const prefix_env = @import("prefix_env.zig");
 const redirect = @import("redirect.zig");
 const registry = @import("cmd/registry.zig");
+const ulib = @import("ulib");
 
 /// Return effective line length after stripping an unquoted `#` comment.
 pub fn stripComment(buf: []u8, len: usize) usize {
@@ -154,7 +155,46 @@ fn operatorLen(op: Op) usize {
 }
 
 fn executeCommand(segment: []u8, expand_bufs: *[argv.max_args][expand.max_arg_len]u8) u8 {
-    var parsed = argv.parse(segment, segment.len) catch {
+    var redirects: redirect.ParseRedirects = .{};
+    redirect.extract(segment, &redirects) catch {
+        io.writeStr("redirect failed\n");
+        return 1;
+    };
+    var cmd_len = segment.len;
+    while (cmd_len > 0 and segment[cmd_len - 1] == 0) cmd_len -= 1;
+    while (cmd_len > 0 and segment[cmd_len - 1] == ' ') cmd_len -= 1;
+
+    var saved_in: i64 = -1;
+    var saved_out: i64 = -1;
+    var saved_err: i64 = -1;
+    if (redirects.count > 0) {
+        saved_in = ulib.fs.duplicate(0);
+        saved_out = ulib.fs.duplicate(1);
+        saved_err = ulib.fs.duplicate(2);
+        if (saved_in < 0 or saved_out < 0 or saved_err < 0) {
+            io.writeStr("redirect failed\n");
+            return 1;
+        }
+        redirect.store(&redirects);
+        redirect.apply(redirects.redirects[0..redirects.count]);
+    }
+    defer {
+        if (saved_in >= 0) {
+            _ = ulib.fs.duplicateTo(@intCast(saved_in), 0);
+            _ = ulib.fs.close(@intCast(saved_in));
+        }
+        if (saved_out >= 0) {
+            _ = ulib.fs.duplicateTo(@intCast(saved_out), 1);
+            _ = ulib.fs.close(@intCast(saved_out));
+        }
+        if (saved_err >= 0) {
+            _ = ulib.fs.duplicateTo(@intCast(saved_err), 2);
+            _ = ulib.fs.close(@intCast(saved_err));
+        }
+        redirect.clearStored();
+    }
+
+    var parsed = argv.parse(segment[0..cmd_len], cmd_len) catch {
         io.writeStr("too many arguments\n");
         return 1;
     };

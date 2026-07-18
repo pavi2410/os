@@ -240,3 +240,9 @@ pub fn applyStored() void {
     has_saved = false;
     apply(saved.redirects[0..saved.count]);
 }
+
+/// Drop any stored redirects without applying them.
+pub fn clearStored() void {
+    has_saved = false;
+    saved.count = 0;
+}
