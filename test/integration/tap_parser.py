@@ -37,6 +37,10 @@ class TapReport:
     def assert_all_passed(self, label: str) -> None:
         if self.bail is not None:
             raise AssertionError(f"{label}: bail out: {self.bail}")
+        if self.planned is None:
+            raise AssertionError(f"{label}: missing TAP plan")
+        if len(self.cases) == 0:
+            raise AssertionError(f"{label}: no TAP test results")
         failures = [case for case in self.cases if not case.passed]
         if failures:
             lines = [f"  not ok - {case.name}" for case in failures]
@@ -46,7 +50,7 @@ class TapReport:
                 f"{label}: {len(failures)} failed, {self.passed} passed\n"
                 + "\n".join(lines)
             )
-        if self.planned is not None and self.planned != len(self.cases):
+        if self.planned != len(self.cases):
             raise AssertionError(
                 f"{label}: planned {self.planned} tests, got {len(self.cases)} results"
             )
