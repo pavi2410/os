@@ -55,9 +55,9 @@ fn resolveName(name: []const u8, out: *[4]u8) bool {
 
 fn httpGet(host: []const u8, ip: *const [4]u8, port: u16, path: []const u8) u8 {
     const fd = ulib.net.socket(
-        ulib.net.AF_INET,
-        ulib.net.SOCK_STREAM,
-        ulib.net.IPPROTO_TCP,
+        .inet,
+        .stream,
+        .tcp,
     );
     if (fd < 0) {
         ulib.io.writeStr("curl: socket failed\n");

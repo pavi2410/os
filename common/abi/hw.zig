@@ -16,19 +16,25 @@ pub const CpuInfo = extern struct {
     apic_id: u8,
 };
 
-pub const MEM_CONVENTIONAL: u32 = 0;
-pub const MEM_RESERVED: u32 = 1;
-pub const MEM_BOOT_SERVICES: u32 = 2;
-pub const MEM_RUNTIME: u32 = 3;
-pub const MEM_MMIO: u32 = 4;
-pub const MEM_ACPI: u32 = 5;
-pub const MEM_UNUSABLE: u32 = 6;
-pub const MEM_UNKNOWN: u32 = 7;
+pub const MemKind = enum(u32) {
+    conventional = 0,
+    reserved = 1,
+    boot_services = 2,
+    runtime = 3,
+    mmio = 4,
+    acpi = 5,
+    unusable = 6,
+    unknown = 7,
+
+    pub fn name(self: MemKind) []const u8 {
+        return @tagName(self);
+    }
+};
 
 pub const MemRegionInfo = extern struct {
     start: u64,
     length: u64,
-    kind: u32,
+    kind: MemKind,
 };
 
 comptime {
@@ -52,6 +58,7 @@ comptime {
             .{ .field = "kind", .offset = 16 },
         },
     });
+    if (@sizeOf(MemKind) != 4) @compileError("MemKind must be u32-sized");
 }
 
 const LayoutField = struct {

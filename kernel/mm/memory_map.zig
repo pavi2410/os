@@ -1,19 +1,7 @@
 const limine = @import("limine");
+const abi_hw = @import("abi_hw");
 
-pub const RegionKind = enum {
-    conventional,
-    reserved,
-    boot_services,
-    runtime,
-    mmio,
-    acpi,
-    unusable,
-    unknown,
-
-    pub fn name(self: RegionKind) []const u8 {
-        return @tagName(self);
-    }
-};
+pub const RegionKind = abi_hw.MemKind;
 
 pub const Region = struct {
     start: u64,

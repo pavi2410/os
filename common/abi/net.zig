@@ -1,10 +1,41 @@
-pub const AF_INET: u16 = 2;
-pub const SOCK_STREAM: u16 = 1;
-pub const SOCK_DGRAM: u16 = 2;
+pub const AddressFamily = enum(u16) {
+    inet = 2,
 
-pub const IPPROTO_ICMP: i32 = 1;
-pub const IPPROTO_TCP: i32 = 6;
-pub const IPPROTO_UDP: i32 = 17;
+    pub fn fromInt(n: u32) ?AddressFamily {
+        return switch (n) {
+            @intFromEnum(AddressFamily.inet) => .inet,
+            else => null,
+        };
+    }
+};
+
+pub const SocketType = enum(u16) {
+    stream = 1,
+    dgram = 2,
+
+    pub fn fromInt(n: u32) ?SocketType {
+        return switch (n) {
+            @intFromEnum(SocketType.stream) => .stream,
+            @intFromEnum(SocketType.dgram) => .dgram,
+            else => null,
+        };
+    }
+};
+
+pub const IpProtocol = enum(i32) {
+    icmp = 1,
+    tcp = 6,
+    udp = 17,
+
+    pub fn fromInt(n: i32) ?IpProtocol {
+        return switch (n) {
+            @intFromEnum(IpProtocol.icmp) => .icmp,
+            @intFromEnum(IpProtocol.tcp) => .tcp,
+            @intFromEnum(IpProtocol.udp) => .udp,
+            else => null,
+        };
+    }
+};
 
 pub const SockaddrIn = extern struct {
     family: u16,
@@ -15,7 +46,7 @@ pub const SockaddrIn = extern struct {
 
 pub fn sockaddrIn(addr: [4]u8, port_host: u16) SockaddrIn {
     return .{
-        .family = AF_INET,
+        .family = @intFromEnum(AddressFamily.inet),
         .port_be = @byteSwap(port_host),
         .addr = addr,
     };
@@ -33,3 +64,12 @@ pub const NeighEntry = extern struct {
     ip: [4]u8,
     mac: [6]u8,
 };
+
+comptime {
+    if (@intFromEnum(AddressFamily.inet) != 2) @compileError("AddressFamily.inet must be 2");
+    if (@intFromEnum(SocketType.stream) != 1) @compileError("SocketType.stream must be 1");
+    if (@intFromEnum(SocketType.dgram) != 2) @compileError("SocketType.dgram must be 2");
+    if (@intFromEnum(IpProtocol.icmp) != 1) @compileError("IpProtocol.icmp must be 1");
+    if (@intFromEnum(IpProtocol.tcp) != 6) @compileError("IpProtocol.tcp must be 6");
+    if (@intFromEnum(IpProtocol.udp) != 17) @compileError("IpProtocol.udp must be 17");
+}

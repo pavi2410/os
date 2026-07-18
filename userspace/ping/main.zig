@@ -35,9 +35,9 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8
     }
 
     const fd = ulib.net.socket(
-        ulib.net.AF_INET,
-        ulib.net.SOCK_DGRAM,
-        ulib.net.IPPROTO_ICMP,
+        .inet,
+        .dgram,
+        .icmp,
     );
     if (fd < 0) {
         ulib.io.writeStr("ping: socket failed\n");

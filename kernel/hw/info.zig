@@ -39,7 +39,7 @@ pub fn fillMemRegions(buf: []MemRegionInfo) usize {
         buf[i] = .{
             .start = region.start,
             .length = region.end - region.start,
-            .kind = mapMemKind(region.kind),
+            .kind = region.kind,
         };
     }
     return count;
@@ -55,17 +55,4 @@ fn trimTrailingSpaces(buf: *[48]u8) void {
     var len = brandRawLen(buf);
     while (len > 0 and buf[len - 1] == ' ') len -= 1;
     if (len < 48) @memset(buf[len..], 0);
-}
-
-fn mapMemKind(kind: memory_map.RegionKind) u32 {
-    return switch (kind) {
-        .conventional => abi_hw.MEM_CONVENTIONAL,
-        .reserved => abi_hw.MEM_RESERVED,
-        .boot_services => abi_hw.MEM_BOOT_SERVICES,
-        .runtime => abi_hw.MEM_RUNTIME,
-        .mmio => abi_hw.MEM_MMIO,
-        .acpi => abi_hw.MEM_ACPI,
-        .unusable => abi_hw.MEM_UNUSABLE,
-        .unknown => abi_hw.MEM_UNKNOWN,
-    };
 }

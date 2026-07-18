@@ -112,13 +112,9 @@ pub fn execve(path: [*:0]const u8, argv: [*:null]?[*:0]const u8, envp: [*:null]?
     return syscall6(abi_syscall.execve, @intFromPtr(path), @intFromPtr(argv), @intFromPtr(envp), 0, 0, 0);
 }
 
-pub const AF_INET = abi_net.AF_INET;
-pub const SOCK_DGRAM = abi_net.SOCK_DGRAM;
-pub const SOCK_STREAM = abi_net.SOCK_STREAM;
-pub const IPPROTO_ICMP: u32 = @intCast(abi_net.IPPROTO_ICMP);
-pub const IPPROTO_TCP: u32 = @intCast(abi_net.IPPROTO_TCP);
-pub const IPPROTO_UDP: u32 = @intCast(abi_net.IPPROTO_UDP);
-
+pub const AddressFamily = abi_net.AddressFamily;
+pub const SocketType = abi_net.SocketType;
+pub const IpProtocol = abi_net.IpProtocol;
 pub const SockaddrIn = abi_net.SockaddrIn;
 
 pub fn socket(domain: u32, sock_type: u32, protocol: u32) isize {

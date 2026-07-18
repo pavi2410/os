@@ -39,7 +39,7 @@ export fn main(argc: usize, argv: [*][*]u8) callconv(.{ .x86_64_sysv = .{} }) u8
         return 1;
     };
 
-    const fd = ulib.net.socket(ulib.net.AF_INET, ulib.net.SOCK_DGRAM, 0);
+    const fd = ulib.net.socket(.inet, .dgram, null);
     if (fd < 0) {
         ulib.io.writeStr("dig: socket failed\n");
         return 1;

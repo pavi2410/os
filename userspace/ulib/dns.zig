@@ -12,7 +12,7 @@ pub noinline fn resolveA(name: []const u8, server: ?[4]u8, out: *[4]u8) bool {
     var query: [256]u8 = undefined;
     const query_len = dns_codec.buildQuery(name, &query) catch return false;
 
-    const fd = net.socket(net.AF_INET, net.SOCK_DGRAM, 0);
+    const fd = net.socket(.inet, .dgram, null);
     if (fd < 0) return false;
 
     var dest = net.sockaddrIn(dns_addr, dns_port);

@@ -15,16 +15,16 @@ fn zstr(buf: []const u8) []const u8 {
     return buf[0..i];
 }
 
-fn memKindName(kind: u32) []const u8 {
+fn memKindName(kind: abi_hw.MemKind) []const u8 {
     return switch (kind) {
-        abi_hw.MEM_CONVENTIONAL => "conventional",
-        abi_hw.MEM_RESERVED => "reserved",
-        abi_hw.MEM_BOOT_SERVICES => "boot-services",
-        abi_hw.MEM_RUNTIME => "runtime",
-        abi_hw.MEM_MMIO => "mmio",
-        abi_hw.MEM_ACPI => "acpi",
-        abi_hw.MEM_UNUSABLE => "unusable",
-        else => "unknown",
+        .conventional => "conventional",
+        .reserved => "reserved",
+        .boot_services => "boot-services",
+        .runtime => "runtime",
+        .mmio => "mmio",
+        .acpi => "acpi",
+        .unusable => "unusable",
+        .unknown => "unknown",
     };
 }
 

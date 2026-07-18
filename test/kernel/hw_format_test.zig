@@ -29,7 +29,7 @@ test "formatCpuinfo emits expected keys" {
 
 test "formatIomem line shape" {
     const regions = [_]abi_hw.MemRegionInfo{
-        .{ .start = 0, .length = 0x1000, .kind = abi_hw.MEM_CONVENTIONAL },
+        .{ .start = 0, .length = 0x1000, .kind = .conventional },
     };
     var buf: [128]u8 = undefined;
     const n = hw_format.formatIomem(&regions, &buf);

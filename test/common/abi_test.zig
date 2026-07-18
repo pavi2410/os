@@ -48,7 +48,7 @@ test "dirent64 helpers round-trip records" {
 
 test "network ABI sockaddr uses big-endian port" {
     const addr = abi_net.sockaddrIn(.{ 10, 0, 2, 2 }, 8080);
-    try std.testing.expectEqual(abi_net.AF_INET, addr.family);
+    try std.testing.expectEqual(@intFromEnum(abi_net.AddressFamily.inet), addr.family);
     try std.testing.expectEqual(@byteSwap(@as(u16, 8080)), addr.port_be);
     try std.testing.expectEqual(@as(u8, 10), addr.addr[0]);
     try std.testing.expectEqual(@as(usize, 16), @sizeOf(abi_net.SockaddrIn));

@@ -259,6 +259,7 @@ pub fn build(b: *std.Build) void {
 
     const memory_map_host_mod = helpers.hostModule(b, "kernel/mm/memory_map.zig");
     memory_map_host_mod.addImport("limine", limine_mod);
+    // abi_host is created later; MemKind import is wired after AbiBundle.create.
 
     const memory_map_test_mod = helpers.hostTestModule(b, "test/kernel/memory_map_test.zig");
     memory_map_test_mod.addImport("memory_map", memory_map_host_mod);
@@ -334,6 +335,7 @@ pub fn build(b: *std.Build) void {
     const abi_host = helpers.AbiBundle.create(b, b.graph.host, .Debug);
     abi_host.attachFsView(host_common.view);
     vma_host_mod.addImport("abi_mman", abi_host.mman);
+    memory_map_host_mod.addImport("abi_hw", abi_host.hw);
 
     const ulib_target_support_host = helpers.hostModule(b, "userspace/ulib/target_support.zig");
     ulib_target_support_host.addImport("common/ipv4_addr", host_common.ipv4_addr);

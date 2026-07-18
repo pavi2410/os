@@ -1,12 +1,9 @@
 const abi_net = @import("abi_net");
 const syscall = @import("syscall.zig");
 
-pub const AF_INET = abi_net.AF_INET;
-pub const SOCK_STREAM = abi_net.SOCK_STREAM;
-pub const SOCK_DGRAM = abi_net.SOCK_DGRAM;
-pub const IPPROTO_ICMP: u32 = @intCast(abi_net.IPPROTO_ICMP);
-pub const IPPROTO_TCP: u32 = @intCast(abi_net.IPPROTO_TCP);
-pub const IPPROTO_UDP: u32 = @intCast(abi_net.IPPROTO_UDP);
+pub const AddressFamily = abi_net.AddressFamily;
+pub const SocketType = abi_net.SocketType;
+pub const IpProtocol = abi_net.IpProtocol;
 
 pub const SockaddrIn = abi_net.SockaddrIn;
 pub const NetConfig = abi_net.NetConfig;
@@ -16,8 +13,9 @@ pub fn sockaddrIn(addr: [4]u8, port_host: u16) SockaddrIn {
     return abi_net.sockaddrIn(addr, port_host);
 }
 
-pub fn socket(domain: u32, sock_type: u32, protocol: u32) isize {
-    return syscall.socket(domain, sock_type, protocol);
+pub fn socket(domain: AddressFamily, sock_type: SocketType, protocol: ?IpProtocol) isize {
+    const proto: u32 = if (protocol) |p| @intCast(@intFromEnum(p)) else 0;
+    return syscall.socket(@intFromEnum(domain), @intFromEnum(sock_type), proto);
 }
 
 pub fn bind(fd: u32, addr: *const SockaddrIn) isize {
