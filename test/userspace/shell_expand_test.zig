@@ -64,3 +64,21 @@ test "expand replaces bare $?" {
     const result = expand.expandWith("$?", &out, mockLookup).?;
     try std.testing.expectEqualStrings("1", result);
 }
+
+test "expandArgv uses environ getValue from setPair" {
+    const argv = @import("argv");
+    const environ = @import("environ");
+
+    environ.init();
+    try std.testing.expect(environ.setPair("PATH", "/BIN"));
+    try std.testing.expect(environ.setPair("FOO", "qux"));
+
+    var parsed: argv.Parsed = .{};
+    parsed.argc = 2;
+    parsed.args[0] = "echo";
+    parsed.args[1] = "$FOO:$PATH";
+    var storage: [argv.max_args][expand.max_arg_len]u8 = undefined;
+    try std.testing.expect(expand.expandArgv(&parsed, &storage));
+    try std.testing.expectEqualStrings("echo", parsed.args[0]);
+    try std.testing.expectEqualStrings("qux:/BIN", parsed.args[1]);
+}

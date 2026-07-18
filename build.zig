@@ -526,6 +526,7 @@ pub fn build(b: *std.Build) void {
     shell_expand_test_mod.addImport("expand", shell_expand_host);
     shell_expand_test_mod.addImport("argv", shell_argv_host);
     shell_expand_test_mod.addImport("status", shell_status_host);
+    shell_expand_test_mod.addImport("environ", shell_environ_stub);
     const run_shell_expand_tests = helpers.runHostTest(b, shell_expand_test_mod);
 
     const ulib_helpers_test_mod = helpers.hostTestModule(b, "test/userspace/ulib_helpers_test.zig");
