@@ -117,3 +117,31 @@ pub const RsdpRequest = extern struct {
     revision: u64 = 0,
     response: ?*RsdpResponse = null,
 };
+
+/// Request x2APIC mode from the bootloader (optional; we stay in xAPIC).
+pub const MP_REQUEST_X86_64_X2APIC: u64 = 1 << 0;
+
+pub const MpGotoAddress = *const fn (*MpInfo) callconv(.c) noreturn;
+
+pub const MpInfo = extern struct {
+    processor_id: u32,
+    lapic_id: u32,
+    reserved: u64,
+    goto_address: ?*const fn (*MpInfo) callconv(.c) noreturn,
+    extra_argument: u64,
+};
+
+pub const MpResponse = extern struct {
+    revision: u64,
+    flags: u32,
+    bsp_lapic_id: u32,
+    cpu_count: u64,
+    cpus: ?[*]?*MpInfo,
+};
+
+pub const MpRequest = extern struct {
+    id: [4]u64 = requestId(0x95a67b819a1b857e, 0xa0b61b723b6a73e0),
+    revision: u64 = 0,
+    response: ?*MpResponse = null,
+    flags: u64 = 0,
+};

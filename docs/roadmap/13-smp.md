@@ -14,16 +14,16 @@
 
 - [ ] Use Limine MP request for AP startup
 - [ ] ACPI RSDP pointer from bootloader
-- [ ] Parse ACPI tables ([`arch/x86_64/acpi.zig`](../../kernel/arch/x86_64/acpi.zig))
-  - [ ] RSDP → RSDT/XSDT
+- [ ] Parse ACPI tables ([`kernel/acpi/`](../../kernel/acpi/))
+  - [x] RSDP → RSDT/XSDT
   - [ ] MADT (APIC entries)
   - [ ] FADT (for ACPI shutdown / timer if needed)
 - [ ] Enable LAPIC and IOAPIC routing
 
 ### SMP bring-up
 
-- [ ] Trampoline for AP startup (low memory or dedicated region)
-- [ ] Send INIT-SIPI-SIPI or equivalent
+- [ ] Trampoline for AP startup (Limine MP `goto_address`; no hand-rolled INIT-SIPI)
+- [ ] Send INIT-SIPI-SIPI or equivalent (via Limine MP)
 - [ ] Per-CPU data (current thread, idle, run queues)
 - [ ] Per-CPU timer and IPI for reschedule (builds on [phase 12](12-preemptive-scheduling.md))
 - [ ] Make scheduler SMP-safe (spinlocks, per-CPU run queues)

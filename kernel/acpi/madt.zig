@@ -7,21 +7,33 @@ pub const IoApic = struct {
     gsi_base: u32,
 };
 
+pub const LocalApic = struct {
+    /// ACPI Processor UID / processor_id.
+    processor_id: u8,
+    lapic_id: u8,
+    /// MADT Local APIC flags bit 0 = enabled.
+    enabled: bool,
+};
+
 pub const Info = struct {
     local_apic_address: u64,
     ioapics: []const IoApic,
+    local_apics: []const LocalApic,
 };
 
 pub const ParseError = error{
     InvalidRsdp,
     MadtNotFound,
     TooManyIoApics,
+    TooManyLocalApics,
 };
 
 const madt_header_size = access.sdt_header_size + 8;
 
 const max_ioapics = 8;
+const max_local_apics = 32;
 var ioapic_storage: [max_ioapics]IoApic = undefined;
+var local_apic_storage: [max_local_apics]LocalApic = undefined;
 
 /// `rsdp_virt` is the HHDM virtual pointer from Limine (base revision >= 4).
 pub fn parse(rsdp_virt: u64) ParseError!Info {
@@ -34,6 +46,7 @@ pub fn parse(rsdp_virt: u64) ParseError!Info {
 
     var local_apic_address: u64 = bytes.readU32Le(madt_bytes, access.sdt_header_size);
     var ioapic_count: usize = 0;
+    var local_apic_count: usize = 0;
 
     var offset: usize = madt_header_size;
     while (offset + 2 <= length) {
@@ -43,6 +56,21 @@ pub fn parse(rsdp_virt: u64) ParseError!Info {
         if (offset + entry_len > length) break;
 
         switch (entry_type) {
+            0 => {
+                // Processor Local APIC
+                if (entry_len < 8) {
+                    offset += entry_len;
+                    continue;
+                }
+                if (local_apic_count >= max_local_apics) return ParseError.TooManyLocalApics;
+                const flags = bytes.readU32Le(madt_bytes, offset + 4);
+                local_apic_storage[local_apic_count] = .{
+                    .processor_id = madt_bytes[offset + 2],
+                    .lapic_id = madt_bytes[offset + 3],
+                    .enabled = (flags & 1) != 0,
+                };
+                local_apic_count += 1;
+            },
             1 => {
                 if (entry_len < 12) {
                     offset += entry_len;
@@ -71,5 +99,6 @@ pub fn parse(rsdp_virt: u64) ParseError!Info {
     return .{
         .local_apic_address = local_apic_address,
         .ioapics = ioapic_storage[0..ioapic_count],
+        .local_apics = local_apic_storage[0..local_apic_count],
     };
 }

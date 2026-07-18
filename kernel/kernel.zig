@@ -27,6 +27,8 @@ const thread = @import("proc/thread.zig");
 const virtual = @import("mm/virtual.zig");
 const memory = @import("mm/memory.zig");
 const runtime_mod = @import("runtime.zig");
+const smp = @import("arch/x86_64/smp.zig");
+const acpi_madt = @import("acpi/madt.zig");
 
 /// Deliberately unmapped higher-half address used to verify the page fault handler.
 const page_fault_test_addr: u64 = 0xFFFFFFFF90000000;
@@ -43,6 +45,7 @@ pub const BootContext = struct {
     memory_map: *const limine.MemmapResponse,
     rsdp_virt: u64,
     bootloader_info: ?*const limine.BootloaderInfoResponse,
+    mp: ?*const limine.MpResponse,
 };
 
 pub fn init(ctx: BootContext) void {
@@ -68,6 +71,18 @@ pub fn init(ctx: BootContext) void {
             hal.console.println("Version: {s}", .{version});
         }
     }
+
+    smp.initFromLimine(ctx.mp);
+    hal.console.println("CPUs available: {d}", .{smp.availableCpuCount()});
+    if (acpi_madt.parse(ctx.rsdp_virt)) |madt_info| {
+        var enabled: usize = 0;
+        for (madt_info.local_apics) |lap| {
+            if (lap.enabled) enabled += 1;
+        }
+        if (enabled != 0) {
+            hal.console.println("MADT local APICs enabled: {d}", .{enabled});
+        }
+    } else |_| {}
 
     memory_map.init(ctx.memory_map);
     reserveMemoryMapBuffer(ctx.memory_map);
