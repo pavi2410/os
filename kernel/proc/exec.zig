@@ -52,20 +52,21 @@ pub fn execve(path: []const u8, argv: []const []const u8, envp: []const []const 
     };
     defer programs.free(image_buf);
 
-    // Build the replacement image before touching the current address space.
-    // A failed execve must return to the old program intact.
+    // Build the replacement image and VMA table before touching the current
+    // address space. A failed execve must return to the old program intact.
     var replacement = process.AddressSpace.create() catch return ExecError.OutOfMemory;
     errdefer replacement.destroy();
     const loaded = user_loader.load(replacement.cr3, image_buf, argv_slice, envp_slice) catch return ExecError.InvalidElf;
+    const new_vmas = process.buildLoadedVmas(&loaded) catch return ExecError.OutOfMemory;
 
+    // Point of no return: swap atomically; nothing after this may fail and return.
     mmap_mod.releaseFileCachePins(proc);
-    proc.vmas.clear();
     var previous = proc.address_space;
     proc.address_space = replacement;
+    proc.vmas = new_vmas;
     previous.destroy();
     signal_mod.resetOnExec(proc);
     proc.brk = process.user_brk_base;
-    process.applyLoadedRegions(proc, &loaded) catch return ExecError.OutOfMemory;
 
     const self = thread.currentThread() orelse thread.exit();
     const kstack = (@intFromPtr(self.stack) + self.stack_size) & ~@as(u64, 15);
