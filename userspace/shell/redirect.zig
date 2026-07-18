@@ -2,6 +2,7 @@ const std = @import("std");
 const ulib = @import("ulib");
 
 pub const max_redirects = 4;
+pub const max_filename_len = 128;
 
 pub const Kind = enum {
     stdout_trunc,
@@ -14,7 +15,7 @@ pub const Kind = enum {
 
 pub const Redirect = struct {
     kind: Kind,
-    filename: [128]u8 = undefined,
+    filename: [max_filename_len]u8 = undefined,
     filename_len: usize = 0,
 
     pub fn filenameSlice(self: *const Redirect) []const u8 {
@@ -28,8 +29,8 @@ pub const ParseRedirects = struct {
 };
 
 /// Extract redirect tokens from the command segment and remove them from the line.
-/// Mutates segment in-place (shrinks it by zeroing out redirect parts).
-pub fn extract(segment: []u8, out: *ParseRedirects) error{TooManyRedirects}!void {
+/// Mutates segment in-place (zeroes out redirect parts; caller should trim trailing NULs).
+pub fn extract(segment: []u8, out: *ParseRedirects) error{ TooManyRedirects, FilenameTooLong }!void {
     out.count = 0;
     var i: usize = 0;
     while (i < segment.len) {
@@ -66,8 +67,11 @@ pub fn extract(segment: []u8, out: *ParseRedirects) error{TooManyRedirects}!void
         if (out.count >= max_redirects) return error.TooManyRedirects;
 
         const filename = segment[arg_start..arg_end];
+        // Leave room for a trailing NUL used by open() as a C string.
+        if (filename.len >= max_filename_len) return error.FilenameTooLong;
         var redir = Redirect{ .kind = kind };
         @memcpy(redir.filename[0..filename.len], filename);
+        redir.filename[filename.len] = 0;
         redir.filename_len = filename.len;
         out.redirects[out.count] = redir;
         out.count += 1;
@@ -139,10 +143,10 @@ fn scanArg(segment: []const u8, start: usize) usize {
 }
 
 fn removeRange(segment: []u8, start: usize, end: usize) void {
-    if (end > segment.len) return;
+    if (end > segment.len or start > end) return;
     const tail = segment.len - end;
-    @memcpy(segment[start..][0..tail], segment[end..][0..tail]);
-    // Zero out the remainder
+    // Overlapping move: src is after dst.
+    std.mem.copyForwards(u8, segment[start..][0..tail], segment[end..][0..tail]);
     @memset(segment[start + tail ..], 0);
 }
 
