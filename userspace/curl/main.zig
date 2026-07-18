@@ -79,6 +79,9 @@ fn httpGet(host: []const u8, ip: *const [4]u8, port: u16, path: []const u8) u8 {
     if (sendPart(@intCast(fd), request[0..request_len]) != 0) return 1;
 
     var got_body = false;
+    // Keep a short overlap so `\r\n\r\n` spanning recv chunks is still found.
+    var pending: [3]u8 = undefined;
+    var pending_len: usize = 0;
     while (true) {
         const n = ulib.net.recv(@intCast(fd), &recv_buf, recv_buf.len, 0);
         if (n == 0) break;
@@ -88,9 +91,20 @@ fn httpGet(host: []const u8, ip: *const [4]u8, port: u16, path: []const u8) u8 {
         }
         const chunk = recv_buf[0..@intCast(n)];
         if (!got_body) {
-            if (target.findBodyStart(chunk)) |body| {
+            var combined: [3 + recv_buf.len]u8 = undefined;
+            @memcpy(combined[0..pending_len], pending[0..pending_len]);
+            @memcpy(combined[pending_len..][0..chunk.len], chunk);
+            const total = pending_len + chunk.len;
+            if (target.findBodyStart(combined[0..total])) |body| {
                 got_body = true;
+                pending_len = 0;
                 ulib.io.writeStr(body);
+            } else if (total <= pending.len) {
+                @memcpy(pending[0..total], combined[0..total]);
+                pending_len = total;
+            } else {
+                @memcpy(pending[0..3], combined[total - 3 .. total]);
+                pending_len = 3;
             }
         } else {
             ulib.io.writeStr(chunk);
