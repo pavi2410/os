@@ -417,8 +417,14 @@ fn sysSocket(domain: u64, sock_type: u64, protocol: u64) i64 {
     const handle = socket.create(&runtime.boot().network, @truncate(domain), @truncate(sock_type), @intCast(protocol)) catch |err| {
         return errno.fromSocket(err);
     };
-    const proc = fdtab.currentProcess() catch return errno.EBADF;
-    const fd = fdtab.alloc(proc) catch return errno.EMFILE;
+    const proc = fdtab.currentProcess() catch {
+        socket.close(&runtime.boot().network, handle);
+        return errno.EBADF;
+    };
+    const fd = fdtab.alloc(proc) catch {
+        socket.close(&runtime.boot().network, handle);
+        return errno.EMFILE;
+    };
     proc.fds.fds[fd] = .{ .socket = handle };
     return @intCast(fd);
 }
