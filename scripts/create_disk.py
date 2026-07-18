@@ -178,9 +178,9 @@ def sync_disk(path: Path, readme: bytes, user_bins: dict[str, Path]) -> None:
         _write_file(pf, "/README.TXT", readme)
         bin_dir = _ensure_dir(pf, "/BIN")
         desired = {name.upper() for name in user_bins}
-        for entry in list(bin_dir.get_entries()):
-            if entry.is_special() or entry.is_directory() or entry.is_volume_id():
-                continue
+        # get_entries() returns (dirs, files, specials), not a flat iterator.
+        _dirs, files, _specials = bin_dir.get_entries()
+        for entry in list(files):
             name = (entry.get_long_name() or entry.get_short_name() or "").upper()
             if not name or name in desired:
                 continue
