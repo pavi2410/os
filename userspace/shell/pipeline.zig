@@ -131,13 +131,13 @@ fn trimSegment(buf: []u8, start: usize, end: usize) usize {
 fn resolveExecutable(name: []const u8, out: []u8) bool {
     if (name.len == 0) return false;
     if (name[0] == '/') {
-        if (name.len > out.len) return false;
+        if (name.len + 1 > out.len) return false;
         @memcpy(out[0..name.len], name);
         out[name.len] = 0;
         return true;
     }
     const prefix = "/BIN/";
-    if (prefix.len + name.len > out.len) return false;
+    if (prefix.len + name.len + 1 > out.len) return false;
     @memcpy(out[0..prefix.len], prefix);
     var i: usize = 0;
     while (i < name.len) : (i += 1) {
