@@ -41,7 +41,7 @@ class LiminePaths:
 def is_valid_limine(bin_path: Path, share_path: Path) -> bool:
     if not bin_path.is_file() or not os.access(bin_path, os.X_OK):
         return False
-    return all((share_path / name).is_file() for name in REQUIRED_SHARE_FILES[:2])
+    return all((share_path / name).is_file() for name in REQUIRED_SHARE_FILES)
 
 
 @cache
