@@ -6,6 +6,7 @@ const vfs = @import("../fs/vfs.zig");
 const pipe = @import("../ipc/pipe.zig");
 const runtime = @import("../runtime.zig");
 const errno = @import("errno.zig");
+const abi_fs = @import("abi_fs");
 
 pub fn read(fd: u64, slot: *process.Fd, buf: []u8) i64 {
     return switch (slot.*) {
@@ -116,7 +117,8 @@ pub fn close(slot: *process.Fd) i64 {
 pub fn lseek(slot: *process.Fd, offset: i64, whence: u32) i64 {
     return switch (slot.*) {
         .file => |handle| {
-            const pos = runtime.boot().vfs.lseek(handle, offset, @enumFromInt(whence)) catch |err| return errno.fromVfs(err);
+            const seek = abi_fs.Seek.fromInt(whence) orelse return errno.EINVAL;
+            const pos = runtime.boot().vfs.lseek(handle, offset, seek) catch |err| return errno.fromVfs(err);
             return @bitCast(@as(i64, @intCast(pos)));
         },
         else => errno.EBADF,

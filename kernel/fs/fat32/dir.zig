@@ -206,7 +206,7 @@ pub fn getDents64(dir_cluster: u32, skip: *usize, out: []u8) FatError!usize {
                 rec,
                 (@as(u64, cluster) << 16) | @as(u64, off),
                 next_off,
-                if (entry[11] & 0x10 != 0) abi_fs.DT_DIR else abi_fs.DT_REG,
+                if (entry[11] & 0x10 != 0) .dir else .reg,
                 name,
             );
 

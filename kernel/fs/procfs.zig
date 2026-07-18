@@ -163,7 +163,7 @@ fn fsGetdents64(file: filesystem.OpenFile, dir_skip: *usize, buf: []u8) filesyst
             buf[written .. written + reclen],
             @intFromEnum(e.node) + 1,
             @intCast(index + 1),
-            abi_fs.DT_REG,
+            .reg,
             e.name,
         );
         written += reclen;

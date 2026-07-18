@@ -146,10 +146,10 @@ fn sysOpen(path_ptr: u64, flags: u64, mode: u64) i64 {
     const path = resolvePathArg(path_raw, &path_buf) orelse return errno.EFAULT;
     const proc = fdtab.currentProcess() catch return errno.EBADF;
 
-    const accmode = flags & abi_fs.O_ACCMODE;
+    const accmode = abi_fs.AccMode.fromFlags(@truncate(flags)) orelse return errno.EINVAL;
     const open_flags: vfs.OpenFlags = .{
-        .read = accmode != abi_fs.O_WRONLY,
-        .write = accmode != 0, // O_RDONLY=0, O_WRONLY=1, O_RDWR=2
+        .read = accmode != .wronly,
+        .write = accmode != .rdonly,
         .create = flags & abi_fs.O_CREAT != 0,
         .truncate = flags & abi_fs.O_TRUNC != 0,
         .append = flags & abi_fs.O_APPEND != 0,
@@ -280,7 +280,7 @@ fn sysChdir(path_ptr: u64) i64 {
 
     var st: vfs.Stat = .{};
     runtime.boot().vfs.stat(path, &st) catch |err| return errno.fromVfs(err);
-    if (st.st_mode & abi_fs.S_IFDIR == 0) return errno.ENOTDIR;
+    if (abi_fs.ModeType.fromMode(st.st_mode) != .dir) return errno.ENOTDIR;
 
     process.setCwd(proc, path) catch return errno.EINVAL;
     return 0;

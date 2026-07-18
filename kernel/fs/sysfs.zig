@@ -246,7 +246,7 @@ fn fsStat(path: []const u8, out: *filesystem.Stat) filesystem.Error!void {
     }
 }
 
-fn emitDent(buf: []u8, written: *usize, dir_skip: *usize, index: usize, ino: u64, dtype: u8, name: []const u8) filesystem.Error!?usize {
+fn emitDent(buf: []u8, written: *usize, dir_skip: *usize, index: usize, ino: u64, dtype: abi_fs.DirentType, name: []const u8) filesystem.Error!?usize {
     const reclen = abi_fs.dirent64Reclen(name.len);
     if (written.* + reclen > buf.len) {
         if (written.* == 0) return filesystem.Error.BufferTooSmall;
@@ -269,18 +269,18 @@ fn fsGetdents64(file: filesystem.OpenFile, dir_skip: *usize, buf: []u8) filesyst
         .root => {
             const names = [_][]const u8{ "bus", "block" };
             while (index < names.len) : (index += 1) {
-                if (try emitDent(buf, &written, dir_skip, index, 10 + index, abi_fs.DT_DIR, names[index])) |n| return n;
+                if (try emitDent(buf, &written, dir_skip, index, 10 + index, .dir, names[index])) |n| return n;
             }
         },
         .bus => {
             if (index == 0) {
-                if (try emitDent(buf, &written, dir_skip, 0, 20, abi_fs.DT_DIR, "pci")) |n| return n;
+                if (try emitDent(buf, &written, dir_skip, 0, 20, .dir, "pci")) |n| return n;
                 index = 1;
             }
         },
         .bus_pci => {
             if (index == 0) {
-                if (try emitDent(buf, &written, dir_skip, 0, 30, abi_fs.DT_DIR, "devices")) |n| return n;
+                if (try emitDent(buf, &written, dir_skip, 0, 30, .dir, "devices")) |n| return n;
                 index = 1;
             }
         },
@@ -290,19 +290,19 @@ fn fsGetdents64(file: filesystem.OpenFile, dir_skip: *usize, buf: []u8) filesyst
                 var name_buf: [8]u8 = undefined;
                 const d = list[index];
                 const nlen = hw_format.formatPciAddr(d.bus, d.device, d.function, &name_buf);
-                if (try emitDent(buf, &written, dir_skip, index, 100 + index, abi_fs.DT_DIR, name_buf[0..nlen])) |n| return n;
+                if (try emitDent(buf, &written, dir_skip, index, 100 + index, .dir, name_buf[0..nlen])) |n| return n;
             }
         },
         .pci_dev => {
             const names = [_][]const u8{ "vendor", "device", "class" };
             while (index < names.len) : (index += 1) {
-                if (try emitDent(buf, &written, dir_skip, index, 200 + index, abi_fs.DT_REG, names[index])) |n| return n;
+                if (try emitDent(buf, &written, dir_skip, index, 200 + index, .reg, names[index])) |n| return n;
             }
         },
         .block_root => {
             if (index == 0) {
                 if (blockName()) |name| {
-                    if (try emitDent(buf, &written, dir_skip, 0, 300, abi_fs.DT_DIR, name)) |n| return n;
+                    if (try emitDent(buf, &written, dir_skip, 0, 300, .dir, name)) |n| return n;
                 }
                 index = 1;
             }
@@ -310,7 +310,7 @@ fn fsGetdents64(file: filesystem.OpenFile, dir_skip: *usize, buf: []u8) filesyst
         .block_dev => {
             const names = [_][]const u8{ "size", "sector_size" };
             while (index < names.len) : (index += 1) {
-                if (try emitDent(buf, &written, dir_skip, index, 400 + index, abi_fs.DT_REG, names[index])) |n| return n;
+                if (try emitDent(buf, &written, dir_skip, index, 400 + index, .reg, names[index])) |n| return n;
             }
         },
         else => return filesystem.Error.NotFile,

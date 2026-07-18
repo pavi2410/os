@@ -27,11 +27,14 @@ test "filesystem ABI layouts match syscall handlers" {
     try std.testing.expectEqual(@as(usize, 19), abi_fs.dirent64_name_offset);
     try std.testing.expectEqual(@as(u32, 0o100), abi_fs.O_CREAT);
     try std.testing.expectEqual(@as(u32, 0o040000), abi_fs.S_IFDIR);
+    try std.testing.expectEqual(abi_fs.Seek.set, abi_fs.Seek.fromInt(0).?);
+    try std.testing.expectEqual(abi_fs.ModeType.dir, abi_fs.ModeType.fromMode(abi_fs.S_IFDIR | 0o755).?);
+    try std.testing.expectEqual(abi_fs.AccMode.rdwr, abi_fs.AccMode.fromFlags(abi_fs.O_RDWR).?);
 }
 
 test "dirent64 helpers round-trip records" {
     var buf: [64]u8 = undefined;
-    abi_fs.writeDirent64(&buf, 42, 7, abi_fs.DT_REG, "foo.txt");
+    abi_fs.writeDirent64(&buf, 42, 7, .reg, "foo.txt");
     try std.testing.expectEqual(@as(usize, 32), abi_fs.dirent64Reclen("foo.txt".len));
 
     var it = abi_fs.Dirent64Iterator{ .data = &buf };
@@ -39,7 +42,7 @@ test "dirent64 helpers round-trip records" {
     try std.testing.expectEqual(@as(u64, 42), entry.header.d_ino);
     try std.testing.expectEqual(@as(i64, 7), entry.header.d_off);
     try std.testing.expectEqual(@as(u16, 32), entry.header.d_reclen);
-    try std.testing.expectEqual(abi_fs.DT_REG, entry.header.d_type);
+    try std.testing.expectEqual(@intFromEnum(abi_fs.DirentType.reg), entry.header.d_type);
     try std.testing.expectEqualStrings("foo.txt", entry.name);
     try std.testing.expect(it.next() == null);
 }

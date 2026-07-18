@@ -244,7 +244,7 @@ pub const Vfs = struct {
         const reclen = abi_fs.dirent64Reclen(name.len);
         if (buf.len < reclen) return VfsError.BufferTooSmall;
         const ino: u64 = @intCast(1000 + h.root_extra_index);
-        abi_fs.writeDirent64(buf[0..reclen], ino, @intCast(h.root_extra_index + 1), abi_fs.DT_DIR, name);
+        abi_fs.writeDirent64(buf[0..reclen], ino, @intCast(h.root_extra_index + 1), .dir, name);
         h.root_extra_index += 1;
         return reclen;
     }

@@ -51,11 +51,7 @@ pub fn errnoCode(err: Error) i64 {
     };
 }
 
-pub const Whence = enum(u32) {
-    set = 0,
-    cur = 1,
-    end = 2,
-};
+pub const Whence = abi_fs.Seek;
 
 pub const OpenFlags = packed struct(u8) {
     read: bool = true,

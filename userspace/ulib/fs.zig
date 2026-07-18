@@ -13,10 +13,12 @@ pub const O_CREAT = abi_fs.O_CREAT;
 pub const O_TRUNC = abi_fs.O_TRUNC;
 pub const O_APPEND = abi_fs.O_APPEND;
 
+pub const Seek = abi_fs.Seek;
 pub const SEEK_SET = abi_fs.SEEK_SET;
 pub const SEEK_CUR = abi_fs.SEEK_CUR;
 pub const SEEK_END = abi_fs.SEEK_END;
 
+pub const ModeType = abi_fs.ModeType;
 pub const S_IFREG = abi_fs.S_IFREG;
 pub const S_IFDIR = abi_fs.S_IFDIR;
 pub const S_IFCHR = abi_fs.S_IFCHR;
@@ -24,6 +26,7 @@ pub const S_IFCHR = abi_fs.S_IFCHR;
 pub const Stat = abi_fs.Stat;
 pub const Dirent64 = abi_fs.Dirent64;
 pub const dirent64_name_offset = abi_fs.dirent64_name_offset;
+pub const DirentType = abi_fs.DirentType;
 pub const DT_DIR = abi_fs.DT_DIR;
 pub const DT_REG = abi_fs.DT_REG;
 pub const DT_CHR = abi_fs.DT_CHR;

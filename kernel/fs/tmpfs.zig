@@ -308,10 +308,10 @@ fn fsGetdents64(file: filesystem.OpenFile, dir_skip: *usize, buf: []u8) filesyst
             dir_skip.* = index;
             return written;
         }
-        const dtype: u8 = switch (child.kind) {
-            .dir => abi_fs.DT_DIR,
-            .file => abi_fs.DT_REG,
-            .symlink => abi_fs.DT_LNK,
+        const dtype: abi_fs.DirentType = switch (child.kind) {
+            .dir => .dir,
+            .file => .reg,
+            .symlink => .lnk,
         };
         abi_fs.writeDirent64(buf[written .. written + reclen], child.ino, @intCast(index + 1), dtype, name);
         written += reclen;

@@ -85,7 +85,7 @@ pub fn getdents64(dir_skip: *usize, buf: []u8) filesystem.Error!usize {
             buf[written .. written + reclen],
             @intFromEnum(dev_nodes[index].device),
             @intCast(index + 1),
-            abi_fs.DT_CHR,
+            .chr,
             name,
         );
         written += reclen;
@@ -100,7 +100,7 @@ pub fn appendRootMountDirent(buf: []u8) ?usize {
     const name = "dev";
     const reclen = abi_fs.dirent64Reclen(name.len);
     if (buf.len < reclen) return null;
-    abi_fs.writeDirent64(buf[0..reclen], dev_root_ino, 1, abi_fs.DT_DIR, name);
+    abi_fs.writeDirent64(buf[0..reclen], dev_root_ino, 1, .dir, name);
     return reclen;
 }
 
