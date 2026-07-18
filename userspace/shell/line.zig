@@ -94,19 +94,39 @@ fn runSegment(segment: []u8, expand_bufs: *[argv.max_args][expand.max_arg_len]u8
 
     var exit_code: u8 = 0;
     var i: usize = 0;
-    while (i < part_count) : (i += 1) {
+    while (i < part_count) {
         if (i > 0) {
             switch (ops[i - 1]) {
-                .and_op => if (exit_code != 0) continue,
-                .or_op => if (exit_code == 0) continue,
+                .and_op => if (exit_code != 0) {
+                    i += 1;
+                    continue;
+                },
+                .or_op => if (exit_code == 0) {
+                    i += 1;
+                    continue;
+                },
                 .pipe_op => {},
             }
         }
 
+        var pipe_end = i;
+        while (pipe_end + 1 < part_count and ops[pipe_end] == .pipe_op) {
+            pipe_end += 1;
+        }
+
+        if (pipe_end > i) {
+            exit_code = runPipeline(segment, part_ranges[i .. pipe_end + 1], expand_bufs);
+            @import("status").set(exit_code);
+            i = pipe_end + 1;
+            continue;
+        }
+
         const range = part_ranges[i];
         const cmd_len = trimSegment(segment, range.start, range.end);
-        if (cmd_len <= range.start) continue;
-        exit_code = executeCommand(segment[range.start..cmd_len], expand_bufs);
+        if (cmd_len > range.start) {
+            exit_code = executeCommand(segment[range.start..cmd_len], expand_bufs);
+        }
+        i += 1;
     }
 }
 
@@ -252,8 +272,15 @@ fn trimTrailing(buf: []u8, end: usize) usize {
     return len;
 }
 
-fn runPipeline(segment: []u8, parts: []PartRange, ops: []Op, part_count: usize, expand_bufs: *[argv.max_args][expand.max_arg_len]u8) u8 {
-    _ = ops;
+fn runPipeline(segment: []u8, parts: []const PartRange, expand_bufs: *[argv.max_args][expand.max_arg_len]u8) u8 {
     const pipeline = @import("pipeline.zig");
-    return pipeline.run(segment, parts, part_count, expand_bufs);
+    var pipe_parts: [max_chain_parts]pipeline.PartRange = undefined;
+    if (parts.len > pipe_parts.len) return 1;
+    for (parts, 0..) |range, idx| {
+        pipe_parts[idx] = .{ .start = range.start, .end = range.end };
+    }
+    // pipeline.run still uses [128]u8 expand buffers; C19 aligns sizes.
+    var short_bufs: [argv.max_args][128]u8 = undefined;
+    _ = expand_bufs;
+    return pipeline.run(segment, pipe_parts[0..parts.len], parts.len, &short_bufs);
 }

@@ -5,7 +5,7 @@ const ulib = @import("ulib");
 
 const max_pipes = 4;
 
-const PartRange = struct {
+pub const PartRange = struct {
     start: usize,
     end: usize,
 };
