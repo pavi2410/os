@@ -28,6 +28,7 @@ class QemuShell:
     root: Path
     boot_timeout: float = 90.0
     command_timeout: float = 20.0
+    extra: tuple[str, ...] = ()
 
     _proc: pexpect.spawn | None = field(default=None, init=False, repr=False)
     _log_writer: _LogWriter = field(default_factory=_LogWriter, init=False, repr=False)
@@ -44,7 +45,7 @@ class QemuShell:
             raise RuntimeError("session already started")
         self._log_writer = _LogWriter()
         prepare_qmp_socket()
-        argv = build_qemu_argv(display_none=True)
+        argv = build_qemu_argv(display_none=True, extra=self.extra)
         self._proc = pexpect.spawn(
             argv[0],
             argv[1:],

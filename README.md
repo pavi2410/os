@@ -169,7 +169,7 @@ Detailed phase docs live in [docs/roadmap/](docs/roadmap/).
 | 10 — Mount / tmpfs | Done | mount table, tmpfs, rename/symlink |
 | 11 — procfs/sysfs | Done | `/proc`, `/sys`; hw snapshot syscalls removed |
 | 12 — Preemption | Done | Involuntary timer preemption (SMP gate) |
-| 13 — SMP | Planned | Multicore bring-up, ACPI, SMP-safe kernel |
+| 13 — SMP | Done | Multicore bring-up, ACPI, SMP-safe kernel |
 | 14 — GUI | Planned | Framebuffer, input, minimal window manager |
 
 Full details and recommended order: [docs/roadmap/README.md](docs/roadmap/README.md).

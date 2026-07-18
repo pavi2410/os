@@ -70,7 +70,7 @@ class TestShellBuiltins:
         run_case(
             shell_session,
             "help",
-            "Built-ins: help, exit, pid, echo, cat, ls, write, rm, mkdir, rmdir, cd, pwd, date, export",
+            "Built-ins: help, exit, poweroff, pid, echo, cat, ls, write, rm, mkdir, rmdir, cd, pwd, date, export",
             case="help",
         )
 

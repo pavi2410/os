@@ -12,29 +12,29 @@
 
 ### ACPI and boot services
 
-- [ ] Use Limine MP request for AP startup
-- [ ] ACPI RSDP pointer from bootloader
-- [ ] Parse ACPI tables ([`kernel/acpi/`](../../kernel/acpi/))
+- [x] Use Limine MP request for AP startup
+- [x] ACPI RSDP pointer from bootloader
+- [x] Parse ACPI tables ([`kernel/acpi/`](../../kernel/acpi/))
   - [x] RSDP → RSDT/XSDT
-  - [ ] MADT (APIC entries)
-  - [ ] FADT (for ACPI shutdown / timer if needed)
-- [ ] Enable LAPIC and IOAPIC routing
+  - [x] MADT (APIC entries)
+  - [x] FADT (for ACPI shutdown / timer if needed)
+- [x] Enable LAPIC and IOAPIC routing
 
 ### SMP bring-up
 
-- [ ] Trampoline for AP startup (Limine MP `goto_address`; no hand-rolled INIT-SIPI)
-- [ ] Send INIT-SIPI-SIPI or equivalent (via Limine MP)
-- [ ] Per-CPU data (current thread, idle, run queues)
-- [ ] Per-CPU timer and IPI for reschedule (builds on [phase 12](12-preemptive-scheduling.md))
-- [ ] Make scheduler SMP-safe (spinlocks, per-CPU run queues)
-- [ ] COW + TLB shootdown on all cores (extends [phase 7](07-copy-on-write-fork.md))
-- [ ] Page cache and mmap locking (extends [phase 9](09-virtual-memory-and-page-cache.md))
+- [x] Trampoline for AP startup (Limine MP `goto_address`; no hand-rolled INIT-SIPI)
+- [x] Send INIT-SIPI-SIPI or equivalent (via Limine MP)
+- [x] Per-CPU data (current thread, idle, run queues)
+- [x] Per-CPU timer and IPI for reschedule (builds on [phase 12](12-preemptive-scheduling.md))
+- [x] Make scheduler SMP-safe (spinlocks, per-CPU run queues)
+- [x] COW + TLB shootdown on all cores (extends [phase 7](07-copy-on-write-fork.md))
+- [x] Page cache and mmap locking (extends [phase 9](09-virtual-memory-and-page-cache.md))
 
 ### Tests
 
-- [ ] QEMU `-smp 2` and `-smp 4` smoke tests
-- [ ] Integration: parallel shell commands or kernel stress threads on multiple CPUs
-- [ ] No refcount or TLB leaks under fork/exec load on SMP
+- [x] QEMU `-smp 2` and `-smp 4` smoke tests
+- [x] Integration: parallel shell commands or kernel stress threads on multiple CPUs
+- [x] No refcount or TLB leaks under fork/exec load on SMP
 
 ---
 
@@ -54,3 +54,5 @@
 - Keep serial as the primary debug console; GUI is [phase 14](14-gui.md).
 - Real hardware will surface edge cases; QEMU `-smp 4` is the primary test target.
 - GOP / framebuffer setup belongs in phase 14, not here.
+- Limine MP replaces hand-rolled INIT-SIPI: APs are parked until `goto_address` is written.
+- Shell `poweroff` uses `reboot(2)` → ACPI S5 / QEMU ports `0x604` / `0xB004`.
