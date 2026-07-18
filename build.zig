@@ -519,7 +519,8 @@ pub fn build(b: *std.Build) void {
     const run_shell_status_tests = helpers.runHostTest(b, shell_status_test_mod);
     const shell_expand_host = helpers.hostModule(b, "userspace/shell/expand.zig");
     shell_expand_host.addImport("argv.zig", shell_argv_host);
-    shell_expand_host.addImport("environ", shell_environ_stub);
+    // expand.zig uses @import("environ.zig"); override that path with the stub.
+    shell_expand_host.addImport("environ.zig", shell_environ_stub);
     shell_expand_host.addImport("status", shell_status_host);
 
     const shell_expand_test_mod = helpers.hostTestModule(b, "test/userspace/shell_expand_test.zig");
