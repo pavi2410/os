@@ -206,6 +206,15 @@ class TestShellEnvironment:
         run_case(shell_session, "FOO=bar echo $FOO", "bar", case="prefix env echo")
 
 
+class TestShellPipesAndRedirects:
+    def test_pipe_echo_cat(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "echo a | cat", "a", case="pipe echo to cat")
+
+    def test_redirect_stdout_to_file(self, shell_session: QemuShell) -> None:
+        run_case(shell_session, "echo hi > /TPIPE.TXT", case="redirect write")
+        run_case(shell_session, "cat /TPIPE.TXT", "hi", case="redirect read back")
+
+
 class TestShellOperators:
     def test_and_short_circuit(self, shell_session: QemuShell) -> None:
         cmd = "false && echo no"
