@@ -29,7 +29,7 @@ Boots under QEMU (including `-smp N`), runs `/BIN/INIT` as PID 1 → serial shel
 
 ## Setup
 
-Requires [mise](https://mise.jdx.dev), Zig (0.16+), QEMU, and Limine. [uv](https://docs.astral.sh/uv/) handles ISO/disk scripts and integration tests. OVMF is optional (UEFI boot only).
+Requires [mise](https://mise.jdx.dev), Zig 0.16.0, QEMU, and Limine. [uv](https://docs.astral.sh/uv/) handles ISO/disk scripts and integration tests. OVMF is optional (UEFI boot only).
 
 **macOS**
 
