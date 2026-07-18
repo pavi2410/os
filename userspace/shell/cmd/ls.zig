@@ -84,12 +84,13 @@ fn printLongEntry(dir: []const u8, name: []const u8) void {
 }
 
 fn writeEntryType(mode: u32) void {
-    if (mode & ulib.fs.S_IFCHR != 0) {
-        io.writeStr("cdev ");
-    } else if (mode & ulib.fs.S_IFDIR != 0) {
-        io.writeStr("dir  ");
-    } else {
+    switch (ulib.fs.ModeType.fromMode(mode) orelse {
         io.writeStr("file ");
+        return;
+    }) {
+        .chr => io.writeStr("cdev "),
+        .dir => io.writeStr("dir  "),
+        .reg, .lnk => io.writeStr("file "),
     }
 }
 

@@ -26,9 +26,8 @@ test "filesystem ABI layouts match syscall handlers" {
     try std.testing.expectEqual(@as(usize, 128), @sizeOf(abi_fs.Stat));
     try std.testing.expectEqual(@as(usize, 19), abi_fs.dirent64_name_offset);
     try std.testing.expectEqual(@as(u32, 0o100), abi_fs.O_CREAT);
-    try std.testing.expectEqual(@as(u32, 0o040000), abi_fs.S_IFDIR);
     try std.testing.expectEqual(abi_fs.Seek.set, abi_fs.Seek.fromInt(0).?);
-    try std.testing.expectEqual(abi_fs.ModeType.dir, abi_fs.ModeType.fromMode(abi_fs.S_IFDIR | 0o755).?);
+    try std.testing.expectEqual(abi_fs.ModeType.dir, abi_fs.ModeType.fromMode(abi_fs.ModeType.dir.withPerms(0o755)).?);
     try std.testing.expectEqual(abi_fs.AccMode.rdwr, abi_fs.AccMode.fromFlags(abi_fs.O_RDWR).?);
 }
 

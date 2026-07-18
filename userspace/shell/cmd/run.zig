@@ -112,7 +112,7 @@ fn tryCandidate(dir: []const u8, name: []const u8, out: []u8) bool {
 fn isExecutable(path_str: []const u8) bool {
     var st: ulib.fs.Stat = .{};
     if (ulib.fs.stat(@ptrCast(path_str.ptr), &st) < 0) return false;
-    return st.st_mode & ulib.fs.S_IFREG != 0;
+    return ulib.fs.ModeType.fromMode(st.st_mode) == .reg;
 }
 
 fn toUpper(ch: u8) u8 {

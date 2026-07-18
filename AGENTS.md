@@ -8,9 +8,9 @@ Do not introduce parallel integer constant bags (`pub const FOO: u32 = N`) for c
 
 - **Closed tag sets** → `enum(uN)` with `fromInt` when decoding raw syscall args (seek whence, dirent type, signal number, address family, mem region kind, clock id).
 - **Orthogonal bitflags** with stable bit positions → `packed struct(uN)` plus `fromLinux` / `toLinux` (mmap prot/flags; see also TCP `Flags`, page-table `Pte`).
-- Decode raw `u64`/`u32` once at the syscall handler edge; pass typed values inward. Do not thread bare masks through kernel modules.
-- **One definition** in `common/abi/` (or another shared common module). Kernel and ulib import it — never redeclare `PROT_*` / `MAP_*` / `AF_*` bags in `userspace/ulib`.
-- Temporary `@intFromEnum` aliases (`pub const SEEK_SET = @intFromEnum(Seek.set)`) are fine during migration; new code must use the typed form.
+- Decode raw `u64`/`u32` once at the syscall handler edge (`fromInt` / `fromLinux`); pass typed values inward. Do not thread bare masks through kernel modules.
+- **One definition** in `common/abi/` (or another shared common module). Kernel and ulib import it — never redeclare flag bags in `userspace/ulib`.
+- **No soft-land int aliases** — do not add `pub const SEEK_SET = @intFromEnum(Seek.set)` (or `PROT_READ = @bitCast(...)`) that let callers keep using untyped integers. Call sites must use the enum / packed struct.
 - Sparse Linux open bits (`O_CREAT=0o100`, …) stay numeric at the ABI edge and convert into `filesystem.OpenFlags` — do not invent a packed layout that pretends to be the Linux open word.
 
 ### In-repo models

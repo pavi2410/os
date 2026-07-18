@@ -37,12 +37,12 @@ pub fn stat(node: Node, out: *filesystem.Stat) void {
     out.* = .{};
     switch (node) {
         .root => {
-            out.st_mode = abi_fs.S_IFDIR | 0o755;
+            out.st_mode = abi_fs.ModeType.dir.withPerms(0o755);
             out.st_ino = dev_root_ino;
             out.st_size = 0;
         },
         .device => |dev| {
-            out.st_mode = abi_fs.S_IFCHR | 0o666;
+            out.st_mode = abi_fs.ModeType.chr.withPerms(0o666);
             out.st_ino = @intFromEnum(dev);
             out.st_rdev = @intFromEnum(dev);
             out.st_size = 0;

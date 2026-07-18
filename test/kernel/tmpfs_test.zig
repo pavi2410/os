@@ -60,7 +60,7 @@ test "tmpfs stat reports mode and size" {
     var st: filesystem.Stat = .{};
     try tmpfs.ops.stat("/s", &st);
     try std.testing.expectEqual(@as(i64, 4), st.st_size);
-    try std.testing.expect((st.st_mode & filesystem.S_IFREG) != 0);
+    try std.testing.expectEqual(filesystem.ModeType.reg, filesystem.ModeType.fromMode(st.st_mode).?);
 }
 
 test "tmpfs rename and symlink round-trip" {

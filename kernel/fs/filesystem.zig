@@ -67,9 +67,7 @@ comptime {
 }
 
 pub const Stat = abi_fs.Stat;
-pub const S_IFREG = abi_fs.S_IFREG;
-pub const S_IFDIR = abi_fs.S_IFDIR;
-pub const S_IFLNK = abi_fs.S_IFLNK;
+pub const ModeType = abi_fs.ModeType;
 
 pub const FileId = struct {
     a: u64 = 0,

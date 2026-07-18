@@ -39,11 +39,7 @@ pub const Seek = enum(u32) {
     }
 };
 
-pub const SEEK_SET: u32 = @intFromEnum(Seek.set);
-pub const SEEK_CUR: u32 = @intFromEnum(Seek.cur);
-pub const SEEK_END: u32 = @intFromEnum(Seek.end);
-
-/// File type bits in `st_mode` (`mode & S_IFMT`).
+/// File type bits in `st_mode` (`mode & ModeType.mask`).
 pub const ModeType = enum(u32) {
     chr = 0o020000,
     dir = 0o040000,
@@ -61,13 +57,12 @@ pub const ModeType = enum(u32) {
             else => null,
         };
     }
-};
 
-pub const S_IFMT: u32 = ModeType.mask;
-pub const S_IFREG: u32 = @intFromEnum(ModeType.reg);
-pub const S_IFDIR: u32 = @intFromEnum(ModeType.dir);
-pub const S_IFCHR: u32 = @intFromEnum(ModeType.chr);
-pub const S_IFLNK: u32 = @intFromEnum(ModeType.lnk);
+    /// Build an `st_mode` value from this file type and permission bits.
+    pub fn withPerms(self: ModeType, perms: u32) u32 {
+        return @intFromEnum(self) | perms;
+    }
+};
 
 pub const Stat = extern struct {
     st_dev: u64 = 0,
@@ -113,11 +108,6 @@ pub const DirentType = enum(u8) {
         };
     }
 };
-
-pub const DT_CHR: u8 = @intFromEnum(DirentType.chr);
-pub const DT_DIR: u8 = @intFromEnum(DirentType.dir);
-pub const DT_REG: u8 = @intFromEnum(DirentType.reg);
-pub const DT_LNK: u8 = @intFromEnum(DirentType.lnk);
 
 pub fn dirent64Reclen(name_len: usize) usize {
     const raw = dirent64_name_offset + name_len + 1;

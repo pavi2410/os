@@ -135,10 +135,10 @@ fn fsStat(path: []const u8, out: *filesystem.Stat) filesystem.Error!void {
     out.st_ino = @intFromEnum(node) + 1;
     out.st_nlink = 1;
     if (node == .root) {
-        out.st_mode = filesystem.S_IFDIR | 0o555;
+        out.st_mode = filesystem.ModeType.dir.withPerms(0o555);
         out.st_size = 0;
     } else {
-        out.st_mode = filesystem.S_IFREG | 0o444;
+        out.st_mode = filesystem.ModeType.reg.withPerms(0o444);
         var scratch: [4096]u8 = undefined;
         out.st_size = @intCast(render(node, &scratch));
     }

@@ -118,7 +118,10 @@ fn fsWriteAt(opened_file: *filesystem.OpenFile, offset: u64, buf: []const u8) fi
 fn fsStat(path_str: []const u8, out: *filesystem.Stat) filesystem.Error!void {
     const entry = lookup(path_str) catch |err| return filesystem.liftFat(err);
     out.* = .{};
-    out.st_mode = if (entry.attr & 0x10 != 0) filesystem.S_IFDIR | 0o755 else filesystem.S_IFREG | 0o644;
+    out.st_mode = if (entry.attr & 0x10 != 0)
+        filesystem.ModeType.dir.withPerms(0o755)
+    else
+        filesystem.ModeType.reg.withPerms(0o644);
     out.st_size = @intCast(entry.size);
 }
 

@@ -274,9 +274,9 @@ fn fsStat(path: []const u8, out: *filesystem.Stat) filesystem.Error!void {
     out.* = .{};
     out.st_ino = n.ino;
     out.st_mode = switch (n.kind) {
-        .dir => filesystem.S_IFDIR | n.mode,
-        .file => filesystem.S_IFREG | n.mode,
-        .symlink => filesystem.S_IFLNK | n.mode,
+        .dir => filesystem.ModeType.dir.withPerms(n.mode),
+        .file => filesystem.ModeType.reg.withPerms(n.mode),
+        .symlink => filesystem.ModeType.lnk.withPerms(n.mode),
     };
     out.st_size = if (n.kind == .file or n.kind == .symlink) @intCast(n.data_len) else 0;
     out.st_nlink = 1;

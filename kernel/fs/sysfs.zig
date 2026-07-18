@@ -237,10 +237,10 @@ fn fsStat(path: []const u8, out: *filesystem.Stat) filesystem.Error!void {
     out.st_ino = ((@as(u64, @intFromEnum(r.kind)) << 16) | r.pci_index) + 1;
     out.st_nlink = 1;
     if (isDir(r.kind)) {
-        out.st_mode = filesystem.S_IFDIR | 0o555;
+        out.st_mode = filesystem.ModeType.dir.withPerms(0o555);
         out.st_size = 0;
     } else {
-        out.st_mode = filesystem.S_IFREG | 0o444;
+        out.st_mode = filesystem.ModeType.reg.withPerms(0o444);
         var scratch: [64]u8 = undefined;
         out.st_size = @intCast(render(r, &scratch));
     }
