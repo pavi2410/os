@@ -20,7 +20,7 @@ from pyfatfs.DosDateTime import DosDateTime
 from pyfatfs.EightDotThree import EightDotThree
 from pyfatfs.FATDirectoryEntry import FATDirectoryEntry, make_lfn_entry
 from pyfatfs.PyFat import PyFat
-from pyfatfs._exceptions import PyFATException
+from pyfatfs._exceptions import NotAnLFNEntryException, PyFATException
 
 DISK_SIZE = 64 * 1024 * 1024
 README_CONTENT = b"Hello from FAT on virtio-blk\r\n"
@@ -31,6 +31,14 @@ logger = logging.getLogger(__name__)
 
 def fat_name(name: str) -> str:
     return name.upper()
+
+
+def _entry_name(entry: FATDirectoryEntry) -> str:
+    try:
+        long_name = entry.get_long_name()
+    except NotAnLFNEntryException:
+        long_name = None
+    return (long_name or entry.get_short_name() or "").upper()
 
 
 def _now() -> datetime.tzinfo:
@@ -181,7 +189,7 @@ def sync_disk(path: Path, readme: bytes, user_bins: dict[str, Path]) -> None:
         # get_entries() returns (dirs, files, specials), not a flat iterator.
         _dirs, files, _specials = bin_dir.get_entries()
         for entry in list(files):
-            name = (entry.get_long_name() or entry.get_short_name() or "").upper()
+            name = _entry_name(entry)
             if not name or name in desired:
                 continue
             cluster = entry.get_cluster()
