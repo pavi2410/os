@@ -279,8 +279,5 @@ fn runPipeline(segment: []u8, parts: []const PartRange, expand_bufs: *[argv.max_
     for (parts, 0..) |range, idx| {
         pipe_parts[idx] = .{ .start = range.start, .end = range.end };
     }
-    // pipeline.run still uses [128]u8 expand buffers; C19 aligns sizes.
-    var short_bufs: [argv.max_args][128]u8 = undefined;
-    _ = expand_bufs;
-    return pipeline.run(segment, pipe_parts[0..parts.len], parts.len, &short_bufs);
+    return pipeline.run(segment, pipe_parts[0..parts.len], parts.len, expand_bufs);
 }

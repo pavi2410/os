@@ -1,5 +1,6 @@
 const argv_mod = @import("../argv.zig");
 const environ = @import("../environ.zig");
+const expand = @import("../expand.zig");
 const io = @import("../io.zig");
 const path = @import("../path.zig");
 const prefix_env = @import("../prefix_env.zig");
@@ -8,7 +9,7 @@ const redirect = @import("../redirect.zig");
 const ulib = @import("ulib");
 
 var exec_path: [128]u8 = undefined;
-var exec_arg_bufs: [argv_mod.max_args][128]u8 = undefined;
+var exec_arg_bufs: [argv_mod.max_args][expand.max_arg_len]u8 = undefined;
 var exec_argv: [argv_mod.max_args + 1]?[*:0]const u8 = .{null} ** (argv_mod.max_args + 1);
 var exec_envp: [environ.max_entries + 1]?[*:0]const u8 = .{null} ** (environ.max_entries + 1);
 
@@ -56,7 +57,7 @@ fn buildArgv(parsed: *const argv_mod.Parsed) ?usize {
     while (i < parsed.argc) : (i += 1) {
         if (argc >= exec_argv.len - 1) return null;
         const arg = parsed.args[i];
-        if (arg.len >= exec_arg_bufs[0].len) return null;
+        if (arg.len >= expand.max_arg_len) return null;
         @memcpy(exec_arg_bufs[argc - 1][0..arg.len], arg);
         exec_arg_bufs[argc - 1][arg.len] = 0;
         exec_argv[argc] = @ptrCast(&exec_arg_bufs[argc - 1]);

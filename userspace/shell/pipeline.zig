@@ -1,5 +1,6 @@
 const argv = @import("argv.zig");
 const environ = @import("environ.zig");
+const expand = @import("expand.zig");
 const io = @import("io.zig");
 const status = @import("status");
 const ulib = @import("ulib");
@@ -15,7 +16,7 @@ pub fn run(
     segment: []u8,
     parts: []const PartRange,
     part_count: usize,
-    expand_bufs: *[argv.max_args][128]u8,
+    expand_bufs: *[argv.max_args][expand.max_arg_len]u8,
 ) u8 {
     _ = expand_bufs;
     if (part_count < 2 or part_count > max_pipes + 1) return 1;
@@ -86,14 +87,14 @@ pub fn run(
             }
 
             var exec_argv: [argv.max_args + 1]?[*:0]const u8 = .{null} ** (argv.max_args + 1);
-            var exec_arg_bufs: [argv.max_args][128]u8 = undefined;
+            var exec_arg_bufs: [argv.max_args][expand.max_arg_len]u8 = undefined;
             exec_argv[0] = @ptrCast(&exec_path);
             var argc: usize = 1;
             var k: usize = 1;
             while (k < parsed.argc) : (k += 1) {
                 if (argc >= exec_argv.len - 1) break;
                 const arg = parsed.args[k];
-                if (arg.len >= exec_arg_bufs[0].len) break;
+                if (arg.len >= expand.max_arg_len) break;
                 @memcpy(exec_arg_bufs[argc - 1][0..arg.len], arg);
                 exec_arg_bufs[argc - 1][arg.len] = 0;
                 exec_argv[argc] = @ptrCast(&exec_arg_bufs[argc - 1]);
