@@ -1,4 +1,5 @@
 const argv = @import("argv.zig");
+const environ = @import("environ.zig");
 const io = @import("io.zig");
 const status = @import("status");
 const ulib = @import("ulib");
@@ -94,7 +95,10 @@ pub fn run(
             }
             exec_argv[argc] = null;
 
-            _ = ulib.process.exec(@ptrCast(&exec_path), @ptrCast(&exec_argv), @ptrCast(&[_]?[*:0]const u8{null}));
+            var exec_envp: [environ.max_entries + 1]?[*:0]const u8 = .{null} ** (environ.max_entries + 1);
+            environ.fillExecEnvp(&exec_envp);
+
+            _ = ulib.process.exec(@ptrCast(&exec_path), @ptrCast(&exec_argv), @ptrCast(&exec_envp));
             ulib.process.exit(1);
         }
 
