@@ -29,6 +29,7 @@ const memory = @import("mm/memory.zig");
 const runtime_mod = @import("runtime.zig");
 const smp = @import("arch/x86_64/smp.zig");
 const acpi_madt = @import("acpi/madt.zig");
+const tlb = @import("mm/tlb.zig");
 
 /// Deliberately unmapped higher-half address used to verify the page fault handler.
 const page_fault_test_addr: u64 = 0xFFFFFFFF90000000;
@@ -167,6 +168,7 @@ fn initTimer() void {
     hal.console.println("\n--- Timer ---", .{});
     interrupts.registerIrq(timer.timer_vector, interrupts.timerIrqHandler);
     interrupts.registerIrq(scheduler.reschedule_vector, scheduler.rescheduleIpiHandler);
+    interrupts.registerIrq(tlb.shootdown_vector, tlb.shootdownIpiHandler);
     const ticks_per_irq = timer.init() catch {
         hal.console.println("LAPIC timer init failed", .{});
         hal.processor.haltForever();

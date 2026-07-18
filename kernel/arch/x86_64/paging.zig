@@ -688,7 +688,8 @@ pub fn unmapUserPageIn(cr3_phys: u64, virt: u64) MapError!void {
 
     const phys = leaf.framePhys();
     leaf.* = .{};
-    if (readCr3() == cr3_phys) invlpg(virt);
+    const tlb = @import("../../mm/tlb.zig");
+    tlb.invalidatePage(cr3_phys, virt);
     page_ref.release(phys) catch {};
 }
 

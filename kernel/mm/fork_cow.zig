@@ -2,6 +2,7 @@ const address = @import("address.zig");
 const paging = @import("../arch/x86_64/paging.zig");
 const page_ref = @import("page_ref.zig");
 const physical = @import("physical.zig");
+const tlb = @import("tlb.zig");
 
 /// Copy-on-write fork: share parent's present user pages into `dst_cr3`.
 ///
@@ -54,7 +55,7 @@ fn protectParentLeaf(ctx_ptr: *anyopaque, virt: u64, leaf: paging.Pte) paging.Ma
     if (leaf.writable == 0) return;
 
     try paging.writeUserLeafFlagsIn(ctx.src_cr3, virt, false, true);
-    if (paging.readCr3() == ctx.src_cr3) paging.invlpg(virt);
+    tlb.invalidatePage(ctx.src_cr3, virt);
 }
 
 /// Break COW for `virt` in `cr3`. Install the new mapping before releasing the old frame.
@@ -71,7 +72,7 @@ pub fn promoteOnWrite(cr3: u64, fault_addr: u64) bool {
 
     if (page_ref.count(old_phys) <= 1) {
         paging.remapUserPageIn(cr3, virt, old_phys, pte) catch return false;
-        if (paging.readCr3() == cr3) paging.invlpg(virt);
+        tlb.invalidatePage(cr3, virt);
         return true;
     }
 
@@ -93,6 +94,6 @@ pub fn promoteOnWrite(cr3: u64, fault_addr: u64) bool {
     // Mapping now owns `new_phys`; drop this address space's claim on the shared frame.
     page_ref.release(old_phys) catch {};
 
-    if (paging.readCr3() == cr3) paging.invlpg(virt);
+    tlb.invalidatePage(cr3, virt);
     return true;
 }

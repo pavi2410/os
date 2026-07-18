@@ -204,7 +204,8 @@ pub fn sysMprotect(proc: *process.Process, addr: u64, len: u64, prot_u: u64) i64
     while (page < end) : (page += paging.page_size) {
         if (paging.getPhysIn(proc.address_space.cr3, page)) |phys| {
             paging.remapUserPageIn(proc.address_space.cr3, page, phys, perm) catch return errno.ENOMEM;
-            if (paging.readCr3() == proc.address_space.cr3) paging.invlpg(page);
+            const tlb = @import("tlb.zig");
+            tlb.invalidatePage(proc.address_space.cr3, page);
         }
     }
     return 0;

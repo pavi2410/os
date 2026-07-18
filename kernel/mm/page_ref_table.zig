@@ -8,7 +8,7 @@ pub const RefError = error{
     Overflow,
 };
 
-/// Host-testable per-PFN reference counts for user data pages.
+/// Host-testable per-PFN reference counts for user data pages (atomic for SMP).
 pub const PageRefTable = struct {
     counts: []u32,
     max_pfn: usize,
@@ -20,20 +20,27 @@ pub const PageRefTable = struct {
 
     pub fn retain(self: *PageRefTable, phys: u64) RefError!void {
         const pfn = try pfnOf(phys, self.max_pfn);
-        if (self.counts[pfn] == std.math.maxInt(u32)) return RefError.Overflow;
-        self.counts[pfn] += 1;
+        const prev = @atomicRmw(u32, &self.counts[pfn], .Add, 1, .monotonic);
+        if (prev == std.math.maxInt(u32)) {
+            _ = @atomicRmw(u32, &self.counts[pfn], .Sub, 1, .monotonic);
+            return RefError.Overflow;
+        }
     }
 
     pub fn release(self: *PageRefTable, phys: u64) RefError!bool {
         const pfn = try pfnOf(phys, self.max_pfn);
-        if (self.counts[pfn] == 0) return RefError.Underflow;
-        self.counts[pfn] -= 1;
-        return self.counts[pfn] == 0;
+        const prev = @atomicRmw(u32, &self.counts[pfn], .Sub, 1, .monotonic);
+        if (prev == 0) {
+            // Undo underflow.
+            _ = @atomicRmw(u32, &self.counts[pfn], .Add, 1, .monotonic);
+            return RefError.Underflow;
+        }
+        return prev == 1;
     }
 
     pub fn count(self: *const PageRefTable, phys: u64) u32 {
         const pfn = pfnOf(phys, self.max_pfn) catch return 0;
-        return self.counts[pfn];
+        return @atomicLoad(u32, &self.counts[pfn], .monotonic);
     }
 };
 

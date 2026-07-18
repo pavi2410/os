@@ -63,7 +63,8 @@ pub fn tryHandleUserPageFault(fault_addr: u64, error_code: u64) bool {
         return false;
     };
 
-    if (paging.readCr3() == proc.address_space.cr3) paging.invlpg(virt);
+    const tlb = @import("tlb.zig");
+    tlb.invalidatePage(proc.address_space.cr3, virt);
     return true;
 }
 
@@ -92,6 +93,7 @@ fn mapFilePage(proc: *process.Process, region: vma.Vma, virt: u64) bool {
         file_cache.unpinPage(&fat32.ops, open, page_index);
         return false;
     };
-    if (paging.readCr3() == proc.address_space.cr3) paging.invlpg(virt);
+    const tlb = @import("tlb.zig");
+    tlb.invalidatePage(proc.address_space.cr3, virt);
     return true;
 }

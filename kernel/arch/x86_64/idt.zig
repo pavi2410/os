@@ -22,7 +22,7 @@ const IdtPointer = packed struct {
 };
 
 const irq_vector_start: usize = 32;
-const irq_vector_end: usize = 49; // 32–47 device/timer IRQs, 48 reschedule IPI
+const irq_vector_end: usize = 50; // 32–47 IRQs, 48 reschedule, 49 TLB shootdown
 
 var idt: [256]IdtEntry = undefined;
 
@@ -51,6 +51,7 @@ extern fn isr_45() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn isr_46() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn isr_47() callconv(.{ .x86_64_sysv = .{} }) void;
 extern fn isr_48() callconv(.{ .x86_64_sysv = .{} }) void;
+extern fn isr_49() callconv(.{ .x86_64_sysv = .{} }) void;
 
 comptime {
     asm (
@@ -247,6 +248,7 @@ fn irqHandler(vector: usize) *const fn () callconv(.{ .x86_64_sysv = .{} }) void
         46 => isr_46,
         47 => isr_47,
         48 => isr_48,
+        49 => isr_49,
         else => isr_default,
     };
 }
