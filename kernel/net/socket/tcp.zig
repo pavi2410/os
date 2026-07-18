@@ -129,11 +129,11 @@ fn ingestSegment(tcp_sock: *table.TcpSocket, seg: tcp.Segment) api.SocketError!v
     if (seg.payload.len > 0 and seg.seq == tcp_sock.rcv_nxt) {
         const space = table.rx_buf_size - tcp_sock.rx_len;
         const copy = @min(seg.payload.len, space);
-        if (copy > 0) {
-            @memcpy(tcp_sock.rx_buf[tcp_sock.rx_len .. tcp_sock.rx_len + copy], seg.payload[0..copy]);
-            tcp_sock.rx_len += copy;
-        }
-        tcp_sock.rcv_nxt +%= @intCast(seg.payload.len);
+        if (copy == 0) return;
+        @memcpy(tcp_sock.rx_buf[tcp_sock.rx_len .. tcp_sock.rx_len + copy], seg.payload[0..copy]);
+        tcp_sock.rx_len += copy;
+        // Only ACK bytes that fit in the receive buffer; leave the rest unacked.
+        tcp_sock.rcv_nxt +%= @intCast(copy);
         try sendSegment(tcp_sock, tcp_sock.snd_nxt, tcp_sock.rcv_nxt, .{ .ack = 1 }, "");
     }
 
