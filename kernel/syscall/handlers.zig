@@ -376,6 +376,9 @@ fn sysGetdents64(fd: u64, buf_ptr: u64, count: u64) i64 {
     const max_len: usize = 4096;
     const cap_len: usize = @intCast(@min(count, max_len));
 
+    // Validate the user buffer before advancing the directory cursor.
+    if (user.bytes(buf_ptr, cap_len) == null) return errno.EFAULT;
+
     var kbuf: [4096]u8 = undefined;
     const n = fd_ops.getdents64(slot, kbuf[0..cap_len]);
     if (n < 0) return n;
