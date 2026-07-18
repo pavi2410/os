@@ -24,6 +24,30 @@ test "unconfigured host validator preserves direct helper tests" {
     try std.testing.expect(user.bytes(@intFromPtr(&out), out.len) != null);
 }
 
+fn rejectHighWritable(ptr: u64, len: usize, writable: bool) bool {
+    _ = len;
+    if (writable and ptr >= 0x7000_0000_0000) return false;
+    return true;
+}
+
+test "injected host validator rejects writable high addresses" {
+    user.setValidator(rejectHighWritable);
+    defer user.setValidator(allowAll);
+
+    var low: [4]u8 = undefined;
+    try std.testing.expect(user.bytes(@intFromPtr(&low), low.len) != null);
+
+    const high_ptr: u64 = 0x7000_0000_0000;
+    try std.testing.expect(user.bytes(high_ptr, 4) == null);
+}
+
+fn allowAll(ptr: u64, len: usize, writable: bool) bool {
+    _ = ptr;
+    _ = len;
+    _ = writable;
+    return true;
+}
+
 test "readArgv reads bounded cstring vector" {
     var arg0 = [_]u8{ 'e', 'c', 'h', 'o', 0 };
     var arg1 = [_]u8{ 'h', 'i', 0 };

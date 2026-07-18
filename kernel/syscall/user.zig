@@ -30,9 +30,10 @@ pub fn setValidator(validator: ValidateFn) void {
 
 pub fn validate(ptr: u64, len: usize, writable: bool) bool {
     if (!range(ptr, len)) return false;
+    // Prefer an installed validator on any target so host tests can inject one.
+    if (validate_current) |validator| return validator(ptr, len, writable);
     if (builtin.os.tag != .freestanding) return true;
-    const validator = validate_current orelse return false;
-    return validator(ptr, len, writable);
+    return false;
 }
 
 pub fn cString(ptr: u64, max_len: usize) ?[]const u8 {
