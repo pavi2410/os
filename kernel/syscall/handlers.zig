@@ -531,7 +531,11 @@ fn sysPipe(fd_ptr: u64) i64 {
         else => return errno.EIO,
     };
 
-    const proc = fdtab.currentProcess() catch return errno.EPERM;
+    const proc = fdtab.currentProcess() catch {
+        runtime.boot().ipc.closeRead(handle);
+        runtime.boot().ipc.closeWrite(handle);
+        return errno.EPERM;
+    };
 
     const read_fd = fdtab.alloc(proc) catch {
         runtime.boot().ipc.closeRead(handle);
