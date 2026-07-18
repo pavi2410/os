@@ -12,7 +12,7 @@ pub const Frame = exc_frame.Frame;
 
 pub const HandlerFn = *const fn (vector: u8) void;
 
-const irq_vector_end: usize = 48;
+const irq_vector_end: usize = 49;
 
 var irq_handlers: [256]?HandlerFn = [_]?HandlerFn{null} ** 256;
 var timer_ticks = std.atomic.Value(u64).init(0);

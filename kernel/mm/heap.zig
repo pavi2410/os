@@ -1,5 +1,5 @@
 const paging = @import("../arch/x86_64/paging.zig");
-const preempt = @import("../proc/preempt.zig");
+const spinlock = @import("../sync/spinlock.zig");
 const std = @import("std");
 const virtual = @import("virtual.zig");
 
@@ -10,6 +10,8 @@ pub const HeapError = error{
     InvalidFree,
     DoubleFree,
 };
+
+var heap_lock: spinlock.SpinLock = .{};
 
 const magic_free: u32 = 0xF4EE0001;
 const magic_used: u32 = 0xA110CAFE;
@@ -52,10 +54,12 @@ pub fn init() HeapError!void {
 }
 
 pub fn kmalloc(size: usize) HeapError![*]u8 {
-    // Freelist is non-preemptible: timer IRQ must not switch mid-alloc.
-    preempt.disable();
-    defer preempt.enable();
+    heap_lock.lock();
+    defer heap_lock.unlock();
+    return kmallocLocked(size);
+}
 
+fn kmallocLocked(size: usize) HeapError![*]u8 {
     if (size == 0) return @ptrCast(@alignCast(@as([*]u8, @ptrFromInt(min_align))));
 
     const needed = std.mem.alignForward(usize, size + @sizeOf(BlockHeader), min_align);
@@ -96,12 +100,12 @@ pub fn kmalloc(size: usize) HeapError![*]u8 {
     }
 
     try growHeap(needed);
-    return kmalloc(size);
+    return kmallocLocked(size);
 }
 
 pub fn kfree(ptr: [*]u8) HeapError!void {
-    preempt.disable();
-    defer preempt.enable();
+    heap_lock.lock();
+    defer heap_lock.unlock();
 
     if (@intFromPtr(ptr) <= min_align) return;
 

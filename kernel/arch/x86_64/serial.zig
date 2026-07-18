@@ -1,5 +1,6 @@
 const std = @import("std");
 const cpu = @import("cpu.zig");
+const spinlock = @import("../../sync/spinlock.zig");
 
 /// COM1 serial port base address
 const COM1: u16 = 0x3F8;
@@ -11,6 +12,8 @@ const FIFO_CTRL: u16 = 2; // FIFO control register
 const LINE_CTRL: u16 = 3; // Line control register
 const MODEM_CTRL: u16 = 4; // Modem control register
 const LINE_STATUS: u16 = 5; // Line status register
+
+var serial_lock: spinlock.SpinLock = .{};
 
 /// Unbuffered so `print` and raw `writeByte` stay ordered on the UART.
 var serial_writer: std.Io.Writer = .{
@@ -103,16 +106,22 @@ pub fn writer() *std.Io.Writer {
 
 /// Formatted print via `std.Io.Writer.print`.
 pub fn print(comptime fmt: []const u8, args: anytype) void {
+    serial_lock.lock();
+    defer serial_lock.unlock();
     writer().print(fmt, args) catch {};
 }
 
 /// Formatted print with a trailing newline.
 pub fn println(comptime fmt: []const u8, args: anytype) void {
+    serial_lock.lock();
+    defer serial_lock.unlock();
     writer().print(fmt ++ "\n", args) catch {};
 }
 
 /// Write bytes through the console writer (applies `\n` → `\r\n`).
 pub fn writeAll(bytes: []const u8) void {
+    serial_lock.lock();
+    defer serial_lock.unlock();
     writer().writeAll(bytes) catch {};
 }
 

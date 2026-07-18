@@ -152,7 +152,14 @@ fn setupCpuGdt(index: usize) void {
 
 /// Release parked APs via Limine `goto_address`. Call after scheduler + timer on BSP.
 pub fn startAps() void {
+    const scheduler = @import("../../proc/scheduler.zig");
     var i: usize = 0;
+    while (i < available_count) : (i += 1) {
+        if (cpus[i].is_bsp) continue;
+        scheduler.prepareApIdle(@intCast(i));
+    }
+
+    i = 0;
     while (i < available_count) : (i += 1) {
         const desc = cpus[i];
         if (desc.is_bsp) continue;
@@ -189,11 +196,9 @@ fn apEntry(info: *limine.MpInfo) callconv(.c) noreturn {
 
     local.online = 1;
     _ = online_count.fetchAdd(1, .release);
+    // Serial is racy across CPUs; keep message short.
     hal.console.println("CPU {d} online (LAPIC id {d})", .{ local.cpu_id, local.lapic_id });
 
-    cpu.sti();
-    while (true) {
-        local.idle_count += 1;
-        cpu.hlt();
-    }
+    const scheduler = @import("../../proc/scheduler.zig");
+    scheduler.apMain();
 }

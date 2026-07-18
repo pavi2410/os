@@ -166,8 +166,8 @@ pub fn sendIpi(dest_lapic_id: u32, vector: u8) void {
         std.atomic.spinLoopHint();
     }
     lapicWrite(lapic_reg.icr_high, dest_lapic_id << 24);
-    // Fixed delivery, physical dest, assert, edge.
-    lapicWrite(lapic_reg.icr_low, @as(u32, vector) | (1 << 14));
+    // Fixed delivery, physical destination, edge-triggered.
+    lapicWrite(lapic_reg.icr_low, vector);
 }
 
 fn maskAllPins(ioapic_index: usize) void {

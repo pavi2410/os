@@ -166,6 +166,7 @@ fn initApic(rsdp_virt: u64) void {
 fn initTimer() void {
     hal.console.println("\n--- Timer ---", .{});
     interrupts.registerIrq(timer.timer_vector, interrupts.timerIrqHandler);
+    interrupts.registerIrq(scheduler.reschedule_vector, scheduler.rescheduleIpiHandler);
     const ticks_per_irq = timer.init() catch {
         hal.console.println("LAPIC timer init failed", .{});
         hal.processor.haltForever();
