@@ -57,24 +57,19 @@ pub fn sysMmap(
     defer mmap_lock.unlock();
 
     if (len == 0) return errno.EINVAL;
-    const prot: u32 = @truncate(prot_u);
-    const flags: u32 = @truncate(flags_u);
+    const prot = vma.Prot.fromLinux(@truncate(prot_u));
+    const flags = vma.MapFlags.fromLinux(@truncate(flags_u));
 
     if (vma.violatesWx(prot)) return errno.EINVAL;
-
-    const anon = flags & vma.MAP_ANONYMOUS != 0;
-    const priv = flags & vma.MAP_PRIVATE != 0;
-    const fixed = flags & vma.MAP_FIXED != 0;
-    const supported = vma.MAP_ANONYMOUS | vma.MAP_PRIVATE | vma.MAP_FIXED;
-    if (flags & ~supported != 0) return errno.EINVAL;
-    if (!priv) return errno.EINVAL;
+    if (flags.hasUnsupported()) return errno.EINVAL;
+    if (!flags.private) return errno.EINVAL;
 
     const map_len = alignUp(len, paging.page_size);
-    const base_or_err = pickBase(proc, addr, map_len, fixed);
+    const base_or_err = pickBase(proc, addr, map_len, flags.fixed);
     if (base_or_err < 0) return base_or_err;
     const base: u64 = @intCast(base_or_err);
 
-    if (anon) {
+    if (flags.anonymous) {
         const fd_ignorable = fd == @as(u64, @bitCast(@as(i64, -1))) or fd == 0;
         if (!fd_ignorable) return errno.EBADF;
 
@@ -92,7 +87,7 @@ pub fn sysMmap(
     }
 
     // File-backed MAP_PRIVATE: read-only for now.
-    if (prot & vma.PROT_WRITE != 0) return errno.EINVAL;
+    if (prot.write) return errno.EINVAL;
     if (offset % paging.page_size != 0) return errno.EINVAL;
 
     const handle = fdtab.expectFile(fd) catch return errno.EBADF;
@@ -195,7 +190,7 @@ pub fn sysMprotect(proc: *process.Process, addr: u64, len: u64, prot_u: u64) i64
 
     if (len == 0) return errno.EINVAL;
     if (addr % paging.page_size != 0) return errno.EINVAL;
-    const prot: u32 = @truncate(prot_u);
+    const prot = vma.Prot.fromLinux(@truncate(prot_u));
     if (vma.violatesWx(prot)) return errno.EINVAL;
 
     const map_len = alignUp(len, paging.page_size);
@@ -204,7 +199,7 @@ pub fn sysMprotect(proc: *process.Process, addr: u64, len: u64, prot_u: u64) i64
     while (page < end) : (page += paging.page_size) {
         if (proc.vmas.find(page) == null) return errno.ENOMEM;
         // File-backed mappings stay read-only for now.
-        if (proc.vmas.find(page).?.kind == .file and prot & vma.PROT_WRITE != 0) {
+        if (proc.vmas.find(page).?.kind == .file and prot.write) {
             return errno.EINVAL;
         }
     }

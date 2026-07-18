@@ -1,6 +1,7 @@
 /// Freestanding Linux x86_64 syscall wrappers for user programs.
 const abi_syscall = @import("abi_syscall");
 const abi_fs = @import("abi_fs");
+const abi_mman = @import("abi_mman");
 const abi_net = @import("abi_net");
 
 pub fn exit(status: u32) noreturn {
@@ -70,20 +71,13 @@ pub fn brk(addr: usize) isize {
     return syscall6(abi_syscall.brk, addr, 0, 0, 0, 0, 0);
 }
 
-pub const PROT_READ: u32 = 0x1;
-pub const PROT_WRITE: u32 = 0x2;
-pub const PROT_EXEC: u32 = 0x4;
-pub const PROT_NONE: u32 = 0x0;
+pub const Prot = abi_mman.Prot;
+pub const MapFlags = abi_mman.MapFlags;
 
-pub const MAP_SHARED: u32 = 0x01;
-pub const MAP_PRIVATE: u32 = 0x02;
-pub const MAP_FIXED: u32 = 0x10;
-pub const MAP_ANONYMOUS: u32 = 0x20;
-
-pub fn mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset: i64) isize {
+pub fn mmap(addr: usize, len: usize, prot: Prot, flags: MapFlags, fd: i32, offset: i64) isize {
     const fd_u: u64 = @bitCast(@as(i64, fd));
     const off_u: u64 = @bitCast(offset);
-    return syscall6(abi_syscall.mmap, addr, len, prot, flags, fd_u, off_u);
+    return syscall6(abi_syscall.mmap, addr, len, prot.toLinux(), flags.toLinux(), fd_u, off_u);
 }
 
 pub fn munmap(addr: usize, len: usize) isize {
@@ -94,8 +88,8 @@ pub fn fsync(fd: u32) isize {
     return syscall6(abi_syscall.fsync, fd, 0, 0, 0, 0, 0);
 }
 
-pub fn mprotect(addr: usize, len: usize, prot: u32) isize {
-    return syscall6(abi_syscall.mprotect, addr, len, prot, 0, 0, 0);
+pub fn mprotect(addr: usize, len: usize, prot: Prot) isize {
+    return syscall6(abi_syscall.mprotect, addr, len, prot.toLinux(), 0, 0, 0);
 }
 
 pub fn getdents64(fd: u32, buf: [*]u8, count: usize) isize {

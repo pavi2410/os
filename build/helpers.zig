@@ -24,6 +24,7 @@ pub const AbiBundle = struct {
     syscall: *std.Build.Module,
     signal: *std.Build.Module,
     fs: *std.Build.Module,
+    mman: *std.Build.Module,
     net: *std.Build.Module,
     hw: *std.Build.Module,
 
@@ -36,6 +37,7 @@ pub const AbiBundle = struct {
             .syscall = exeModule(b, "common/abi/syscall.zig", target, optimize),
             .signal = exeModule(b, "common/abi/signal.zig", target, optimize),
             .fs = exeModule(b, "common/abi/fs.zig", target, optimize),
+            .mman = exeModule(b, "common/abi/mman.zig", target, optimize),
             .net = exeModule(b, "common/abi/net.zig", target, optimize),
             .hw = exeModule(b, "common/abi/hw.zig", target, optimize),
         };
@@ -45,6 +47,7 @@ pub const AbiBundle = struct {
         mod.addImport("abi_syscall", self.syscall);
         mod.addImport("abi_signal", self.signal);
         mod.addImport("abi_fs", self.fs);
+        mod.addImport("abi_mman", self.mman);
         mod.addImport("abi_net", self.net);
         mod.addImport("abi_hw", self.hw);
     }

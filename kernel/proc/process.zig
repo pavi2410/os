@@ -385,7 +385,7 @@ fn seedVmasInto(vmas: *vma.VmaTable, loaded: *const user_loader.LoadedImage) vma
             .base = region.base,
             .len = region.len,
             .prot = region.prot,
-            .flags = vma.MAP_PRIVATE,
+            .flags = .{ .private = true },
             .kind = region.kind,
         });
     }

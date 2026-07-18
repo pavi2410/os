@@ -6,8 +6,8 @@ test "insert find and overlap" {
     try table.insert(.{
         .base = 0x400000,
         .len = 0x1000,
-        .prot = vma.PROT_READ | vma.PROT_EXEC,
-        .flags = vma.MAP_PRIVATE,
+        .prot = .{ .read = true, .exec = true },
+        .flags = .{ .private = true },
         .kind = .elf,
     });
     try std.testing.expect(table.find(0x400000) != null);
@@ -16,8 +16,8 @@ test "insert find and overlap" {
     try std.testing.expectError(vma.VmaError.Overlap, table.insert(.{
         .base = 0x400000,
         .len = 0x2000,
-        .prot = vma.PROT_READ,
-        .flags = vma.MAP_PRIVATE,
+        .prot = .{ .read = true },
+        .flags = .{ .private = true },
         .kind = .anon,
     }));
 }
@@ -27,8 +27,8 @@ test "unmapRange punches hole" {
     try table.insert(.{
         .base = 0x10000,
         .len = 0x3000,
-        .prot = vma.PROT_READ | vma.PROT_WRITE,
-        .flags = vma.MAP_PRIVATE | vma.MAP_ANONYMOUS,
+        .prot = .{ .read = true, .write = true },
+        .flags = .{ .private = true, .anonymous = true },
         .kind = .anon,
     });
     try table.unmapRange(0x11000, 0x1000);
@@ -43,15 +43,15 @@ test "setProt splits region" {
     try table.insert(.{
         .base = 0x20000,
         .len = 0x3000,
-        .prot = vma.PROT_READ | vma.PROT_WRITE,
-        .flags = vma.MAP_PRIVATE | vma.MAP_ANONYMOUS,
+        .prot = .{ .read = true, .write = true },
+        .flags = .{ .private = true, .anonymous = true },
         .kind = .anon,
     });
-    try table.setProt(0x21000, 0x1000, vma.PROT_READ);
+    try table.setProt(0x21000, 0x1000, .{ .read = true });
     try std.testing.expectEqual(@as(usize, 3), table.count());
     const mid = table.find(0x21000).?;
-    try std.testing.expectEqual(vma.PROT_READ, mid.prot);
-    try std.testing.expectEqual(vma.PROT_READ | vma.PROT_WRITE, table.find(0x20000).?.prot);
+    try std.testing.expectEqual(vma.Prot{ .read = true }, mid.prot);
+    try std.testing.expectEqual(vma.Prot{ .read = true, .write = true }, table.find(0x20000).?.prot);
 }
 
 test "setHeapEnd creates and grows" {
@@ -65,7 +65,7 @@ test "setHeapEnd creates and grows" {
 }
 
 test "violatesWx detects write-exec" {
-    try std.testing.expect(vma.violatesWx(vma.PROT_WRITE | vma.PROT_EXEC));
-    try std.testing.expect(!vma.violatesWx(vma.PROT_READ | vma.PROT_WRITE));
-    try std.testing.expect(!vma.violatesWx(vma.PROT_READ | vma.PROT_EXEC));
+    try std.testing.expect(vma.violatesWx(.{ .write = true, .exec = true }));
+    try std.testing.expect(!vma.violatesWx(.{ .read = true, .write = true }));
+    try std.testing.expect(!vma.violatesWx(.{ .read = true, .exec = true }));
 }

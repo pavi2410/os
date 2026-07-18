@@ -1,17 +1,10 @@
+const abi_mman = @import("abi_mman");
+
 pub const page_size: u64 = 4096;
 pub const max_vmas: usize = 32;
 
-/// Linux-compatible protection bits.
-pub const PROT_READ: u32 = 0x1;
-pub const PROT_WRITE: u32 = 0x2;
-pub const PROT_EXEC: u32 = 0x4;
-pub const PROT_NONE: u32 = 0x0;
-
-/// Linux-compatible mmap flags (subset).
-pub const MAP_SHARED: u32 = 0x01;
-pub const MAP_PRIVATE: u32 = 0x02;
-pub const MAP_FIXED: u32 = 0x10;
-pub const MAP_ANONYMOUS: u32 = 0x20;
+pub const Prot = abi_mman.Prot;
+pub const MapFlags = abi_mman.MapFlags;
 
 pub const Kind = enum {
     none,
@@ -43,8 +36,8 @@ pub const FileBacking = struct {
 pub const Vma = struct {
     base: u64 = 0,
     len: u64 = 0,
-    prot: u32 = 0,
-    flags: u32 = 0,
+    prot: Prot = .{},
+    flags: MapFlags = .{},
     kind: Kind = .none,
     file: FileBacking = .{},
 
@@ -63,15 +56,15 @@ pub const Vma = struct {
     }
 
     pub fn isWritable(self: Vma) bool {
-        return self.prot & PROT_WRITE != 0;
+        return self.prot.write;
     }
 
     pub fn isExecutable(self: Vma) bool {
-        return self.prot & PROT_EXEC != 0;
+        return self.prot.exec;
     }
 
     pub fn isReadable(self: Vma) bool {
-        return self.prot & PROT_READ != 0;
+        return self.prot.read;
     }
 };
 
@@ -197,7 +190,7 @@ pub const VmaTable = struct {
     }
 
     /// Change protection on the VMA covering `[base, base+len)`, splitting as needed.
-    pub fn setProt(self: *VmaTable, base: u64, len: u64, prot: u32) VmaError!void {
+    pub fn setProt(self: *VmaTable, base: u64, len: u64, prot: Prot) VmaError!void {
         if (len == 0) return;
         if (base % page_size != 0 or len % page_size != 0) return VmaError.InvalidRange;
         const range_end = base + len;
@@ -292,20 +285,21 @@ pub const VmaTable = struct {
         try self.insert(.{
             .base = heap_base,
             .len = new_end - heap_base,
-            .prot = PROT_READ | PROT_WRITE,
-            .flags = MAP_PRIVATE | MAP_ANONYMOUS,
+            .prot = .{ .read = true, .write = true },
+            .flags = .{ .private = true, .anonymous = true },
             .kind = .heap,
         });
     }
 };
 
-pub fn protFromElfFlags(writable: bool, executable: bool) u32 {
-    var prot: u32 = PROT_READ;
-    if (writable) prot |= PROT_WRITE;
-    if (executable) prot |= PROT_EXEC;
-    return prot;
+pub fn protFromElfFlags(writable: bool, executable: bool) Prot {
+    return .{
+        .read = true,
+        .write = writable,
+        .exec = executable,
+    };
 }
 
-pub fn violatesWx(prot: u32) bool {
-    return (prot & PROT_WRITE != 0) and (prot & PROT_EXEC != 0);
+pub fn violatesWx(prot: Prot) bool {
+    return prot.violatesWx();
 }

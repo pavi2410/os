@@ -333,6 +333,7 @@ pub fn build(b: *std.Build) void {
 
     const abi_host = helpers.AbiBundle.create(b, b.graph.host, .Debug);
     abi_host.attachFsView(host_common.view);
+    vma_host_mod.addImport("abi_mman", abi_host.mman);
 
     const ulib_target_support_host = helpers.hostModule(b, "userspace/ulib/target_support.zig");
     ulib_target_support_host.addImport("common/ipv4_addr", host_common.ipv4_addr);

@@ -17,10 +17,10 @@ const PfErr = packed struct(u64) {
     _: u59 = 0,
 };
 
-pub fn pteFromProt(prot: u32) paging.Pte {
+pub fn pteFromProt(prot: vma.Prot) paging.Pte {
     var pte = paging.Pte{ .present = 1, .user = 1 };
-    if (prot & vma.PROT_WRITE != 0) pte.writable = 1;
-    if (prot & vma.PROT_EXEC == 0) pte.no_exec = 1;
+    if (prot.write) pte.writable = 1;
+    if (!prot.exec) pte.no_exec = 1;
     return pte;
 }
 

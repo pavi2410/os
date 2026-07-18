@@ -26,8 +26,8 @@ fn testAnonMapWriteRead() void {
     const ptr = ulib.syscall.mmap(
         0,
         len,
-        ulib.syscall.PROT_READ | ulib.syscall.PROT_WRITE,
-        ulib.syscall.MAP_PRIVATE | ulib.syscall.MAP_ANONYMOUS,
+        .{ .read = true, .write = true },
+        .{ .private = true, .anonymous = true },
         -1,
         0,
     );
@@ -48,8 +48,8 @@ fn testMunmapFaultKillsChild() void {
     const ptr = ulib.syscall.mmap(
         0,
         len,
-        ulib.syscall.PROT_READ | ulib.syscall.PROT_WRITE,
-        ulib.syscall.MAP_PRIVATE | ulib.syscall.MAP_ANONYMOUS,
+        .{ .read = true, .write = true },
+        .{ .private = true, .anonymous = true },
         -1,
         0,
     );
@@ -81,8 +81,8 @@ fn testMprotectRoWriteFaults() void {
     const ptr = ulib.syscall.mmap(
         0,
         len,
-        ulib.syscall.PROT_READ | ulib.syscall.PROT_WRITE,
-        ulib.syscall.MAP_PRIVATE | ulib.syscall.MAP_ANONYMOUS,
+        .{ .read = true, .write = true },
+        .{ .private = true, .anonymous = true },
         -1,
         0,
     );
@@ -93,7 +93,7 @@ fn testMprotectRoWriteFaults() void {
     const addr: usize = @intCast(ptr);
     const base: [*]u8 = @ptrFromInt(addr);
     base[0] = 1;
-    if (ulib.syscall.mprotect(addr, len, ulib.syscall.PROT_READ) < 0) {
+    if (ulib.syscall.mprotect(addr, len, .{ .read = true }) < 0) {
         tap.Harness.notOk("mprotect ro write faults", "mprotect failed");
         _ = ulib.syscall.munmap(addr, len);
         return;
@@ -122,8 +122,8 @@ fn testForkMmapCow() void {
     const ptr = ulib.syscall.mmap(
         0,
         len,
-        ulib.syscall.PROT_READ | ulib.syscall.PROT_WRITE,
-        ulib.syscall.MAP_PRIVATE | ulib.syscall.MAP_ANONYMOUS,
+        .{ .read = true, .write = true },
+        .{ .private = true, .anonymous = true },
         -1,
         0,
     );
@@ -173,8 +173,8 @@ fn testFileMapRead() void {
     const ptr = ulib.syscall.mmap(
         0,
         4096,
-        ulib.syscall.PROT_READ,
-        ulib.syscall.MAP_PRIVATE,
+        .{ .read = true },
+        .{ .private = true },
         @intCast(fd),
         0,
     );
@@ -199,8 +199,8 @@ fn testForkAnonPrivate() void {
     const ptr = ulib.syscall.mmap(
         0,
         len,
-        ulib.syscall.PROT_READ | ulib.syscall.PROT_WRITE,
-        ulib.syscall.MAP_PRIVATE | ulib.syscall.MAP_ANONYMOUS,
+        .{ .read = true, .write = true },
+        .{ .private = true, .anonymous = true },
         -1,
         0,
     );

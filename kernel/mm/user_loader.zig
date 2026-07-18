@@ -17,7 +17,7 @@ pub const max_seed_regions = vma.max_vmas;
 pub const RegionSeed = struct {
     base: u64,
     len: u64,
-    prot: u32,
+    prot: vma.Prot,
     kind: vma.Kind,
 };
 
@@ -74,7 +74,7 @@ pub fn load(cr3: u64, image: []const u8, argv: []const []const u8, envp: []const
     try pushRegionSeed(&result, .{
         .base = stack_start,
         .len = stack_end - stack_start,
-        .prot = vma.PROT_READ | vma.PROT_WRITE,
+        .prot = .{ .read = true, .write = true },
         .kind = .stack,
     });
     _ = stack_mapped_top;
@@ -97,13 +97,13 @@ fn pushRegionSeed(image: *LoadedImage, region: RegionSeed) LoadError!void {
         const prev = &image.regions[image.region_count - 1];
         if (prev.kind == .elf and prev.base + prev.len == region.base) {
             prev.len += region.len;
-            prev.prot |= region.prot;
+            prev.prot = prev.prot.merge(region.prot);
             return;
         }
         if (prev.kind == .elf and region.base < prev.base + prev.len) {
             const new_end = @max(prev.base + prev.len, region.base + region.len);
             prev.len = new_end - prev.base;
-            prev.prot |= region.prot;
+            prev.prot = prev.prot.merge(region.prot);
             return;
         }
     }
