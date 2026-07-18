@@ -81,6 +81,9 @@
         "scripts",
         "limine.conf",
         "kernel",
+        "userspace",
+        "common",
+        "build",
         "test",
     },
 }
