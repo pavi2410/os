@@ -28,7 +28,7 @@ pub fn run(parsed: *const argv_mod.Parsed) u8 {
     }
 
     if (ulib.process.getpid() != my_pid) {
-        _ = ulib.signal.default(ulib.signal.SIGINT);
+        _ = ulib.signal.default(.int);
         redirect.applyStored();
         const argc = buildArgv(parsed) orelse {
             ulib.process.exit(1);

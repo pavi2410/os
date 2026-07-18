@@ -41,7 +41,7 @@ fn testParentProgressUnderBusyChild() void {
         }
     }
 
-    _ = ulib.signal.kill(child, ulib.signal.SIGKILL);
+    _ = ulib.signal.kill(child, ulib.signal.Signal.kill);
     var status: u32 = 0;
     _ = ulib.process.wait(child, &status, 0);
 
@@ -58,7 +58,7 @@ fn testTwoBusyChildrenParentProgress() void {
 
     const b = ulib.process.fork();
     if (b < 0) {
-        _ = ulib.signal.kill(a, ulib.signal.SIGKILL);
+        _ = ulib.signal.kill(a, ulib.signal.Signal.kill);
         var st: u32 = 0;
         _ = ulib.process.wait(a, &st, 0);
         tap.Harness.notOk("two busy children parent progress", "fork B failed");
@@ -75,8 +75,8 @@ fn testTwoBusyChildrenParentProgress() void {
         }
     }
 
-    _ = ulib.signal.kill(a, ulib.signal.SIGKILL);
-    _ = ulib.signal.kill(b, ulib.signal.SIGKILL);
+    _ = ulib.signal.kill(a, ulib.signal.Signal.kill);
+    _ = ulib.signal.kill(b, ulib.signal.Signal.kill);
     var status: u32 = 0;
     _ = ulib.process.wait(a, &status, 0);
     _ = ulib.process.wait(b, &status, 0);

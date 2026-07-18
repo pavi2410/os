@@ -48,7 +48,7 @@ pub fn queue(proc: *process.Process, sig: u32) void {
     const bit = abi_signal.mask(sig);
     proc.signals.pending |= bit;
 
-    if (sig == abi_signal.SIGKILL) {
+    if (sig == abi_signal.Signal.kill.number()) {
         tryApply(proc);
         return;
     }
@@ -71,7 +71,7 @@ pub fn applyPending(proc: *process.Process) void {
     while (sig < abi_signal.NSIG) : (sig += 1) {
         const bit = abi_signal.mask(sig);
         if (proc.signals.pending & bit == 0) continue;
-        if (sig != abi_signal.SIGKILL and proc.signals.blocked & bit != 0) continue;
+        if (sig != abi_signal.Signal.kill.number() and proc.signals.blocked & bit != 0) continue;
 
         proc.signals.pending &= ~bit;
 
@@ -88,7 +88,7 @@ fn resolveAction(proc: *const process.Process, sig: u32) enum {
     default_ignore,
     terminate,
 } {
-    if (sig == abi_signal.SIGCHLD) {
+    if (sig == abi_signal.Signal.chld.number()) {
         return switch (proc.signals.actions[sig]) {
             .ign => .ignore,
             .dfl => .default_ignore,
@@ -110,14 +110,16 @@ pub fn terminateBySignal(proc: *process.Process, sig: u32) noreturn {
 
 pub fn sigaction(proc: *process.Process, signum: u32, act: ?abi_signal.Sigaction) ActionError!Action {
     if (!abi_signal.isValid(signum)) return error.Invalid;
-    if (signum == abi_signal.SIGKILL or signum == abi_signal.SIGSTOP) return error.Invalid;
+    if (signum == abi_signal.Signal.kill.number() or signum == abi_signal.Signal.stop.number()) {
+        return error.Invalid;
+    }
 
     const old = proc.signals.actions[signum];
     if (act) |new_act| {
         const handler = new_act.sa_handler;
         proc.signals.actions[signum] = switch (handler) {
-            abi_signal.SIG_DFL => .dfl,
-            abi_signal.SIG_IGN => .ign,
+            @intFromEnum(abi_signal.Disposition.default) => .dfl,
+            @intFromEnum(abi_signal.Disposition.ignore) => .ign,
             else => return error.Invalid,
         };
     }
@@ -125,22 +127,22 @@ pub fn sigaction(proc: *process.Process, signum: u32, act: ?abi_signal.Sigaction
 }
 
 pub fn sigprocmask(proc: *process.Process, how: i32, set: u64) i64 {
+    const how_kind = abi_signal.SigHow.fromInt(how) orelse return -22;
     const old = proc.signals.blocked;
-    proc.signals.blocked = switch (how) {
-        abi_signal.SIG_BLOCK => abi_signal.blockMask(old, set),
-        abi_signal.SIG_UNBLOCK => abi_signal.unblockMask(old, set),
-        abi_signal.SIG_SETMASK => abi_signal.setMask(set),
-        else => return -22,
+    proc.signals.blocked = switch (how_kind) {
+        .block => abi_signal.blockMask(old, set),
+        .unblock => abi_signal.unblockMask(old, set),
+        .setmask => abi_signal.setMask(set),
     };
-    proc.signals.blocked &= ~abi_signal.mask(abi_signal.SIGKILL);
+    proc.signals.blocked &= ~abi_signal.maskOf(.kill);
     tryApply(proc);
     return @bitCast(@as(i64, @intCast(old)));
 }
 
 pub fn actionToHandler(action: Action) u64 {
     return switch (action) {
-        .dfl => abi_signal.SIG_DFL,
-        .ign => abi_signal.SIG_IGN,
+        .dfl => @intFromEnum(abi_signal.Disposition.default),
+        .ign => @intFromEnum(abi_signal.Disposition.ignore),
     };
 }
 
@@ -151,7 +153,7 @@ pub const ActionError = error{
 pub fn notifyChildExit(parent_id: usize) void {
     if (parent_id == process.no_parent) return;
     if (process.lookup(parent_id)) |parent| {
-        queue(parent, abi_signal.SIGCHLD);
+        queue(parent, abi_signal.Signal.chld.number());
     }
 }
 

@@ -204,7 +204,7 @@ pub fn yield() void {
     if (smp.cpuId() == 0) {
         tty.get().pollCtrlC();
         if (tty.get().takePendingCtrlC()) |pid| {
-            _ = signal.send(pid, abi_signal.SIGINT);
+            _ = signal.send(pid, abi_signal.Signal.int.number());
         }
     }
     const self = thread.currentThread() orelse return;
