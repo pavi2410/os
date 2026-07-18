@@ -160,6 +160,15 @@ pub const ProcessManager = struct {
         return ProcessError.TooManyZombies;
     }
 
+    pub fn peekZombieAny(self: *const ProcessManager, parent_id: usize, pid: isize) ?Zombie {
+        for (self.zombies) |slot| {
+            if (!slot.in_use or slot.parent_id != parent_id) continue;
+            if (pid >= 0 and @as(usize, @intCast(pid)) != slot.pid) continue;
+            return slot;
+        }
+        return null;
+    }
+
     pub fn reapZombieAny(self: *ProcessManager, parent_id: usize, pid: isize) ?Zombie {
         for (&self.zombies) |*slot| {
             if (!slot.in_use or slot.parent_id != parent_id) continue;
@@ -326,6 +335,10 @@ pub fn reapZombie(parent_id: usize, pid: usize) ?Zombie {
 }
 
 /// `pid == -1` waits for any child of `parent_id`; otherwise match a specific pid.
+pub fn peekZombieAny(parent_id: usize, pid: isize) ?Zombie {
+    return table.peekZombieAny(parent_id, pid);
+}
+
 pub fn reapZombieAny(parent_id: usize, pid: isize) ?Zombie {
     return table.reapZombieAny(parent_id, pid);
 }

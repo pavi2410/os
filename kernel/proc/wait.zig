@@ -13,12 +13,14 @@ pub fn wait4(parent: *process.Process, pid: i64, status_ptr: u64, options: u32) 
     while (true) {
         signal.tryApply(parent);
 
-        if (process.reapZombieAny(parent.id, pid)) |zombie| {
+        if (process.peekZombieAny(parent.id, pid)) |zombie| {
             if (status_ptr != 0) {
                 parent.address_space.activate();
                 const wstatus: u32 = zombie.status;
                 copy_out.copyOut(status_ptr, std.mem.asBytes(&wstatus)) catch return errno.EFAULT;
             }
+            // Only reap after a successful status copy (or no status pointer).
+            _ = process.reapZombieAny(parent.id, @intCast(zombie.pid));
             return @intCast(zombie.pid);
         }
 
