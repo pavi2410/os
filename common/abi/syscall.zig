@@ -39,6 +39,7 @@ pub const symlink = 88;
 pub const readlink = 89;
 pub const mount = 165;
 pub const umount2 = 166;
+pub const reboot = 169;
 pub const getdents64 = 217;
 pub const clock_gettime = 228;
 pub const exit_group = 231;

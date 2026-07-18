@@ -95,6 +95,7 @@ fn dispatchSyscall(frame: *Frame) i64 {
         numbers.readlink => sysReadlink(frame.arg0, frame.arg1, frame.arg2),
         numbers.mount => sysMount(frame.arg0, frame.arg1, frame.arg2, frame.arg3, frame.arg4),
         numbers.umount2 => sysUmount2(frame.arg0, frame.arg1),
+        numbers.reboot => sysReboot(frame.arg0, frame.arg1, frame.arg2, frame.arg3),
         numbers.getdents64 => sysGetdents64(frame.arg0, frame.arg1, frame.arg2),
         numbers.clock_gettime => sysClockGettime(frame.arg0, frame.arg1),
         numbers.socket => sysSocket(frame.arg0, frame.arg1, frame.arg2),
@@ -578,6 +579,17 @@ fn sysExit(status: u64) i64 {
         process.terminateCurrent(abi_signal.waitStatusForExit(@truncate(status)));
     }
     thread.exit();
+}
+
+/// Linux reboot(2): magic1=0xfee1dead, magic2=672274793, cmd=POWER_OFF(0x4321fedc).
+fn sysReboot(magic1: u64, magic2: u64, cmd: u64, _: u64) i64 {
+    const linux_reboot_magic1: u64 = 0xfee1dead;
+    const linux_reboot_magic2: u64 = 672274793;
+    const linux_reboot_cmd_power_off: u64 = 0x4321fedc;
+    if (magic1 != linux_reboot_magic1 or magic2 != linux_reboot_magic2) return errno.EINVAL;
+    if (cmd != linux_reboot_cmd_power_off) return errno.EINVAL;
+    const power = @import("../acpi/power.zig");
+    power.powerOff();
 }
 
 fn sysRtSigaction(signum: u64, act_ptr: u64, oldact_ptr: u64, sigsetsize: u64) i64 {

@@ -1,5 +1,6 @@
 const physical = @import("physical.zig");
 const core = @import("page_cache_core.zig");
+const spinlock = @import("../sync/spinlock.zig");
 
 pub const max_slots = core.max_slots;
 pub const CacheError = core.CacheError;
@@ -9,6 +10,7 @@ pub const PageCache = core.PageCache;
 
 var global_cache: PageCache = .{};
 var global_ready: bool = false;
+var cache_lock: spinlock.SpinLock = .{};
 
 fn kernelAlloc() CacheError!u64 {
     return physical.allocPage() catch return CacheError.OutOfMemory;
@@ -29,4 +31,12 @@ pub fn global() *PageCache {
 
 pub fn ready() bool {
     return global_ready;
+}
+
+pub fn lock() void {
+    cache_lock.lock();
+}
+
+pub fn unlock() void {
+    cache_lock.unlock();
 }

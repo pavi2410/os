@@ -63,6 +63,15 @@ pub inline fn outb(port: u16, value: u8) void {
     );
 }
 
+/// Output a 16-bit value to an I/O port.
+pub inline fn outw(port: u16, value: u16) void {
+    asm volatile ("outw %[value], %[port]"
+        :
+        : [value] "{ax}" (value),
+          [port] "{dx}" (port),
+    );
+}
+
 /// Input a byte from an I/O port.
 pub inline fn inb(port: u16) u8 {
     return asm volatile ("inb %[port], %[result]"

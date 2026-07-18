@@ -8,6 +8,14 @@ pub fn exit(status: u32) noreturn {
     unreachable;
 }
 
+pub fn rebootPowerOff() noreturn {
+    const magic1: u64 = 0xfee1dead;
+    const magic2: u64 = 672274793;
+    const cmd_power_off: u64 = 0x4321fedc;
+    _ = syscall6(abi_syscall.reboot, magic1, magic2, cmd_power_off, 0, 0, 0);
+    unreachable;
+}
+
 pub fn write(fd: u32, buf: [*]const u8, count: usize) isize {
     return syscall6(abi_syscall.write, fd, @intFromPtr(buf), count, 0, 0, 0);
 }

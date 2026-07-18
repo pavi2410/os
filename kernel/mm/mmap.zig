@@ -7,10 +7,13 @@ const fdtab = @import("../syscall/fd.zig");
 const runtime = @import("../runtime.zig");
 const filesystem = @import("../fs/filesystem.zig");
 const file_cache = @import("../fs/file_cache.zig");
+const spinlock = @import("../sync/spinlock.zig");
 
 /// Anonymous mmap arena: below the stack guard, above the ELF/heap base.
 pub const mmap_floor: u64 = process.user_brk_base;
 pub const mmap_ceiling: u64 = process.user_brk_limit;
+
+var mmap_lock: spinlock.SpinLock = .{};
 
 fn alignUp(n: u64, align_to: u64) u64 {
     return (n + align_to - 1) & ~(align_to - 1);
@@ -50,6 +53,9 @@ pub fn sysMmap(
     fd: u64,
     offset: u64,
 ) i64 {
+    mmap_lock.lock();
+    defer mmap_lock.unlock();
+
     if (len == 0) return errno.EINVAL;
     const prot: u32 = @truncate(prot_u);
     const flags: u32 = @truncate(flags_u);
@@ -164,6 +170,9 @@ pub fn releaseFileCachePins(proc: *process.Process) void {
 }
 
 pub fn sysMunmap(proc: *process.Process, addr: u64, len: u64) i64 {
+    mmap_lock.lock();
+    defer mmap_lock.unlock();
+
     if (len == 0) return errno.EINVAL;
     if (addr % paging.page_size != 0) return errno.EINVAL;
     const map_len = alignUp(len, paging.page_size);
@@ -181,6 +190,9 @@ pub fn sysMunmap(proc: *process.Process, addr: u64, len: u64) i64 {
 }
 
 pub fn sysMprotect(proc: *process.Process, addr: u64, len: u64, prot_u: u64) i64 {
+    mmap_lock.lock();
+    defer mmap_lock.unlock();
+
     if (len == 0) return errno.EINVAL;
     if (addr % paging.page_size != 0) return errno.EINVAL;
     const prot: u32 = @truncate(prot_u);

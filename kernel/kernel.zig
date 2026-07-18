@@ -84,6 +84,8 @@ pub fn init(ctx: BootContext) void {
             hal.console.println("MADT local APICs enabled: {d}", .{enabled});
         }
     } else |_| {}
+    const acpi_power = @import("acpi/power.zig");
+    acpi_power.init(ctx.rsdp_virt);
 
     memory_map.init(ctx.memory_map);
     reserveMemoryMapBuffer(ctx.memory_map);

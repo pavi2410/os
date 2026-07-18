@@ -7,6 +7,7 @@ const cmd_cd = @import("cd.zig");
 const cmd_date = @import("date.zig");
 const cmd_echo = @import("echo.zig");
 const cmd_exit = @import("exit.zig");
+const cmd_poweroff = @import("poweroff.zig");
 const cmd_ls = @import("ls.zig");
 const cmd_mkdir = @import("mkdir.zig");
 const cmd_pid = @import("pid.zig");
@@ -22,6 +23,7 @@ const cmd_write = @import("write.zig");
 
 pub const Handler = union(enum) {
     exit,
+    poweroff,
     none: *const fn () u8,
     parsed: *const fn (*const argv.Parsed) u8,
 };
@@ -35,6 +37,7 @@ pub const Entry = struct {
 pub const entries = [_]Entry{
     .{ .name = "help", .handler = .{ .none = printHelp } },
     .{ .name = "exit", .handler = .exit },
+    .{ .name = "poweroff", .handler = .poweroff, .summary = "  poweroff  ACPI/QEMU power off" },
     .{ .name = "pid", .handler = .{ .none = cmd_pid.run } },
     .{ .name = "echo", .handler = .{ .parsed = cmd_echo.run }, .summary = "  echo [text...]  print a line" },
     .{ .name = "cat", .handler = .{ .parsed = cmd_cat.run } },
@@ -57,6 +60,7 @@ pub fn dispatch(cmd: []const u8, parsed: *const argv.Parsed) u8 {
         if (!io.eql(cmd, entry.name)) continue;
         const code = switch (entry.handler) {
             .exit => cmd_exit.run(),
+            .poweroff => cmd_poweroff.run(),
             .none => |run| run(),
             .parsed => |run| run(parsed),
         };

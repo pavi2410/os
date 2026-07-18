@@ -40,6 +40,7 @@ pub const symlink = abi.symlink;
 pub const readlink = abi.readlink;
 pub const mount = abi.mount;
 pub const umount2 = abi.umount2;
+pub const reboot = abi.reboot;
 pub const getdents64 = abi.getdents64;
 pub const clock_gettime = abi.clock_gettime;
 pub const exit_group = abi.exit_group;

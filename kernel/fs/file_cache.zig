@@ -85,6 +85,9 @@ pub fn read(
     if (!page_cache.ready()) return ops.read(file, offset, buf);
     if (offset >= file.size or buf.len == 0) return 0;
 
+    page_cache.lock();
+    defer page_cache.unlock();
+
     const total = @min(buf.len, file.size - offset);
     var done: usize = 0;
     const cache = page_cache.global();
@@ -116,6 +119,9 @@ pub fn write(
 ) filesystem.Error!usize {
     if (!page_cache.ready()) return ops.write_at(file, offset, buf);
     if (buf.len == 0) return 0;
+
+    page_cache.lock();
+    defer page_cache.unlock();
 
     var done: usize = 0;
     const cache = page_cache.global();
@@ -155,12 +161,16 @@ pub fn write(
 
 pub fn fsync(ops: *const filesystem.Ops, file: *filesystem.OpenFile) filesystem.Error!void {
     if (!page_cache.ready()) return;
+    page_cache.lock();
+    defer page_cache.unlock();
     page_cache.global().flushFile(file.id.a, file.id.b, @intFromPtr(ops)) catch return filesystem.Error.IoError;
 }
 
 /// Populate (if needed) and pin a file page; caller must `unpinPage` when unmapped.
 pub fn pinPage(ops: *const filesystem.Ops, file: filesystem.OpenFile, page_index: u64) filesystem.Error!u64 {
     if (!page_cache.ready()) return filesystem.Error.NotReady;
+    page_cache.lock();
+    defer page_cache.unlock();
     const cache = page_cache.global();
     const key = keyFor(ops, file, page_index);
     const slot = cache.getOrAlloc(key) catch return filesystem.Error.NoSpace;
@@ -170,6 +180,8 @@ pub fn pinPage(ops: *const filesystem.Ops, file: filesystem.OpenFile, page_index
 
 pub fn unpinPage(ops: *const filesystem.Ops, file: filesystem.OpenFile, page_index: u64) void {
     if (!page_cache.ready()) return;
+    page_cache.lock();
+    defer page_cache.unlock();
     page_cache.global().unpin(keyFor(ops, file, page_index));
 }
 
