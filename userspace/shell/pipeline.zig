@@ -2,6 +2,7 @@ const argv = @import("argv.zig");
 const environ = @import("environ.zig");
 const expand = @import("expand.zig");
 const io = @import("io.zig");
+const registry = @import("cmd/registry.zig");
 const status = @import("status");
 const ulib = @import("ulib");
 
@@ -83,7 +84,8 @@ pub fn run(
 
             var exec_path: [128]u8 = undefined;
             if (!resolveExecutable(cmd, &exec_path)) {
-                ulib.process.exit(127);
+                // Built-ins (echo, cat, …) are not separate /BIN binaries.
+                ulib.process.exit(registry.dispatch(cmd, &parsed));
             }
 
             var exec_argv: [argv.max_args + 1]?[*:0]const u8 = .{null} ** (argv.max_args + 1);
