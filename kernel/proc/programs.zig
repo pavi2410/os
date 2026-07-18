@@ -29,11 +29,8 @@ pub fn shellPath() []const u8 {
 }
 
 /// Read a program ELF from the mounted FAT32 volume (exact path only).
+/// Caller must `heap.kfree` the returned buffer when done.
 pub fn load(path: []const u8) LoadError![]u8 {
-    return loadAt(path);
-}
-
-fn loadAt(path: []const u8) LoadError![]u8 {
     if (!runtime.boot().vfs.isReady()) return LoadError.NotReady;
 
     const entry = fat32.lookup(path) catch |err| switch (err) {
@@ -56,9 +53,4 @@ fn loadAt(path: []const u8) LoadError![]u8 {
     if (n != entry.size) return LoadError.IoError;
 
     return buf;
-}
-
-pub fn free(image: []u8) void {
-    if (image.len == 0) return;
-    heap.kfree(image.ptr) catch {};
 }

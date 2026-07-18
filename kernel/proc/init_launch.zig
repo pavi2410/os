@@ -2,6 +2,7 @@ const process = @import("process.zig");
 const programs = @import("programs.zig");
 const scheduler = @import("scheduler.zig");
 const hal = @import("../hal.zig");
+const heap = @import("../mm/heap.zig");
 const thread = @import("thread.zig");
 const user_loader = @import("../mm/user_loader.zig");
 
@@ -16,7 +17,7 @@ pub fn launch() void {
         });
         return;
     };
-    defer programs.free(image_buf);
+    defer heap.kfree(image_buf.ptr) catch {};
 
     init_proc = process.create() catch {
         hal.console.println("init process create failed", .{});

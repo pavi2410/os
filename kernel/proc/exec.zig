@@ -2,6 +2,7 @@ const process = @import("process.zig");
 const programs = @import("programs.zig");
 const signal_mod = @import("signal.zig");
 const thread = @import("thread.zig");
+const heap = @import("../mm/heap.zig");
 const user_loader = @import("../mm/user_loader.zig");
 const mmap_mod = @import("../mm/mmap.zig");
 
@@ -50,7 +51,7 @@ pub fn execve(path: []const u8, argv: []const []const u8, envp: []const []const 
         programs.LoadError.TooLarge => return ExecError.InvalidElf,
         programs.LoadError.NotReady, programs.LoadError.IoError => return ExecError.IoError,
     };
-    defer programs.free(image_buf);
+    defer heap.kfree(image_buf.ptr) catch {};
 
     // Build the replacement image and VMA table before touching the current
     // address space. A failed execve must return to the old program intact.
