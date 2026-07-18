@@ -443,6 +443,7 @@ pub fn build(b: *std.Build) void {
     const run_syscall_user_tests = helpers.runHostTest(b, syscall_user_test_mod);
 
     const crash_util_host_mod = helpers.hostModule(b, "kernel/proc/crash_util.zig");
+    crash_util_host_mod.addImport("abi_signal", abi_host.signal);
 
     const crash_test_mod = helpers.hostTestModule(b, "test/kernel/crash_test.zig");
     crash_test_mod.addImport("crash_util", crash_util_host_mod);

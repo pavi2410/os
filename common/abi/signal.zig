@@ -107,8 +107,8 @@ pub fn waitStatusForExit(code: u32) u32 {
     return (code & 0xff) << 8;
 }
 
-pub fn waitStatusForSignal(sig: u32) u32 {
-    return sig & 0x7f;
+pub fn waitStatusForSignal(sig: Signal) u32 {
+    return sig.number() & 0x7f;
 }
 
 comptime {

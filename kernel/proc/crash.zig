@@ -85,7 +85,7 @@ pub fn log(trap: *const exc_frame.Frame, info: Info) void {
     serial.println("\n--- userspace crash ---", .{});
     serial.println("pid: {d}", .{pid});
     serial.println("exception: {s} (vector {d})", .{ exceptionName(info.vector), info.vector });
-    serial.println("signal: {s} ({d})", .{ signalName(signal), signal });
+    serial.println("signal: {s} ({d})", .{ signalName(signal), signal.number() });
 
     if (info.vector == 14) {
         const addr = info.fault_addr orelse 0;

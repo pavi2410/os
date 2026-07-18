@@ -14,7 +14,7 @@ test "signal mask helpers" {
 
 test "wait status encoding" {
     try std.testing.expectEqual(@as(u32, 0x2a00), abi_signal.waitStatusForExit(42));
-    try std.testing.expectEqual(@as(u32, 2), abi_signal.waitStatusForSignal(abi_signal.Signal.int.number()));
+    try std.testing.expectEqual(@as(u32, 2), abi_signal.waitStatusForSignal(.int));
 }
 
 test "valid signal numbers" {

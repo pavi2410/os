@@ -1,6 +1,5 @@
 const cpu = @import("../arch/x86_64/cpu.zig");
 const hal = @import("../hal.zig");
-const abi_signal = @import("abi_signal");
 const init_launch = @import("init_launch.zig");
 const preempt = @import("preempt.zig");
 const process = @import("process.zig");
@@ -204,7 +203,7 @@ pub fn yield() void {
     if (smp.cpuId() == 0) {
         tty.get().pollCtrlC();
         if (tty.get().takePendingCtrlC()) |pid| {
-            _ = signal.send(pid, abi_signal.Signal.int.number());
+            _ = signal.send(pid, .int);
         }
     }
     const self = thread.currentThread() orelse return;

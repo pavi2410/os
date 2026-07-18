@@ -1,17 +1,19 @@
 //! Signal and exception metadata shared by crash reporting.
+const abi_signal = @import("abi_signal");
+
 pub fn exitStatusForVector(vector: u64) u32 {
-    return 128 + signalForVector(vector);
+    return 128 + signalForVector(vector).number();
 }
 
-pub fn signalForVector(vector: u64) u32 {
+pub fn signalForVector(vector: u64) abi_signal.Signal {
     return switch (vector) {
-        0, 4, 7, 8 => 8, // SIGFPE
-        5 => 5, // SIGTRAP
-        6 => 4, // SIGILL
-        11 => 11, // SIGSEGV
-        13, 14 => 11, // SIGSEGV
-        17 => 7, // SIGBUS
-        else => 4, // SIGILL
+        0, 4, 7, 8 => .fpe,
+        5 => .trap,
+        6 => .ill,
+        11 => .segv,
+        13, 14 => .segv,
+        17 => .bus,
+        else => .ill,
     };
 }
 
@@ -31,15 +33,15 @@ pub fn exceptionName(vector: u64) []const u8 {
     };
 }
 
-pub fn signalName(signal: u32) []const u8 {
+pub fn signalName(signal: abi_signal.Signal) []const u8 {
     return switch (signal) {
-        2 => "SIGINT",
-        4 => "SIGILL",
-        5 => "SIGTRAP",
-        7 => "SIGBUS",
-        8 => "SIGFPE",
-        11 => "SIGSEGV",
-        17 => "SIGCHLD",
+        .int => "SIGINT",
+        .ill => "SIGILL",
+        .trap => "SIGTRAP",
+        .bus => "SIGBUS",
+        .fpe => "SIGFPE",
+        .segv => "SIGSEGV",
+        .chld => "SIGCHLD",
         else => "SIG???",
     };
 }

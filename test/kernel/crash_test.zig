@@ -2,9 +2,9 @@ const crash_util = @import("crash_util");
 const std = @import("std");
 
 test "signal mapping matches Linux conventions" {
-    try std.testing.expectEqual(@as(u32, 11), crash_util.signalForVector(14));
-    try std.testing.expectEqual(@as(u32, 11), crash_util.signalForVector(13));
-    try std.testing.expectEqual(@as(u32, 4), crash_util.signalForVector(6));
+    try std.testing.expectEqual(.segv, crash_util.signalForVector(14));
+    try std.testing.expectEqual(.segv, crash_util.signalForVector(13));
+    try std.testing.expectEqual(.ill, crash_util.signalForVector(6));
     try std.testing.expectEqual(@as(u32, 139), crash_util.exitStatusForVector(14));
 }
 

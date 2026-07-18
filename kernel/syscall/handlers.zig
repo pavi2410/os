@@ -608,8 +608,7 @@ fn sysReboot(magic1: u64, magic2: u64, cmd: u64, _: u64) i64 {
 fn sysRtSigaction(signum: u64, act_ptr: u64, oldact_ptr: u64, sigsetsize: u64) i64 {
     if (sigsetsize != abi_signal.sigset_wordsize) return errno.EINVAL;
     const proc = process.currentProcess() orelse return errno.EPERM;
-    const sig = @as(u32, @intCast(signum));
-    if (!abi_signal.isValid(sig)) return errno.EINVAL;
+    const sig = abi_signal.Signal.fromInt(@intCast(signum)) orelse return errno.EINVAL;
 
     const act = if (act_ptr != 0) user.value(abi_signal.Sigaction, act_ptr) else null;
     const old_action = signal.sigaction(proc, sig, act) catch return errno.EINVAL;
@@ -644,8 +643,7 @@ fn sysRtSigprocmask(how: u64, set_ptr: u64, oldset_ptr: u64, sigsetsize: u64) i6
 
 fn sysKill(pid: u64, sig: u64) i64 {
     if (pid == 0 or @as(i64, @bitCast(pid)) < 0) return errno.EINVAL;
-    const signum = @as(u32, @intCast(sig));
-    if (!abi_signal.isValid(signum)) return errno.EINVAL;
-    if (!signal.send(@intCast(pid), signum)) return errno.ESRCH;
+    const signal_num = abi_signal.Signal.fromInt(@intCast(sig)) orelse return errno.EINVAL;
+    if (!signal.send(@intCast(pid), signal_num)) return errno.ESRCH;
     return 0;
 }
