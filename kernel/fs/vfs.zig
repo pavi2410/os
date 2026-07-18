@@ -161,7 +161,10 @@ pub const Vfs = struct {
         if (h.kind == .dev_root) return VfsError.IsDirectory;
         if (!h.writable) return VfsError.ReadOnly;
         const ops = try handleOps(h);
-        const n = try file_cache.write(ops, &h.open, h.offset, buf);
+        const n = if (ops.use_page_cache)
+            try file_cache.write(ops, &h.open, h.offset, buf)
+        else
+            try ops.write_at(&h.open, h.offset, buf);
         h.offset += n;
         return n;
     }

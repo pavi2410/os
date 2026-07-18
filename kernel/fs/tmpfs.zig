@@ -48,6 +48,8 @@ pub const ops: filesystem.Ops = .{
     .rename = fsRename,
     .symlink = fsSymlink,
     .readlink = fsReadlink,
+    // In-memory store; bypass page cache so writes hit data_pool immediately.
+    .use_page_cache = false,
 };
 
 pub fn isReady() bool {
