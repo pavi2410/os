@@ -25,7 +25,7 @@ pub fn sigprocmask(how: i32, set: ?*const u64, oldset: ?*u64) isize {
 }
 
 pub fn kill(pid: isize, signum: u32) isize {
-    return syscall.kill(@bitCast(@as(u64, @intCast(pid))), signum);
+    return syscall.kill(@bitCast(@as(i64, pid)), signum);
 }
 
 pub fn ignore(signum: u32) isize {
