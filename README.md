@@ -92,6 +92,7 @@ poweroff
 | `test` / `test-host` | Fast host unit tests |
 | `test-in-guest` | Kernel + `/BIN/utest` TAP under QEMU |
 | `test-shell` | Serial shell smoke + disk persistence |
+| `test-smp` | QEMU `-smp` online-CPU smoke |
 | `test-extended` | Network-marked diagnostics (optional) |
 | `kill-qemu` / `clean` / `clean-disk` | Stop QEMU / wipe build or disk |
 
@@ -101,7 +102,7 @@ poweroff
 mise run test && mise run test-in-guest && mise run test-shell
 ```
 
-Rebuild ISO/disk after kernel or userspace changes — stale images can hide ABI skew. SMP smoke: `test/integration/test_smp.py` (`-smp 2` / `-smp 4`).
+Rebuild ISO/disk after kernel or userspace changes — stale images can hide ABI skew. Optional SMP gate: `mise run test-smp`.
 
 ### VirtIO disk
 

@@ -108,6 +108,19 @@ sources = [
 ]
 run = "uv run pytest test/integration/test_in_guest.py -v"
 
+[tasks."test-smp"]
+description = "Boot with -smp and verify multiple CPUs come online"
+depends = ["iso", "disk"]
+sources = [
+  "pyproject.toml",
+  "uv.lock",
+  "test/integration/test_smp.py",
+  "test/integration/shell_session.py",
+  "config/qemu.ini",
+  "scripts/qemu.py",
+]
+run = "uv run pytest test/integration/test_smp.py -v"
+
 [tasks."kill-qemu"]
 description = "Stop any QEMU instance booting this project's ISO"
 depends = ["uv-sync"]
