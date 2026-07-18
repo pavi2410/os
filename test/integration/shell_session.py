@@ -128,16 +128,20 @@ def assert_contains(window: str, needle: str, case: str) -> None:
         )
 
 
-def cat_body(window: str, path: str) -> str:
+def output_body(window: str, cmd: str) -> str:
+    """Return text after the echoed command line (TTY echo-safe)."""
     text = window.replace("\r", "")
-    needle = f"cat {path}"
-    idx = text.lower().find(needle.lower())
-    if idx < 0:
-        raise ValueError(f"{needle} not in output window")
-    rest = text[idx + len(needle) :]
+    parts = text.split(cmd, 1)
+    if len(parts) < 2:
+        raise ValueError(f"command {cmd!r} not found in output window")
+    rest = parts[1]
     if rest.startswith("\n"):
         rest = rest[1:]
-    return rest.rstrip("\n")
+    return rest
+
+
+def cat_body(window: str, path: str) -> str:
+    return output_body(window, f"cat {path}").rstrip("\n")
 
 
 def assert_cat_exact(window: str, path: str, expected: str, case: str) -> None:

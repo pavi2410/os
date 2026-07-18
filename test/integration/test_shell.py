@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import socket
 import subprocess
 import sys
@@ -10,7 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from shell_session import QemuShell, assert_cat_exact, assert_contains, sync_disk
+from shell_session import (
+    QemuShell,
+    assert_cat_exact,
+    assert_contains,
+    output_body,
+    sync_disk,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -29,8 +36,12 @@ def repo_root() -> Path:
 def run_case(shell: QemuShell, cmd: str, *needles: str, case: str | None = None) -> str:
     label = case or cmd
     window = shell.run(cmd)
+    try:
+        body = output_body(window, cmd)
+    except ValueError as exc:
+        raise AssertionError(f"{label}: {exc}\n{window}") from exc
     for needle in needles:
-        assert_contains(window, needle, label)
+        assert_contains(body, needle, label)
     return window
 
 
@@ -197,22 +208,29 @@ class TestShellEnvironment:
 
 class TestShellOperators:
     def test_and_short_circuit(self, shell_session: QemuShell) -> None:
-        window = shell_session.run("false && echo no")
-        if "\nno\n" in window or window.rstrip().endswith("no"):
+        cmd = "false && echo no"
+        window = shell_session.run(cmd)
+        body = output_body(window, cmd)
+        # Require a standalone output line; ignore the echoed command itself.
+        if re.search(r"(?m)^no$", body):
             raise AssertionError(f"&& short-circuit failed:\n{window}")
 
     def test_or_fallback(self, shell_session: QemuShell) -> None:
         run_case(shell_session, "false || echo yes", "yes", case="or runs on failure")
 
     def test_and_before_or(self, shell_session: QemuShell) -> None:
-        window = shell_session.run("true && echo a || echo b")
-        assert_contains(window, "a", "and then or")
-        if "b" in window.split("true && echo a || echo b", 1)[-1]:
+        cmd = "true && echo a || echo b"
+        window = shell_session.run(cmd)
+        body = output_body(window, cmd)
+        assert_contains(body, "a", "and then or")
+        if re.search(r"(?m)^b$", body):
             raise AssertionError(f"unexpected b in:\n{window}")
 
     def test_semicolon_with_and(self, shell_session: QemuShell) -> None:
-        window = shell_session.run("false; false && echo x")
-        if "x" in window.split("false; false && echo x", 1)[-1]:
+        cmd = "false; false && echo x"
+        window = shell_session.run(cmd)
+        body = output_body(window, cmd)
+        if re.search(r"(?m)^x$", body):
             raise AssertionError(f"unexpected x in:\n{window}")
 
 
