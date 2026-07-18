@@ -113,16 +113,40 @@ pub fn spawnWithProcess(
     name: []const u8,
     proc: ?proc_types.Id,
 ) SchedulerError!*thread.Thread {
+    // Userspace stays on the spawning CPU (init/shell). Kernel threads may be
+    // placed on another CPU via spawnOn.
+    return spawnOn(smp.cpuId(), entry, name, proc);
+}
+
+/// Enqueue a thread on `cpu_index` and IPI-wake that CPU if remote.
+pub fn spawnOn(
+    cpu_index: u32,
+    entry: thread.EntryFn,
+    name: []const u8,
+    proc: ?proc_types.Id,
+) SchedulerError!*thread.Thread {
+    const online = smp.onlineCpuCount();
+    if (cpu_index >= online) return SchedulerError.OutOfMemory;
+
     const t = thread.create(entry, name, thread.default_stack_size) catch return SchedulerError.OutOfMemory;
     t.process_id = proc;
-
-    // Run new threads on the spawning CPU. Cross-CPU migration is via IPI wake
-    // when we explicitly choose a remote CPU later; pinning avoids shipping
-    // early init/shell to an AP before userspace is proven there.
-    const target: u32 = smp.cpuId();
-
-    enqueueOn(target, t);
+    enqueueOn(cpu_index, t);
+    if (cpu_index != smp.cpuId()) {
+        requestReschedule(cpu_index);
+    }
     return t;
+}
+
+/// Start a kernel worker on each AP so work_count / IPI paths are exercised.
+pub fn startApWorkers() void {
+    const online = smp.onlineCpuCount();
+    var i: u32 = 1;
+    while (i < online) : (i += 1) {
+        _ = spawnOn(i, apWorkerEntry, "ap-worker", null) catch {
+            hal.console.println("ap-worker spawn on cpu {d} failed", .{i});
+            continue;
+        };
+    }
 }
 
 fn enqueueOn(cpu_index: u32, t: *thread.Thread) void {
@@ -176,9 +200,12 @@ pub fn yield() void {
     preemptDisable();
     defer preemptEnable();
 
-    tty.get().pollCtrlC();
-    if (tty.get().takePendingCtrlC()) |pid| {
-        _ = signal.send(pid, abi_signal.SIGINT);
+    // TTY is not SMP-safe; only the BSP polls ctrl-c.
+    if (smp.cpuId() == 0) {
+        tty.get().pollCtrlC();
+        if (tty.get().takePendingCtrlC()) |pid| {
+            _ = signal.send(pid, abi_signal.SIGINT);
+        }
     }
     const self = thread.currentThread() orelse return;
     const sched = thisSched();
@@ -261,6 +288,17 @@ fn idleEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
         yieldIfRequested();
         smp.thisCpu().idle_count += 1;
         cpu.hlt();
+    }
+}
+
+fn apWorkerEntry() callconv(.{ .x86_64_sysv = .{} }) noreturn {
+    const id = smp.cpuId();
+    hal.console.println("cpu {d} worker running", .{id});
+    while (true) {
+        smp.thisCpu().work_count += 1;
+        // Park until the LAPIC timer preempts; avoid yield()/TTY on APs.
+        cpu.hlt();
+        yieldIfRequested();
     }
 }
 

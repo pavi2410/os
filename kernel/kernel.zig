@@ -120,6 +120,7 @@ pub fn init(ctx: BootContext) void {
     rtc.init();
     initScheduler();
     smp.startAps();
+    scheduler.startApWorkers();
 
     if (boot_debug.thread_switch_test) {
         thread.runSwitchTest(10_000);

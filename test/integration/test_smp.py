@@ -30,7 +30,9 @@ def test_smp_cpus_online(repo_root: Path, smp: int) -> None:
         shell.wait_ready()
         assert_contains(shell.log, f"CPUs available: {smp}", f"smp{smp} available")
         assert_contains(shell.log, f"CPUs online: {smp}", f"smp{smp} online")
-        # Parallel fork smoke: echo via a child should still work.
+        # Kernel workers are IPI'd onto each AP.
+        for cpu in range(1, smp):
+            assert_contains(shell.log, f"cpu {cpu} worker running", f"smp{smp} worker cpu{cpu}")
         window = shell.run("echo hello-smp")
         assert_contains(window, "hello-smp", f"smp{smp} echo")
         shell.assert_no_faults()
