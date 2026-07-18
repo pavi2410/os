@@ -131,8 +131,19 @@ def build_iso() -> None:
     iso_root = stage_iso_root()
     try:
         ISO_PATH.parent.mkdir(parents=True, exist_ok=True)
-        write_iso(iso_root, ISO_PATH)
-        bios_install(ISO_PATH)
+        # Write to a temp path, bios-install, then rename so a failed install
+        # cannot leave a cached half-finished zig-out/os.iso for mise.
+        tmp_iso = ISO_PATH.with_name(ISO_PATH.name + ".tmp")
+        if tmp_iso.exists():
+            tmp_iso.unlink()
+        try:
+            write_iso(iso_root, tmp_iso)
+            bios_install(tmp_iso)
+            tmp_iso.replace(ISO_PATH)
+        except BaseException:
+            if tmp_iso.exists():
+                tmp_iso.unlink()
+            raise
     finally:
         shutil.rmtree(iso_root, ignore_errors=True)
 
